@@ -1,4 +1,4 @@
- import sys
+import sys
 import asyncio
 
 # --- Correctif de stabilité asyncio pour Windows ---
