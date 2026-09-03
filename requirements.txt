@@ -1,3 +1,6 @@
 streamlit
 google-genai
 streamlit-mic-recorder
+gspread
+oauth2client
+pandas
