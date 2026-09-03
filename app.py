@@ -3,7 +3,6 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 import json
-from datetime import datetime
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
@@ -28,7 +27,7 @@ st.markdown("""
         border-radius: 8px 8px 0px 0px;
         padding: 8px 12px;
         font-weight: 600;
-        font-size: 14px;
+        font-size: 13px;
     }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -36,8 +35,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONNEXION VIA FICHIER JSON ---
-def connect_with_json_file(uploaded_file):
+# --- CONNEXION GOOGLE SHEETS VIA FICHIER JSON ---
+def connect_with_file(uploaded_file):
     try:
         creds_dict = json.load(uploaded_file)
         scope = [
@@ -51,8 +50,9 @@ def connect_with_json_file(uploaded_file):
             sheet = client.open("MonAssistantData")
         except gspread.SpreadsheetNotFound:
             sheet = client.create("MonAssistantData")
-            sheet.values_append("Sheet1", {'valueInputOption': 'RAW'}, {'values': [['Date', 'Heure', 'Titre', 'Description']]})
-            sheet.rename_worksheet(sheet.worksheet("Sheet1"), "Agenda")
+            # Création automatique des onglets si le fichier est neuf
+            sheet.values_append("Sheet1", {'valueInputOption': 'RAW'}, {'values': [['Tache', 'Statut']]})
+            sheet.rename_worksheet(sheet.worksheet("Sheet1"), "Taches")
             
             sheet.add_worksheet(title="Notes", rows="100", cols="20")
             sheet.values_append("Notes", {'valueInputOption': 'RAW'}, {'values': [['Titre', 'Contenu']]})
@@ -64,176 +64,261 @@ def connect_with_json_file(uploaded_file):
     except Exception as e:
         return None, str(e)
 
+def connect_with_secrets():
+    try:
+        if "gcp_service_account" in st.secrets:
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            if "private_key" in creds_dict:
+                creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+            scope = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive"
+            ]
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+            client = gspread.authorize(creds)
+            return client.open("MonAssistantData")
+    except Exception:
+        return None
+    return None
+
+sheet = connect_with_secrets()
+if not sheet and "uploaded_sheet_data" in st.session_state:
+    sheet = st.session_state["uploaded_sheet_data"]
+
 # --- EN-TÊTE DE LA PAGE ---
 st.title("💡 Notre Tableau de Bord")
-st.caption("Partagé en direct 🚀")
+st.caption("Partagé en direct entre vous et votre copine 🚀")
 
-sheet = st.session_state.get("sheet_instance", None)
-
-# NAVIGATION PAR ONGLETS (Accueil, Agenda, Notes, Recettes)
-tab_accueil, tab_agenda, tab_notes, tab_recettes = st.tabs(["🏠 Accueil", "📅 Agenda", "📝 Notes", "🍲 Recettes"])
+# --- NAVIGATION PAR ONGLET (5 onglets) ---
+tab_accueil, tab_assistant, tab_taches, tab_notes, tab_recettes = st.tabs(["🏠 Accueil", "🤖 Assistant IA", "✅ Tâches", "📝 Notes", "🍲 Recettes"])
 
 # ==========================================
 # ONGLET 0 : ACCUEIL
 # ==========================================
 with tab_accueil:
     st.header("Bienvenue sur votre espace !")
-    st.write("Ce tableau de bord centralise votre agenda, vos notes et vos recettes partagées.")
-    
-    if not sheet:
-        st.warning("⚠️ Clé de configuration requise.")
-        st.write("Pour connecter l'application, déposez simplement votre fichier de clé JSON Google Cloud ci-dessous :")
-        
-        uploaded_json = st.file_uploader("Glissez votre fichier JSON ici", type=["json"])
-        if uploaded_json is not None:
-            connected_sheet, error_msg = connect_with_json_file(uploaded_json)
-            if connected_sheet:
-                st.session_state["sheet_instance"] = connected_sheet
-                st.success("Connexion réussie ! Actualisation...")
-                st.rerun()
-            else:
-                st.error(f"Erreur de connexion : {error_msg}")
-    else:
-        try:
-            agenda_count = len(sheet.worksheet("Agenda").get_all_records()) if "Agenda" in [w.title for w in sheet.worksheets()] else 0
-            notes_count = len(sheet.worksheet("Notes").get_all_records()) if "Notes" in [w.title for w in sheet.worksheets()] else 0
-            recettes_count = len(sheet.worksheet("Recettes").get_all_records()) if "Recettes" in [w.title for w in sheet.worksheets()] else 0
-            
-            c1, c2, c3 = st.columns(3)
-            with c1: st.metric(label="📅 Événements", value=agenda_count)
-            with c2: st.metric(label="📌 Notes", value=notes_count)
-            with c3: st.metric(label="🍲 Recettes", value=recettes_count)
-            
-            st.divider()
-            st.info("💡 **Astuce mobile :** Ajoutez cette application à l'écran d'accueil de votre téléphone pour l'utiliser comme une appli native !")
-        except Exception as e:
-            st.warning(f"Connecté, mais structure des onglets incomplète : {e}")
-
-# ==========================================
-# ONGLET 1 : AGENDA
-# ==========================================
-with tab_agenda:
-    st.header("📅 Agenda Partagé")
+    st.write("Ce tableau de bord centralise toutes vos idées, vos tâches, vos mémos et vos recettes.")
     
     if sheet:
         try:
             sheet_names = [w.title for w in sheet.worksheets()]
-            if "Agenda" not in sheet_names:
-                agenda_ws = sheet.add_worksheet(title="Agenda", rows="100", cols="20")
-                agenda_ws.append_row(["Date", "Heure", "Titre", "Description"])
-            else:
-                agenda_ws = sheet.worksheet("Agenda")
-                
-            all_events = agenda_ws.get_all_records()
+            taches_count = len(sheet.worksheet("Taches").get_all_records()) if "Taches" in sheet_names else 0
+            notes_count = len(sheet.worksheet("Notes").get_all_records()) if "Notes" in sheet_names else 0
+            recettes_count = len(sheet.worksheet("Recettes").get_all_records()) if "Recettes" in sheet_names else 0
             
-            if all_events:
-                st.write(f"*{len(all_events)} événement(s) prévu(s)*")
-                for index, row in enumerate(all_events):
-                    date_ev = row.get('Date', '')
-                    heure_ev = row.get('Heure', '')
-                    titre_ev = row.get('Titre', 'Sans titre')
-                    desc_ev = row.get('Description', '')
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(label="✅ Tâches", value=taches_count)
+            with col2:
+                st.metric(label="📌 Notes", value=notes_count)
+            with col3:
+                st.metric(label="🍲 Recettes", value=recettes_count)
+                
+            st.divider()
+            st.info("💡 **Astuce mobile :** Vous pouvez ajouter cette application sur l'écran d'accueil de votre téléphone pour l'utiliser comme une vraie application native !")
+        except Exception as e:
+            st.warning(f"Connecté, mais structure incomplète : {e}")
+    else:
+        st.warning("⚠️ Connexion Google Sheets requise.")
+        st.write("Pour activer l'application, déposez votre fichier de clé JSON ci-dessous :")
+        
+        uploaded_json = st.file_uploader("Fichier JSON de configuration", type=["json"])
+        if uploaded_json is not None:
+            connected_sheet, error_msg = connect_with_file(uploaded_json)
+            if connected_sheet:
+                st.session_state["uploaded_sheet_data"] = connected_sheet
+                st.success("Connexion réussie ! Actualisation en cours...")
+                st.rerun()
+            else:
+                st.error(f"Erreur de connexion : {error_msg}")
+
+# ==========================================
+# ONGLET 1 : ASSISTANT IA
+# ==========================================
+with tab_assistant:
+    st.header("Discutez avec votre assistant")
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Que voulez-vous planifier ou chercher ?"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        response = f"J'ai bien reçu votre message : '{prompt}'. Je m'en occupe !"
+        with st.chat_message("assistant"):
+            st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
+# ==========================================
+# ONGLET 2 : TÂCHES
+# ==========================================
+with tab_taches:
+    st.header("✅ Tâches à faire")
+    
+    if sheet:
+        try:
+            sheet_names = [w.title for w in sheet.worksheets()]
+            if "Taches" not in sheet_names:
+                taches_ws = sheet.add_worksheet(title="Taches", rows="100", cols="20")
+                taches_ws.append_row(["Tache", "Statut"])
+            else:
+                taches_ws = sheet.worksheet("Taches")
+                
+            all_taches = taches_ws.get_all_records()
+            
+            if all_taches:
+                st.write(f"*{len(all_taches)} tâche(s) enregistrée(s)*")
+                for index, row in enumerate(all_taches):
+                    tache_nom = row.get('Tache', 'Sans nom')
                     
-                    with st.expander(f"🗓️ {date_ev} à {heure_ev} - {titre_ev}"):
-                        if desc_ev:
-                            st.write(f"**Détails :** {desc_ev}")
-                        if st.button("🗑️ Supprimer cet événement", key=f"del_ev_{index}"):
-                            real_row_index = all_events.index(row) + 2
-                            agenda_ws.delete_rows(real_row_index)
-                            st.success("Événement supprimé !")
+                    col_t, col_b = st.columns([3, 1])
+                    with col_t:
+                        st.markdown(f"- {tache_nom}")
+                    with col_b:
+                        if st.button("✔️ Fait", key=f"del_tache_{index}"):
+                            real_row_index = all_taches.index(row) + 2
+                            taches_ws.delete_rows(real_row_index)
+                            st.success("Tâche validée !")
                             st.rerun()
             else:
-                st.info("Aucun événement dans l'agenda pour l'instant.")
+                st.info("Aucune tâche en cours. Bravo !")
                 
             st.divider()
             
-            with st.form("form_agenda", clear_on_submit=True):
-                st.subheader("➕ Ajouter un événement")
-                e_date = st.date_input("Date de l'événement", value=datetime.today())
-                e_heure = st.time_input("Heure", value=datetime.now().time())
-                e_titre = st.text_input("Titre de l'événement")
-                e_desc = st.text_area("Description (optionnel)")
-                submitted_ev = st.form_submit_button("Ajouter à l'agenda")
+            with st.form("form_tache", clear_on_submit=True):
+                st.subheader("➕ Ajouter une tâche")
+                n_tache = st.text_input("Intitulé de la tâche")
+                submitted_tache = st.form_submit_button("Ajouter la tâche")
                 
-                if submitted_ev and e_titre:
-                    agenda_ws.append_row([str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
-                    st.success("Événement ajouté avec succès !")
+                if submitted_tache and n_tache:
+                    taches_ws.append_row([n_tache, "À faire"])
+                    st.success("Tâche ajoutée !")
                     st.rerun()
         except Exception as e:
-            st.error(f"Erreur dans l'onglet Agenda : {e}")
+            st.error(f"Erreur avec l'onglet Tâches : {e}")
     else:
-        st.info("Veuillez d'abord déposer votre fichier JSON dans l'onglet Accueil.")
+        st.info("Veuillez d'abord connecter votre Google Sheet depuis l'onglet Accueil.")
 
 # ==========================================
-# ONGLET 2 : NOTES
+# ONGLET 3 : NOTES
 # ==========================================
 with tab_notes:
     st.header("Nos Notes Partagées")
+    
     if sheet:
         try:
-            notes_ws = sheet.worksheet("Notes")
+            sheet_names = [w.title for w in sheet.worksheets()]
+            if "Notes" not in sheet_names:
+                notes_ws = sheet.add_worksheet(title="Notes", rows="100", cols="20")
+                notes_ws.append_row(["Titre", "Contenu"])
+            else:
+                notes_ws = sheet.worksheet("Notes")
+                
             all_notes = notes_ws.get_all_records()
             
-            search_note = st.text_input("🔍 Rechercher dans les notes", placeholder="Mot-clé...")
-            filtered_notes = [n for n in all_notes if search_note.lower() in str(n.get('Titre','')).lower() or search_note.lower() in str(n.get('Contenu','')).lower()] if search_note else all_notes
+            search_note = st.text_input("🔍 Rechercher dans les notes", placeholder="Tapez un mot-clé...")
+            
+            if search_note:
+                filtered_notes = [n for n in all_notes if search_note.lower() in str(n.get('Titre','')).lower() or search_note.lower() in str(n.get('Contenu','')).lower()]
+            else:
+                filtered_notes = all_notes
 
             if filtered_notes:
+                st.write(f"*{len(filtered_notes)} note(s) affichée(s)*")
                 for index, row in enumerate(filtered_notes):
-                    with st.expander(f"📌 {row.get('Titre', 'Sans titre')}"):
-                        st.write(row.get('Contenu', ''))
-                        if st.button("🗑️ Supprimer", key=f"del_n_{index}"):
-                            notes_ws.delete_rows(all_notes.index(row) + 2)
+                    titre = row.get('Titre', 'Sans titre')
+                    contenu = row.get('Contenu', '')
+                    
+                    with st.expander(f"📌 {titre}"):
+                        st.write(contenu)
+                        if st.button("🗑️ Supprimer", key=f"del_note_{index}"):
+                            real_row_index = all_notes.index(row) + 2
+                            notes_ws.delete_rows(real_row_index)
+                            st.success("Note supprimée !")
                             st.rerun()
             else:
-                st.info("Aucune note.")
+                st.info("Aucune note trouvée.")
                 
             st.divider()
+            
             with st.form("form_note", clear_on_submit=True):
-                st.subheader("➕ Nouvelle note")
-                n_titre = st.text_input("Titre")
-                n_contenu = st.text_area("Contenu")
-                if st.form_submit_button("Enregistrer") and n_titre:
+                st.subheader("➕ Ajouter une nouvelle note")
+                n_titre = st.text_input("Titre de la note")
+                n_contenu = st.text_area("Contenu de la note")
+                submitted_note = st.form_submit_button("Enregistrer la note")
+                
+                if submitted_note and n_titre:
                     notes_ws.append_row([n_titre, n_contenu])
+                    st.success("Note ajoutée !")
                     st.rerun()
         except Exception as e:
-            st.error(f"Erreur : {e}")
+            st.error(f"Erreur avec l'onglet Notes : {e}")
     else:
-        st.info("Fichier JSON requis dans l'Accueil.")
+        st.info("Veuillez d'abord connecter votre Google Sheet depuis l'onglet Accueil.")
 
 # ==========================================
-# ONGLET 3 : RECETTES
+# ONGLET 4 : RECETTES
 # ==========================================
 with tab_recettes:
     st.header("Nos Recettes de Cuisine")
+    
     if sheet:
         try:
-            recettes_ws = sheet.worksheet("Recettes")
+            sheet_names = [w.title for w in sheet.worksheets()]
+            if "Recettes" not in sheet_names:
+                recettes_ws = sheet.add_worksheet(title="Recettes", rows="100", cols="20")
+                recettes_ws.append_row(["Titre", "Ingrédients", "Instructions"])
+            else:
+                recettes_ws = sheet.worksheet("Recettes")
+                
             all_recettes = recettes_ws.get_all_records()
             
-            search_rec = st.text_input("🔍 Rechercher une recette", placeholder="Ex: Pâtes...")
-            filtered_rec = [r for r in all_recettes if search_rec.lower() in str(r.get('Titre','')).lower()] if search_rec else all_recettes
+            search_recette = st.text_input("🔍 Rechercher une recette ou un ingrédient", placeholder="Ex: Pâtes...")
+            
+            if search_recette:
+                filtered_recettes = [r for r in all_recettes if search_recette.lower() in str(r.get('Titre','')).lower() or search_recette.lower() in str(r.get('Ingrédients','')).lower()]
+            else:
+                filtered_recettes = all_recettes
 
-            if filtered_rec:
-                for index, row in enumerate(filtered_rec):
-                    with st.expander(f"🍲 {row.get('Titre', 'Sans titre')}"):
-                        st.markdown(f"**Ingrédients :**\n{row.get('Ingrédients', '')}")
-                        st.markdown(f"**Instructions :**\n{row.get('Instructions', '')}")
-                        if st.button("🗑️ Supprimer", key=f"del_r_{index}"):
-                            recettes_ws.delete_rows(all_recettes.index(row) + 2)
+            if filtered_recettes:
+                st.write(f"*{len(filtered_recettes)} recette(s) affichée(s)*")
+                for index, row in enumerate(filtered_recettes):
+                    titre = row.get('Titre', 'Sans titre')
+                    ingredients = row.get('Ingrédients', '')
+                    instructions = row.get('Instructions', '')
+                    
+                    with st.expander(f"🍲 {titre}"):
+                        st.markdown(f"**🛒 Ingrédients :**\n{ingredients}")
+                        st.markdown(f"**👨‍🍳 Instructions :**\n{instructions}")
+                        
+                        if st.button("🗑️ Supprimer cette recette", key=f"del_recette_{index}"):
+                            real_row_index = all_recettes.index(row) + 2
+                            recettes_ws.delete_rows(real_row_index)
+                            st.success("Recette supprimée !")
                             st.rerun()
             else:
-                st.info("Aucune recette.")
+                st.info("Aucune recette trouvée.")
                 
             st.divider()
+            
             with st.form("form_recette", clear_on_submit=True):
-                st.subheader("➕ Nouvelle recette")
-                r_titre = st.text_input("Nom")
-                r_ing = st.text_area("Ingrédients")
-                r_inst = st.text_area("Instructions")
-                if st.form_submit_button("Enregistrer") and r_titre:
-                    recettes_ws.append_row([r_titre, r_ing, r_inst])
+                st.subheader("➕ Ajouter une nouvelle recette")
+                r_titre = st.text_input("Nom de la recette")
+                r_ingredients = st.text_area("Ingrédients nécessaires")
+                r_instructions = st.text_area("Étapes de préparation")
+                submitted_recette = st.form_submit_button("Enregistrer la recette")
+                
+                if submitted_recette and r_titre:
+                    recettes_ws.append_row([r_titre, r_ingredients, r_instructions])
+                    st.success("Recette ajoutée !")
                     st.rerun()
         except Exception as e:
-            st.error(f"Erreur : {e}")
+            st.error(f"Erreur avec l'onglet Recettes : {e}")
     else:
-        st.info("Fichier JSON requis dans l'Accueil.")
+        st.info("Veuillez d'abord connecter votre Google Sheet depuis l'onglet Accueil.")
