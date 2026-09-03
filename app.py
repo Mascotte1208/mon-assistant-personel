@@ -35,7 +35,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONNEXION GOOGLE SHEETS VIA FICHIER JSON ---
-@st.cache_resource
 def connect_with_file(uploaded_file):
     try:
         creds_dict = json.load(uploaded_file)
@@ -46,11 +45,10 @@ def connect_with_file(uploaded_file):
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         sheet = client.open("MonAssistantData")
-        return sheet
+        return sheet, None
     except Exception as e:
-        return None
+        return None, str(e)
 
-@st.cache_resource
 def connect_with_secrets():
     try:
         if "gcp_service_account" in st.secrets:
@@ -68,7 +66,6 @@ def connect_with_secrets():
         return None
     return None
 
-# Tentative de récupération depuis la session ou les secrets
 sheet = connect_with_secrets()
 if not sheet and "uploaded_sheet_data" in st.session_state:
     sheet = st.session_state["uploaded_sheet_data"]
@@ -108,13 +105,13 @@ with tab_accueil:
         
         uploaded_json = st.file_uploader("Fichier JSON de configuration", type=["json"])
         if uploaded_json is not None:
-            connected_sheet = connect_with_file(uploaded_json)
+            connected_sheet, error_msg = connect_with_file(uploaded_json)
             if connected_sheet:
                 st.session_state["uploaded_sheet_data"] = connected_sheet
                 st.success("Connexion réussie ! Actualisation en cours...")
                 st.rerun()
             else:
-                st.error("Impossible de se connecter avec ce fichier. Vérifiez qu'il s'agit bien de la bonne clé Google Cloud.")
+                st.error(f"Erreur de connexion : {error_msg}")
 
 # ==========================================
 # ONGLET 1 : ASSISTANT IA
