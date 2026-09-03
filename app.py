@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
@@ -11,16 +10,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLE CSS PERSONNALISÉ (Design & Mobile-friendly) ---
+# --- STYLE CSS PERSONNALISÉ ---
 st.markdown("""
     <style>
-    /* Style global et arrondis */
     .stButton button {
         border-radius: 12px;
         width: 100%;
         font-weight: bold;
     }
-    /* Style des conteneurs d'onglets */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
@@ -29,21 +26,19 @@ st.markdown("""
         padding: 10px 16px;
         font-weight: 600;
     }
-    /* Masquer les éléments techniques par défaut de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONNEXION GOOGLE SHEETS ---
+# --- CONNEXION GOOGLE SHEETS (Version simplifiée & robuste) ---
 @st.cache_resource
 def init_connection():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     if "gcp_service_account" in st.secrets:
         creds_dict = dict(st.secrets["gcp_service_account"])
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
+        # Connexion directe via gspread sans oauth2client
+        client = gspread.service_account_from_dict(creds_dict)
         sheet = client.open("MonAssistantData")
         return sheet
     else:
@@ -67,7 +62,6 @@ with tab_accueil:
     
     if sheet:
         try:
-            # Récupération rapide pour l'affichage du résumé
             notes_count = len(sheet.worksheet("Notes").get_all_records())
             recettes_count = len(sheet.worksheet("Recettes").get_all_records())
             
@@ -118,10 +112,8 @@ with tab_notes:
             notes_ws = sheet.worksheet("Notes")
             all_notes = notes_ws.get_all_records()
             
-            # Barre de recherche instantanée
             search_note = st.text_input("🔍 Rechercher dans les notes", placeholder="Tapez un mot-clé...")
             
-            # Filtrage dynamique
             if search_note:
                 filtered_notes = [n for n in all_notes if search_note.lower() in str(n.get('Titre','')).lower() or search_note.lower() in str(n.get('Contenu','')).lower()]
             else:
@@ -135,9 +127,7 @@ with tab_notes:
                     
                     with st.expander(f"📌 {titre}"):
                         st.write(contenu)
-                        # Option de suppression (basée sur la ligne réelle dans le sheet)
                         if st.button("🗑️ Supprimer cette note", key=f"del_note_{index}"):
-                            # +2 car les lignes commencent à 1 et l'en-tête prend la ligne 1
                             real_row_index = all_notes.index(row) + 2
                             notes_ws.delete_rows(real_row_index)
                             st.success("Note supprimée !")
@@ -147,7 +137,6 @@ with tab_notes:
                 
             st.divider()
             
-            # Formulaire d'ajout propre
             with st.form("form_note", clear_on_submit=True):
                 st.subheader("➕ Ajouter une nouvelle note")
                 n_titre = st.text_input("Titre de la note")
@@ -172,11 +161,10 @@ with tab_recettes:
             recettes_ws = sheet.worksheet("Recettes")
             all_recettes = recettes_ws.get_all_records()
             
-            # Barre de recherche instantanée
             search_recette = st.text_input("🔍 Rechercher une recette ou un ingrédient", placeholder="Ex: Pâtes, chocolat...")
             
             if search_recette:
-                filtered_recettes = [r for r in all_recettes if search_recette.lower() in str(r.get('Titre','')).lower() or search_note.lower() in str(r.get('Ingrédients','')).lower()] # Corrigé
+                filtered_recettes = [r for r in all_recettes if search_recette.lower() in str(r.get('Titre','')).lower() or search_recette.lower() in str(r.get('Ingrédients','')).lower()]
             else:
                 filtered_recettes = all_recettes
 
