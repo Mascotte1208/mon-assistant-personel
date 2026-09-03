@@ -13,68 +13,81 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLE CSS ULTRA-MODERNE ET ÉPURÉ ---
+# --- BALISES PWA & NATIVE MOBILE ---
+st.markdown("""
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#6366f1" />
+        <link rel="apple-touch-icon" href="https://img.icons8.com/emoji/192/sparkles-emoji.png" />
+    </head>
+""", unsafe_allow_html=True)
+
+# --- STYLE CSS APPLI NATIVE ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
-    /* Style Global */
+    /* Configuration Écran Mobile */
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
         background-color: #f8fafc;
         color: #0f172a;
+        -webkit-tap-highlight-color: transparent;
     }
     
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* Conteneur principal */
+    /* Centrage et marges tactiles */
     .block-container {
-        padding-top: 1.5rem !important;
-        padding-bottom: 3rem !important;
-        max-width: 600px !important;
+        padding-top: 1.2rem !important;
+        padding-bottom: 4rem !important;
+        max-width: 550px !important;
     }
 
-    /* Style des Onglets Principaux (Barre Tactile) */
+    /* Barre d'Onglets Tactiles (PWA Bottom-Nav Style) */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
         background-color: #e2e8f0;
         padding: 6px;
-        border-radius: 20px;
+        border-radius: 22px;
         overflow-x: auto;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 14px;
-        padding: 10px 16px;
+        border-radius: 16px;
+        padding: 10px 14px;
         font-weight: 700;
         font-size: 13px;
         color: #64748b;
         background-color: transparent;
         border: none;
         white-space: nowrap;
-        transition: all 0.2s ease;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
         color: #4f46e5 !important;
-        box-shadow: 0 4px 14px rgba(79, 70, 229, 0.15);
+        box-shadow: 0 4px 16px rgba(79, 70, 229, 0.18);
     }
 
-    /* Cartes Dashboard modernes */
+    /* Cartes Tactiles */
     .widget-card {
         background: #ffffff;
         border: 1px solid #f1f5f9;
         border-radius: 22px;
-        padding: 20px;
+        padding: 18px;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04);
         margin-bottom: 12px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
-    .widget-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 14px 28px -5px rgba(0, 0, 0, 0.07);
+    .widget-card:active {
+        transform: scale(0.98);
+        box-shadow: 0 6px 14px -5px rgba(0, 0, 0, 0.06);
     }
     .widget-title {
         font-size: 11px;
@@ -84,10 +97,10 @@ st.markdown("""
         letter-spacing: 0.9px;
     }
     .widget-value {
-        font-size: 28px;
+        font-size: 26px;
         font-weight: 800;
         color: #0f172a;
-        margin-top: 4px;
+        margin-top: 2px;
     }
     .widget-sub {
         font-size: 12px;
@@ -96,7 +109,7 @@ st.markdown("""
         margin-top: 2px;
     }
 
-    /* Badges de Statut */
+    /* Badges */
     .badge-tag {
         display: inline-block;
         padding: 3px 10px;
@@ -107,39 +120,34 @@ st.markdown("""
         color: #4338ca;
     }
 
-    /* Boutons Modernisés */
+    /* Boutons Tactiles */
     .stButton button {
-        border-radius: 14px;
+        border-radius: 16px;
         font-weight: 700;
         font-size: 14px;
         background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
         color: white;
         border: none;
-        padding: 12px 20px;
-        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
-        transition: all 0.2s ease;
+        padding: 14px 20px;
+        box-shadow: 0 4px 16px rgba(99, 102, 241, 0.28);
+        transition: all 0.15s ease;
     }
-    .stButton button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
+    .stButton button:active {
+        transform: scale(0.96);
     }
 
-    /* Formulaires & Input Fields */
+    /* Formulaires fluides sans zoom */
     .stTextInput input, .stTextArea textarea, .stSelectbox select {
-        border-radius: 14px !important;
+        border-radius: 16px !important;
         border: 1px solid #e2e8f0 !important;
-        padding: 10px 14px !important;
+        padding: 12px 16px !important;
+        font-size: 16px !important; /* Empêche le zoom auto sur iPhone */
         background-color: #ffffff !important;
     }
-    .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: #6366f1 !important;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
-    }
 
-    /* Expanders / Accordéons Épurés */
     .streamlit-expanderHeader {
         background-color: #ffffff !important;
-        border-radius: 16px !important;
+        border-radius: 18px !important;
         border: 1px solid #f1f5f9 !important;
         font-weight: 700 !important;
         color: #1e293b !important;
@@ -174,7 +182,7 @@ if "json_credentials_str" not in st.session_state:
 
 # --- EN-TÊTE PRINCIPAL ---
 st.markdown("<h1 style='text-align: center; font-weight: 800; color: #0f172a; margin-bottom: 0px;'>✨ Notre Espace</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 13px; font-weight: 600; color: #64748b; margin-top: 4px; margin-bottom: 24px;'>Tableau de bord partagé — <b>Lucas & Alex</b></p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 13px; font-weight: 600; color: #64748b; margin-top: 4px; margin-bottom: 20px;'>Tableau de bord partagé — <b>Lucas & Alex</b></p>", unsafe_allow_html=True)
 
 # --- NAVIGATION RESTRUCTURÉE (5 SUPER-ONGLETS) ---
 tab_dash, tab_quotidien, tab_budget_adv, tab_pro, tab_loisirs = st.tabs([
@@ -182,7 +190,7 @@ tab_dash, tab_quotidien, tab_budget_adv, tab_pro, tab_loisirs = st.tabs([
 ])
 
 # ==========================================
-# SUPER-ONGLET 1 : DASHBOARD VISUEL
+# SUPER-ONGLET 1 : DASHBOARD VISUEL & PWA
 # ==========================================
 with tab_dash:
     if not st.session_state["json_credentials_str"]:
@@ -280,6 +288,13 @@ with tab_dash:
             ''', unsafe_allow_html=True)
 
         st.divider()
+        
+        with st.expander("📲 **Installer sur Smartphone (Mode App)**"):
+            st.markdown("""
+            * **Sur iPhone (Safari) :** Appuyez sur le bouton de partage <span style='font-size:16px;'>🔗</span> puis sélectionnez **"Sur l'écran d'accueil"**.
+            * **Sur Android (Chrome) :** Appuyez sur les 3 points <span style='font-size:16px;'>⋮</span> puis sélectionnez **"Installer l'application"**.
+            """)
+
         col_act1, col_act2 = st.columns(2)
         with col_act1:
             if st.button("🔄 Actualiser"):
