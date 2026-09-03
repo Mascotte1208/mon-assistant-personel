@@ -79,7 +79,7 @@ st.caption("Partagé en direct entre vous et votre copine 🚀")
 if not sheet:
     st.sidebar.header("🔑 Configuration Google Sheets")
     uploaded_json = st.sidebar.file_uploader("Glissez-déposez votre fichier JSON Google Cloud ici", type=["json"])
-    if uploaded_json is not للص: # simple check
+    if uploaded_json is not None:
         sheet = connect_with_file(uploaded_json)
 
 # --- NAVIGATION PAR ONGLET ---
@@ -108,7 +108,7 @@ with tab_accueil:
         except Exception as e:
             st.warning("Impossible de charger les statistiques d'accueil pour le moment.")
     else:
-        st.warning("⚠️ Pour activer le tableau partagé, veuillez glisser-déposer votre fichier de clé JSON dans le menu latéral (icône ☰ ou > en haut à gauche sur mobile).")
+        st.warning("⚠️ Pour activer le tableau partagé, veuillez glisser-déposez votre fichier de clé JSON dans le menu latéral (icône ☰ ou > en haut à gauche sur mobile).")
 
 # ==========================================
 # ONGLET 1 : ASSISTANT IA
