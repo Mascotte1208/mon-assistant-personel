@@ -102,6 +102,7 @@ with tab_accueil:
     if sheet:
         try:
             sheet_names = [w.title for w in sheet.worksheets()]
+            
             taches_count = len(sheet.worksheet("Taches").get_all_records()) if "Taches" in sheet_names else 0
             notes_count = len(sheet.worksheet("Notes").get_all_records()) if "Notes" in sheet_names else 0
             recettes_count = len(sheet.worksheet("Recettes").get_all_records()) if "Recettes" in sheet_names else 0
@@ -120,9 +121,9 @@ with tab_accueil:
             st.warning(f"Connecté, mais structure incomplète : {e}")
     else:
         st.warning("⚠️ Connexion Google Sheets requise.")
-        st.write("Pour activer l'application, déposez votre fichier de clé JSON ci-dessous :")
+        st.write("Pour activer l'application, **glissez et déposez votre fichier de clé JSON** ci-dessous :")
         
-        uploaded_json = st.file_uploader("Fichier JSON de configuration", type=["json"])
+        uploaded_json = st.file_uploader("Glissez votre fichier JSON de configuration ici", type=["json"])
         if uploaded_json is not None:
             connected_sheet, error_msg = connect_with_file(uploaded_json)
             if connected_sheet:
