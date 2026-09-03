@@ -38,12 +38,11 @@ st.markdown("""
 @st.cache_resource
 def get_sheet_connection(sheet_url):
     try:
-        client = gspread.service_account(filename="secrets.json") # Si un fichier local existe
+        client = gspread.service_account(filename="secrets.json")
         sheet = client.open_by_url(sheet_url)
         return sheet
     except Exception:
         try:
-            # Connexion alternative si le sheet est partagé publiquement avec le lien
             client = gspread.no_credentials()
             sheet = client.open_by_url(sheet_url)
             return sheet
@@ -54,14 +53,14 @@ def get_sheet_connection(sheet_url):
 st.title("💡 Notre Tableau de Bord")
 st.caption("Partagé en direct 🚀")
 
-# Configuration de l'URL du Google Sheet (Vous pouvez coller l'URL de votre Google Sheet ici ou dans un secret)
-sheet_url = st.secrets.get("sheet_url", "")
+# Récupération de l'URL depuis les secrets ou la session
+sheet_url = st.secrets.get("sheet_url", st.session_state.get("sheet_url", ""))
 
 sheet = None
 if sheet_url:
     sheet = get_sheet_connection(sheet_url)
 
-# NAVIGATION PAR ONGLETS (Ajout de l'Agenda)
+# NAVIGATION PAR ONGLETS
 tab_accueil, tab_agenda, tab_notes, tab_recettes = st.tabs(["🏠 Accueil", "📅 Agenda", "📝 Notes", "🍲 Recettes"])
 
 # ==========================================
@@ -75,7 +74,7 @@ with tab_accueil:
         st.warning("⚠️ Veuillez configurer l'URL de votre Google Sheet.")
         new_url = st.text_input("Collez le lien de votre Google Sheet ici :")
         if new_url:
-            st.secrets["sheet_url"] = new_url
+            st.session_state["sheet_url"] = new_url
             st.rerun()
     elif sheet:
         try:
@@ -96,14 +95,13 @@ with tab_accueil:
         st.error("Impossible d'accéder au Google Sheet. Vérifiez que le lien est correct et accessible.")
 
 # ==========================================
-# ONGLET 1 : AGENDA (NOUVEAU)
+# ONGLET 1 : AGENDA
 # ==========================================
 with tab_agenda:
     st.header("📅 Agenda Partagé")
     
     if sheet:
         try:
-            # Vérifier si l'onglet Agenda existe, sinon le créer
             sheet_names = [w.title for w in sheet.worksheets()]
             if "Agenda" not in sheet_names:
                 agenda_ws = sheet.add_worksheet(title="Agenda", rows="100", cols="20")
@@ -147,7 +145,7 @@ with tab_agenda:
                     st.success("Événement ajouté avec succès !")
                     st.rerun()
         except Exception as e:
-                    st.error(f"Erreur dans l'onglet Agenda : {e}")
+            st.error(f"Erreur dans l'onglet Agenda : {e}")
     else:
         st.info("Veuillez d'abord configurer le lien Google Sheet dans l'accueil.")
 
