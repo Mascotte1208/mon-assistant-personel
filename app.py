@@ -122,6 +122,18 @@ def connect_with_file(uploaded_file):
             sheet.add_worksheet(title="Saiko", rows="100", cols="20")
             sheet.values_append("Saiko", {'valueInputOption': 'RAW'}, {'values': [['Date', 'Type', 'Sujet', 'Notes']]})
             
+            sheet.add_worksheet(title="Budget", rows="100", cols="20")
+            sheet.values_append("Budget", {'valueInputOption': 'RAW'}, {'values': [['Date', 'Payé Par', 'Intitulé', 'Montant']]})
+
+            sheet.add_worksheet(title="Repas", rows="100", cols="20")
+            sheet.values_append("Repas", {'valueInputOption': 'RAW'}, {'values': [['Jour', 'Repas', 'Plat']]})
+
+            sheet.add_worksheet(title="Admin", rows="100", cols="20")
+            sheet.values_append("Admin", {'valueInputOption': 'RAW'}, {'values': [['Sujet', 'Echéance', 'Détails']]})
+
+            sheet.add_worksheet(title="Listes", rows="100", cols="20")
+            sheet.values_append("Listes", {'valueInputOption': 'RAW'}, {'values': [['Catégorie', 'Élément', 'Notes']]})
+            
         return sheet, None
     except Exception as e:
         return None, str(e)
@@ -152,8 +164,8 @@ st.markdown("## ✨ Notre Espace Partagé")
 st.caption("Centralisez votre quotidien à deux, en toute simplicité 🚀")
 
 # --- NAVIGATION PAR ONGLETS ---
-tab_accueil, tab_agenda, tab_taches, tab_courses, tab_saiko, tab_notes, tab_recettes = st.tabs([
-    "🏠 Accueil", "📅 Agenda", "✅ Tâches", "🛒 Courses", "🐶 Saiko", "📝 Notes", "🍲 Recettes"
+tab_accueil, tab_agenda, tab_taches, tab_courses, tab_saiko, tab_budget, tab_repas, tab_admin, tab_listes, tab_notes, tab_recettes = st.tabs([
+    "🏠 Accueil", "📅 Agenda", "✅ Tâches", "🛒 Courses", "🐶 Saiko", "💶 Budget", "🍽️ Repas", "🏡 Admin", "🧳 Listes", "📝 Notes", "🍲 Recettes"
 ])
 
 # ==========================================
@@ -399,7 +411,239 @@ with tab_saiko:
         st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
 # ==========================================
-# ONGLET 5 : NOTES
+# ONGLET 5 : BUDGET PARTAGÉ (NOUVEAU)
+# ==========================================
+with tab_budget:
+    st.subheader("💶 Budget & Comptes du Couple")
+    st.caption("Équilibrez vos dépenses communes en toute simplicité")
+    if sheet:
+        try:
+            ws_names = [w.title for w in sheet.worksheets()]
+            budget_ws = sheet.worksheet("Budget") if "Budget" in ws_names else sheet.add_worksheet(title="Budget", rows="100", cols="20")
+            
+            all_vals = budget_ws.get_all_values()
+            if len(all_vals) <= 1:
+                budget_ws.append_row(["Date", "Payé Par", "Intitulé", "Montant"])
+                all_vals = [["Date", "Payé Par", "Intitulé", "Montant"]]
+
+            budget_data = all_vals[1:]
+            total_lucas = 0.0
+            total_alexia = 0.0
+
+            if budget_data:
+                for row in budget_data:
+                    payer = row[1] if len(row) > 1 else ""
+                    try:
+                        amt = float(row[3].replace(',', '.')) if len(row) > 3 else 0.0
+                    except ValueError:
+                        amt = 0.0
+
+                    if payer == "Lucas":
+                        total_lucas += amt
+                    elif payer == "Alexia":
+                        total_alexia += amt
+
+                # Calcul du bilan
+                diff = (total_lucas - total_alexia) / 2
+                
+                b1, b2 = st.columns(2)
+                with b1:
+                    st.metric(label="Total payé par Lucas", value=f"{total_lucas:.2f} €")
+                with b2:
+                    st.metric(label="Total payé par Alexia", value=f"{total_alexia:.2f} €")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                if diff > 0:
+                    st.success(f"👉 **Alexia doit {diff:.2f} € à Lucas** pour équilibrer les comptes.")
+                elif diff < 0:
+                    st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alexia** pour équilibrer les comptes.")
+                else:
+                    st.info("⚖️ Les comptes sont parfaitement équilibrés !")
+
+                st.divider()
+                st.markdown("#### Historique des dépenses")
+                for idx, row in enumerate(budget_data):
+                    dt = row[0] if len(row) > 0 else ""
+                    pyr = row[1] if len(row) > 1 else ""
+                    lbl = row[2] if len(row) > 2 else ""
+                    val = row[3] if len(row) > 3 else "0"
+                    real_idx = all_vals.index(row) + 1
+                    
+                    c_info, c_del = st.columns([4, 1])
+                    with c_info:
+                        st.markdown(f"- **{lbl}** : {val} € *(Payé par {pyr} le {dt})*")
+                    with c_del:
+                        if st.button("🗑️", key=f"del_b_{idx}_{real_idx}"):
+                            budget_ws.delete_rows(real_idx)
+                            st.rerun()
+            else:
+                st.info("Aucune dépense enregistrée pour le moment.")
+
+            st.divider()
+            with st.form("form_budget", clear_on_submit=True):
+                st.markdown("#### ➕ Ajouter une dépense commune")
+                b_date = st.date_input("Date", value=datetime.today())
+                b_payer = st.radio("Qui a payé ?", ["Lucas", "Alexia"], horizontal=True)
+                b_label = st.text_input("Intitulé (ex: Courses, Resto, Facture Internet...)")
+                b_amount = st.number_input("Montant (€)", min_value=0.0, step=0.5, format="%.2f")
+                if st.form_submit_button("Ajouter la dépense") and b_label and b_amount > 0:
+                    budget_ws.append_row([str(b_date), b_payer, b_label, str(b_amount)])
+                    st.rerun()
+        except Exception as e:
+            st.error(f"Erreur Budget : {e}")
+    else:
+        st.info("Veuillez connecter votre fichier dans l'Accueil.")
+
+# ==========================================
+# ONGLET 6 : PLANNING REPAS (NOUVEAU)
+# ==========================================
+with tab_repas:
+    st.subheader("🍽️ Planning des Repas de la Semaine")
+    if sheet:
+        try:
+            ws_names = [w.title for w in sheet.worksheets()]
+            repas_ws = sheet.worksheet("Repas") if "Repas" in ws_names else sheet.add_worksheet(title="Repas", rows="100", cols="20")
+            
+            all_vals = repas_ws.get_all_values()
+            if len(all_vals) <= 1:
+                repas_ws.append_row(["Jour", "Repas", "Plat"])
+                all_vals = [["Jour", "Repas", "Plat"]]
+
+            repas_data = all_vals[1:]
+            jours = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+
+            for jour in jours:
+                st.markdown(f"##### 📅 {jour}")
+                repas_j = [r for r in repas_data if len(r) > 0 and r[0] == jour]
+                if repas_j:
+                    for r in repas_j:
+                        typ = r[1] if len(r) > 1 else ""
+                        plt = r[2] if len(r) > 2 else ""
+                        real_idx = all_vals.index(r) + 1
+                        
+                        col_m, col_d = st.columns([4, 1])
+                        with col_m:
+                            st.write(f"- **{typ}** : {plt}")
+                        with col_d:
+                            if st.button("🗑️", key=f"del_rep_{real_idx}"):
+                                repas_ws.delete_rows(real_idx)
+                                st.rerun()
+                else:
+                    st.caption("Rien de prévu")
+
+            st.divider()
+            with st.form("form_repas", clear_on_submit=True):
+                st.markdown("#### ➕ Ajouter un plat au planning")
+                r_jour = st.selectbox("Jour", jours)
+                r_type = st.radio("Repas", ["Midi", "Soir"], horizontal=True)
+                r_plat = st.text_input("Nom du plat / Recette")
+                if st.form_submit_button("Ajouter au planning") and r_plat:
+                    repas_ws.append_row([r_jour, r_type, r_plat])
+                    st.rerun()
+        except Exception as e:
+            st.error(f"Erreur Repas : {e}")
+    else:
+        st.info("Veuillez connecter votre fichier dans l'Accueil.")
+
+# ==========================================
+# ONGLET 7 : LOGEMENT & ADMIN (NOUVEAU)
+# ==========================================
+with tab_admin:
+    st.subheader("🏡 Logement & Administratif")
+    st.caption("Rappels de factures, documents, bail & contacts importants")
+    if sheet:
+        try:
+            ws_names = [w.title for w in sheet.worksheets()]
+            admin_ws = sheet.worksheet("Admin") if "Admin" in ws_names else sheet.add_worksheet(title="Admin", rows="100", cols="20")
+            
+            all_vals = admin_ws.get_all_values()
+            if len(all_vals) <= 1:
+                admin_ws.append_row(["Sujet", "Echéance", "Détails"])
+                all_vals = [["Sujet", "Echéance", "Détails"]]
+
+            admin_data = all_vals[1:]
+            if admin_data:
+                for idx, row in enumerate(admin_data):
+                    sj = row[0] if len(row) > 0 else "Sujet"
+                    ec = row[1] if len(row) > 1 else ""
+                    dt = row[2] if len(row) > 2 else ""
+                    real_idx = all_vals.index(row) + 1
+                    
+                    with st.expander(f"📋 {sj} {f'(Échéance : {ec})' if ec else ''}"):
+                        if dt:
+                            st.write(dt)
+                        if st.button("🗑️ Supprimer", key=f"del_adm_{idx}_{real_idx}"):
+                            admin_ws.delete_rows(real_idx)
+                            st.rerun()
+            else:
+                st.info("Aucun mémo administratif enregistré.")
+
+            st.divider()
+            with st.form("form_admin", clear_on_submit=True):
+                st.markdown("#### ➕ Ajouter une note administrative")
+                a_sujet = st.text_input("Sujet (ex: Contrôle technique, Assurance, Propriétaire...)")
+                a_echeance = st.text_input("Date / Échéance (ex: 15/10/2026, Annuel...)")
+                a_details = st.text_area("Détails / N° de contrat / Téléphone")
+                if st.form_submit_button("Enregistrer") and a_sujet:
+                    admin_ws.append_row([a_sujet, a_echeance, a_details])
+                    st.rerun()
+        except Exception as e:
+            st.error(f"Erreur Admin : {e}")
+    else:
+        st.info("Veuillez connecter votre fichier dans l'Accueil.")
+
+# ==========================================
+# ONGLET 8 : LISTES & CADEAUX (NOUVEAU)
+# ==========================================
+with tab_listes:
+    st.subheader("🧳 Checklists & Idées Cadeaux")
+    if sheet:
+        try:
+            ws_names = [w.title for w in sheet.worksheets()]
+            listes_ws = sheet.worksheet("Listes") if "Listes" in ws_names else sheet.add_worksheet(title="Listes", rows="100", cols="20")
+            
+            all_vals = listes_ws.get_all_values()
+            if len(all_vals) <= 1:
+                listes_ws.append_row(["Catégorie", "Élément", "Notes"])
+                all_vals = [["Catégorie", "Élément", "Notes"]]
+
+            listes_data = all_vals[1:]
+            cat_listes = st.radio("Type de liste", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
+
+            filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_listes] if listes_data else []
+
+            if filtered:
+                for idx, row in enumerate(filtered):
+                    elm = row[1] if len(row) > 1 else ""
+                    nts = row[2] if len(row) > 2 else ""
+                    real_idx = all_vals.index(row) + 1
+                    
+                    c_i, c_d = st.columns([4, 1])
+                    with c_i:
+                        st.markdown(f"- **{elm}** {f'(*{nts}*)' if nts else ''}")
+                    with c_d:
+                        if st.button("🗑️", key=f"del_lst_{idx}_{real_idx}"):
+                            listes_ws.delete_rows(real_idx)
+                            st.rerun()
+            else:
+                st.info("Aucun élément dans cette liste.")
+
+            st.divider()
+            with st.form("form_listes", clear_on_submit=True):
+                st.markdown("#### ➕ Ajouter un élément")
+                l_cat = st.selectbox("Liste", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"])
+                l_elem = st.text_input("Élément / Idée")
+                l_notes = st.text_input("Notes / Taille / Prix (optionnel)")
+                if st.form_submit_button("Ajouter à la liste") and l_elem:
+                    listes_ws.append_row([l_cat, l_elem, l_notes])
+                    st.rerun()
+        except Exception as e:
+            st.error(f"Erreur Listes : {e}")
+    else:
+        st.info("Veuillez connecter votre fichier dans l'Accueil.")
+
+# ==========================================
+# ONGLET 9 : NOTES
 # ==========================================
 with tab_notes:
     st.subheader("📝 Notes Partagées")
@@ -449,7 +693,7 @@ with tab_notes:
         st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
 # ==========================================
-# ONGLET 6 : RECETTES
+# ONGLET 10 : RECETTES
 # ==========================================
 with tab_recettes:
     st.subheader("🍲 Recettes de Cuisine")
