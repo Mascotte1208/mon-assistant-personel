@@ -68,19 +68,14 @@ def connect_with_secrets():
         return None
     return None
 
-# Tentative de connexion via les secrets, sinon via le fichier téléchargé
+# Tentative de récupération depuis la session ou les secrets
 sheet = connect_with_secrets()
+if not sheet and "uploaded_sheet_data" in st.session_state:
+    sheet = st.session_state["uploaded_sheet_data"]
 
-# --- EN-TÊTE DE L'APPLICATION ---
+# --- EN-TÊTE DE LA PAGE ---
 st.title("💡 Notre Tableau de Bord")
 st.caption("Partagé en direct entre vous et votre copine 🚀")
-
-# Si la connexion n'est pas établie, on propose d'importer le fichier JSON directement
-if not sheet:
-    st.sidebar.header("🔑 Configuration Google Sheets")
-    uploaded_json = st.sidebar.file_uploader("Glissez-déposez votre fichier JSON Google Cloud ici", type=["json"])
-    if uploaded_json is not None:
-        sheet = connect_with_file(uploaded_json)
 
 # --- NAVIGATION PAR ONGLET ---
 tab_accueil, tab_assistant, tab_notes, tab_recettes = st.tabs(["🏠 Accueil", "🤖 Assistant IA", "📝 Notes", "🍲 Recettes"])
@@ -108,7 +103,18 @@ with tab_accueil:
         except Exception as e:
             st.warning("Impossible de charger les statistiques d'accueil pour le moment.")
     else:
-        st.warning("⚠️ Pour activer le tableau partagé, veuillez glisser-déposez votre fichier de clé JSON dans le menu latéral (icône ☰ ou > en haut à gauche sur mobile).")
+        st.warning("⚠️ Connexion Google Sheets requise.")
+        st.write("Pour activer l'application, déposez votre fichier de clé JSON ci-dessous :")
+        
+        uploaded_json = st.file_uploader("Fichier JSON de configuration", type=["json"])
+        if uploaded_json is not None:
+            connected_sheet = connect_with_file(uploaded_json)
+            if connected_sheet:
+                st.session_state["uploaded_sheet_data"] = connected_sheet
+                st.success("Connexion réussie ! Actualisation en cours...")
+                st.rerun()
+            else:
+                st.error("Impossible de se connecter avec ce fichier. Vérifiez qu'il s'agit bien de la bonne clé Google Cloud.")
 
 # ==========================================
 # ONGLET 1 : ASSISTANT IA
@@ -182,7 +188,7 @@ with tab_notes:
         except Exception as e:
             st.error(f"Erreur avec l'onglet Notes : {e}")
     else:
-        st.info("Veuillez importer votre fichier de clés dans le menu latéral pour accéder aux notes.")
+        st.info("Veuillez d'abord connecter votre Google Sheet depuis l'onglet Accueil.")
 
 # ==========================================
 # ONGLET 3 : RECETTES
@@ -237,4 +243,4 @@ with tab_recettes:
         except Exception as e:
             st.error(f"Erreur avec l'onglet Recettes : {e}")
     else:
-        st.info("Veuillez importer votre fichier de clés dans le menu latéral pour accéder aux recettes.")
+        st.info("Veuillez d'abord connecter votre Google Sheet depuis l'onglet Accueil.")
