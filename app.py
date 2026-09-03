@@ -4,72 +4,87 @@ import gspread
 from google.oauth2.service_account import Credentials
 import json
 from datetime import datetime
-import io
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
-    page_title="Notre Assistant Partagé", 
-    page_icon="⚡", 
+    page_title="Notre Assistant", 
+    page_icon="✨", 
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLE CSS DESIGN & MOBILE-FIRST ---
+# --- STYLE CSS ULTRA-MODERNE ET ÉPURÉ ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
+    /* Style Global */
     html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
         background-color: #f8fafc;
+        color: #0f172a;
     }
     
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* Style des Onglets Principaux */
+    /* Conteneur principal */
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 3rem !important;
+        max-width: 600px !important;
+    }
+
+    /* Style des Onglets Principaux (Barre Tactile) */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
-        background-color: #f1f5f9;
-        padding: 8px;
+        background-color: #e2e8f0;
+        padding: 6px;
         border-radius: 20px;
         overflow-x: auto;
+        margin-bottom: 12px;
     }
     .stTabs [data-baseweb="tab"] {
         border-radius: 14px;
-        padding: 10px 14px;
+        padding: 10px 16px;
         font-weight: 700;
         font-size: 13px;
         color: #64748b;
         background-color: transparent;
         border: none;
         white-space: nowrap;
+        transition: all 0.2s ease;
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
-        color: #6366f1 !important;
-        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.15);
+        color: #4f46e5 !important;
+        box-shadow: 0 4px 14px rgba(79, 70, 229, 0.15);
     }
 
     /* Cartes Dashboard modernes */
     .widget-card {
         background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 20px;
-        padding: 18px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.03);
+        border: 1px solid #f1f5f9;
+        border-radius: 22px;
+        padding: 20px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04);
         margin-bottom: 12px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .widget-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 28px -5px rgba(0, 0, 0, 0.07);
     }
     .widget-title {
         font-size: 11px;
         font-weight: 800;
         color: #94a3b8;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
+        letter-spacing: 0.9px;
     }
     .widget-value {
-        font-size: 26px;
+        font-size: 28px;
         font-weight: 800;
         color: #0f172a;
         margin-top: 4px;
@@ -81,15 +96,54 @@ st.markdown("""
         margin-top: 2px;
     }
 
-    /* Boutons modernisés */
+    /* Badges de Statut */
+    .badge-tag {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 700;
+        background-color: #e0e7ff;
+        color: #4338ca;
+    }
+
+    /* Boutons Modernisés */
     .stButton button {
         border-radius: 14px;
         font-weight: 700;
+        font-size: 14px;
         background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
         color: white;
         border: none;
-        padding: 10px 16px;
-        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2);
+        padding: 12px 20px;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
+        transition: all 0.2s ease;
+    }
+    .stButton button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
+    }
+
+    /* Formulaires & Input Fields */
+    .stTextInput input, .stTextArea textarea, .stSelectbox select {
+        border-radius: 14px !important;
+        border: 1px solid #e2e8f0 !important;
+        padding: 10px 14px !important;
+        background-color: #ffffff !important;
+    }
+    .stTextInput input:focus, .stTextArea textarea:focus {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+    }
+
+    /* Expanders / Accordéons Épurés */
+    .streamlit-expanderHeader {
+        background-color: #ffffff !important;
+        border-radius: 16px !important;
+        border: 1px solid #f1f5f9 !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -119,12 +173,12 @@ if "json_credentials_str" not in st.session_state:
     st.session_state["json_credentials_str"] = None
 
 # --- EN-TÊTE PRINCIPAL ---
-st.markdown("# ⚡ Notre Espace")
-st.caption("Tableau de bord partagé — **Lucas & Alex**")
+st.markdown("<h1 style='text-align: center; font-weight: 800; color: #0f172a; margin-bottom: 0px;'>✨ Notre Espace</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 13px; font-weight: 600; color: #64748b; margin-top: 4px; margin-bottom: 24px;'>Tableau de bord partagé — <b>Lucas & Alex</b></p>", unsafe_allow_html=True)
 
 # --- NAVIGATION RESTRUCTURÉE (5 SUPER-ONGLETS) ---
 tab_dash, tab_quotidien, tab_budget_adv, tab_pro, tab_loisirs = st.tabs([
-    "🏠 Dashboard", "📋 Quotidien", "📊 Budget Avancé", "🎓 Espace Pro", "🐾 Saiko & Cuisine"
+    "🏠 Dashboard", "📋 Quotidien", "📊 Budget", "🎓 Espace Pro", "🐾 Saiko & Cuisine"
 ])
 
 # ==========================================
@@ -179,32 +233,32 @@ with tab_dash:
         nb_agenda = max(0, len(agenda_vals) - 1)
         nb_cand = max(0, len(cand_vals) - 1)
 
-        st.markdown("### ⚡ Vue Rapide")
+        st.markdown("<h4 style='font-weight: 800; color: #1e293b; margin-bottom: 12px;'>⚡ Aperçu Rapide</h4>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
             st.markdown(f'''
                 <div class="widget-card">
-                    <div class="widget-title">✅ Tâches accomplies</div>
-                    <div class="widget-value">{taches_faites} / {total_taches}</div>
-                    <div class="widget-sub">{"🎉 Tout est à jour !" if total_taches == taches_faites and total_taches > 0 else "En cours..."}</div>
+                    <div class="widget-title">✅ Tâches</div>
+                    <div class="widget-value">{taches_faites} <span style="font-size:16px; color:#94a3b8;">/ {total_taches}</span></div>
+                    <div class="widget-sub">{"🎉 À jour !" if total_taches == taches_faites and total_taches > 0 else "En cours"}</div>
                 </div>
             ''', unsafe_allow_html=True)
             
             st.markdown(f'''
                 <div class="widget-card">
-                    <div class="widget-title">🛒 À acheter</div>
+                    <div class="widget-title">🛒 Courses</div>
                     <div class="widget-value">{nb_courses}</div>
-                    <div class="widget-sub">Articles en liste de courses</div>
+                    <div class="widget-sub">Articles à acheter</div>
                 </div>
             ''', unsafe_allow_html=True)
 
         with c2:
             st.markdown(f'''
                 <div class="widget-card">
-                    <div class="widget-title">🎓 Candidatures / Pro</div>
+                    <div class="widget-title">🎓 Candidatures</div>
                     <div class="widget-value">{nb_cand}</div>
-                    <div class="widget-sub">Dossiers en cours de suivi</div>
+                    <div class="widget-sub">Dossiers suivis</div>
                 </div>
             ''', unsafe_allow_html=True)
             
@@ -219,20 +273,20 @@ with tab_dash:
             
             st.markdown(f'''
                 <div class="widget-card">
-                    <div class="widget-title">💶 Bilan Budget</div>
+                    <div class="widget-title">💶 Équilibre</div>
                     <div class="widget-value">{abs(diff):.2f} €</div>
-                    <div class="widget-sub">{"Alex doit à Lucas" if diff > 0 else ("Lucas doit à Alex" if diff < 0 else "Comptes équilibrés")}</div>
+                    <div class="widget-sub">{"Alex ➔ Lucas" if diff > 0 else ("Lucas ➔ Alex" if diff < 0 else "Équilibré")}</div>
                 </div>
             ''', unsafe_allow_html=True)
 
         st.divider()
         col_act1, col_act2 = st.columns(2)
         with col_act1:
-            if st.button("🔄 Rafraîchir les données"):
+            if st.button("🔄 Actualiser"):
                 st.cache_data.clear()
                 st.rerun()
         with col_act2:
-            if st.button("🔴 Déconnexion JSON"):
+            if st.button("🔴 Déconnexion"):
                 st.session_state["json_credentials_str"] = None
                 st.cache_data.clear()
                 st.rerun()
@@ -270,9 +324,9 @@ with tab_quotidien:
                     c1, c2 = st.columns([3, 1])
                     with c1:
                         if statut_t == "Fait":
-                            st.markdown(f"- ~~**{nom_t}**~~ *[{cat_t}]*")
+                            st.markdown(f"- ~~**{nom_t}**~~ <span class='badge-tag'>{cat_t}</span>", unsafe_allow_html=True)
                         else:
-                            st.markdown(f"- **{nom_t}** *[{cat_t}]*")
+                            st.markdown(f"- **{nom_t}** <span class='badge-tag'>{cat_t}</span>", unsafe_allow_html=True)
                     with c2:
                         if statut_t != "Fait":
                             if st.button("✔️", key=f"t_fait_{idx}"):
@@ -387,16 +441,15 @@ with tab_quotidien:
                     st.rerun()
 
 # ==========================================
-# SUPER-ONGLET 3 : BUDGET AVANCÉ & ANALYTICS
+# SUPER-ONGLET 3 : BUDGET AVANCÉ
 # ==========================================
 with tab_budget_adv:
     if json_str:
-        st.subheader("📊 Tableau de Bord Financier Avancé")
+        st.subheader("📊 Tableau de Bord Financier")
         all_vals = fetch_sheet_data(json_str, "Budget")
         budget_data = all_vals[1:] if len(all_vals) > 1 else []
 
         if budget_data:
-            # Traitement des données pour analyse
             parsed_rows = []
             for r in budget_data:
                 dt_str, pyr, lbl = (r + ["", "", ""])[:3]
@@ -415,45 +468,41 @@ with tab_budget_adv:
             
             df_budget = pd.DataFrame(parsed_rows)
             
-            # --- 1. VENTILATION PAR CATÉGORIES ---
-            st.markdown("#### 🏷️ Dépenses par Catégorie")
+            st.markdown("#### 🏷️ Ventilation par Catégorie")
             df_cat = df_budget.groupby("Catégorie")["Montant (€)"].sum().reset_index()
             st.bar_chart(df_cat, x="Catégorie", y="Montant (€)")
 
-            # --- 2. RÉPARTITION PAR PAYEUR & BILAN ---
-            st.markdown("#### ⚖️ Bilan du Couple")
+            st.markdown("#### ⚖️ Bilan Équilibré")
             total_lucas = df_budget[df_budget["Payeur"] == "Lucas"]["Montant (€)"].sum()
             total_alex = df_budget[df_budget["Payeur"] == "Alex"]["Montant (€)"].sum()
             diff = (total_lucas - total_alex) / 2
 
             b1, b2 = st.columns(2)
-            with b1: st.metric("Lucas a payé", f"{total_lucas:.2f} €")
-            with b2: st.metric("Alex a payé", f"{total_alex:.2f} €")
+            with b1: st.metric("Payé par Lucas", f"{total_lucas:.2f} €")
+            with b2: st.metric("Payé par Alex", f"{total_alex:.2f} €")
 
-            if diff > 0: st.success(f"👉 **Alex doit {diff:.2f} € à Lucas** pour équilibrer.")
-            elif diff < 0: st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alex** pour équilibrer.")
+            if diff > 0: st.success(f"👉 **Alex doit {diff:.2f} € à Lucas**")
+            elif diff < 0: st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alex**")
             else: st.info("⚖️ Comptes parfaitement équilibrés !")
 
-            # --- 3. EXPORT / TÉLÉCHARGEMENT DU RAPPORT CSV ---
             st.divider()
-            st.markdown("#### 📥 Exporter le Récapitulatif Mensuel")
             csv_buffer = df_budget.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="📄 Télécharger le récapitulatif (CSV / Excel)",
+                label="📄 Exporter en CSV / Excel",
                 data=csv_buffer,
                 file_name=f"recapitulatif_budget_{datetime.now().strftime('%Y_%m')}.csv",
                 mime="text/csv"
             )
 
             st.divider()
-            st.markdown("#### 📜 Historique détaillé")
+            st.markdown("#### 📜 Historique des dépenses")
             for idx, row in enumerate(budget_data):
                 dt, pyr, lbl = (row + ["", "", ""])[:3]
                 val = row[3] if len(row) > 3 else "0"
                 cat = row[4] if len(row) > 4 else "Alimentation"
                 real_idx = idx + 2
                 c1, c2 = st.columns([4, 1])
-                with c1: st.markdown(f"- **{lbl}** ({cat}) : {val} € *(par {pyr} le {dt})*")
+                with c1: st.markdown(f"- **{lbl}** <span class='badge-tag'>{cat}</span> : {val} € *(par {pyr} le {dt})*", unsafe_allow_html=True)
                 with c2:
                     if st.button("🗑️", key=f"adv_b_del_{idx}"):
                         get_gspread_client(json_str).open("MonAssistantData").worksheet("Budget").delete_rows(real_idx)
@@ -467,7 +516,7 @@ with tab_budget_adv:
             st.markdown("#### ➕ Saisir une dépense")
             b_date = st.date_input("Date", value=datetime.today())
             b_payer = st.radio("Qui a payé ?", ["Lucas", "Alex"], horizontal=True)
-            b_label = st.text_input("Intitulé (ex: Courses, Matériel OSB...)")
+            b_label = st.text_input("Intitulé")
             b_cat = st.selectbox("Catégorie", ["Alimentation", "Saiko", "Maison/Bricolage", "Sorties", "Fixe/Admin"])
             b_amount = st.number_input("Montant (€)", min_value=0.0, step=0.5)
             if st.form_submit_button("Enregistrer la dépense") and b_label and b_amount > 0:
@@ -476,13 +525,12 @@ with tab_budget_adv:
                 st.rerun()
 
 # ==========================================
-# SUPER-ONGLET 4 : ESPACE PRO & CANDIDATURES
+# SUPER-ONGLET 4 : ESPACE PRO
 # ==========================================
 with tab_pro:
     if json_str:
-        sub_tab_c1, sub_tab_c2 = st.tabs(["📌 Suivi Dossiers", "🎯 Préparation Entretiens / Jury"])
+        sub_tab_c1, sub_tab_c2 = st.tabs(["📌 Suivi Dossiers", "🎯 Entretiens & Jury"])
 
-        # --- SUIVI DES CANDIDATURES ---
         with sub_tab_c1:
             st.subheader("🎓 Candidatures & Formations")
             all_vals = fetch_sheet_data(json_str, "Candidatures")
@@ -494,8 +542,8 @@ with tab_pro:
                     real_idx = idx + 2
                     
                     with st.expander(f"🏢 [{stat}] {org} — {intit}"):
-                        if ech: st.write(f"**📅 Échéance / RDV :** {ech}")
-                        if nts: st.write(f"**📝 Notes / Contacts :** {nts}")
+                        if ech: st.write(f"**📅 Échéance :** {ech}")
+                        if nts: st.write(f"**📝 Notes :** {nts}")
                         
                         col_stat, col_del = st.columns([3, 1])
                         with col_stat:
@@ -505,7 +553,7 @@ with tab_pro:
                                 index=["Dossier envoyé", "Relance à faire", "Entretien prévu", "Confirmé / Admis", "Refusé"].index(stat) if stat in ["Dossier envoyé", "Relance à faire", "Entretien prévu", "Confirmé / Admis", "Refusé"] else 0,
                                 key=f"stat_sel_{idx}"
                             )
-                            if st.button("Mettre à jour statut", key=f"btn_up_{idx}"):
+                            if st.button("Mettre à jour", key=f"btn_up_{idx}"):
                                 get_gspread_client(json_str).open("MonAssistantData").worksheet("Candidatures").update_cell(real_idx, 3, new_stat)
                                 st.cache_data.clear()
                                 st.rerun()
@@ -515,33 +563,28 @@ with tab_pro:
                                 st.cache_data.clear()
                                 st.rerun()
             else:
-                st.info("Aucun dossier de candidature enregistré.")
+                st.info("Aucun dossier enregistré.")
 
             st.divider()
             with st.form("form_cand", clear_on_submit=True):
-                st.markdown("#### ➕ Ajouter une candidature / formation")
-                c_org = st.text_input("Organisme / École (ex: efp, BF technics...)")
-                c_intit = st.text_input("Formation / Intitulé (ex: Électricien, Frigoriste...)")
+                st.markdown("#### ➕ Ajouter une candidature")
+                c_org = st.text_input("Organisme (ex: efp, BF technics...)")
+                c_intit = st.text_input("Formation (ex: Électricien, Frigoriste...)")
                 c_stat = st.selectbox("Statut initial", ["Dossier envoyé", "Relance à faire", "Entretien prévu", "Confirmé / Admis"])
-                c_ech = st.text_input("Date échéance / Entretien")
-                c_nts = st.text_area("Notes, contacts, pièces à fournir")
-                if st.form_submit_button("Enregistrer candidature") and c_org:
+                c_ech = st.text_input("Échéance / RDV")
+                c_nts = st.text_area("Notes & pièces à fournir")
+                if st.form_submit_button("Enregistrer") and c_org:
                     get_gspread_client(json_str).open("MonAssistantData").worksheet("Candidatures").append_row([c_org, c_intit, c_stat, c_ech, c_nts])
                     st.cache_data.clear()
                     st.rerun()
 
-        # --- PRÉPARATION AUX ENTRETIENS ---
         with sub_tab_c2:
-            st.subheader("🎯 Préparation aux Entretiens & Jury")
-            st.write("Gardez sous la main vos arguments clés pour présenter votre projet professionnel avec succès.")
-
-            with st.expander("💡 **Fiche de préparation : Projet Électricité & Froid**", expanded=True):
+            st.subheader("🎯 Préparation Jury & Entretien")
+            with st.expander("💡 **Fiche Projet : Électricité & Frigoriste**", expanded=True):
                 st.markdown("""
-                * **Point fort 1 :** Synergie forte entre la formation d'électricien et le secteur de la réfrigération.
-                * **Point fort 2 :** Capacité d'organisation au quotidien et rigueur technique.
-                * **Arguments Jury :**
-                  1. Mettre en avant le projet concret d'avenir et la polyvalence technique.
-                  2. Montrer la maîtrise des compétences de base et l'implication personnelle.
+                * **Synergie :** Argumenter sur la complémentarité entre la formation d'électricien et le métier de frigoriste.
+                * **Atouts :** Rigueur, méthode et vision globale des installations techniques.
+                * **Checklist :** CV à jour, lettre de motivation préparée et convention de stage signée.
                 """)
 
 # ==========================================
@@ -571,9 +614,9 @@ with tab_loisirs:
             with st.form("form_saiko", clear_on_submit=True):
                 s_date = st.date_input("Date", value=datetime.today())
                 s_type = st.selectbox("Type", ["Vétérinaire / Vaccin", "Anti-puces / Vermifuge", "Achat Croquettes / Matériel", "Soin / Toilettage", "Autre"])
-                s_sujet = st.text_input("Titre / Sujet")
+                s_sujet = st.text_input("Titre")
                 s_notes = st.text_area("Notes")
-                if st.form_submit_button("Enregistrer pour Saiko") and s_sujet:
+                if st.form_submit_button("Enregistrer") and s_sujet:
                     get_gspread_client(json_str).open("MonAssistantData").worksheet("Saiko").append_row([str(s_date), s_type, s_sujet, s_notes])
                     st.cache_data.clear()
                     st.rerun()
