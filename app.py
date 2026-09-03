@@ -282,6 +282,17 @@ with tab_taches:
 
             taches_data = all_vals[1:]
             
+            # --- BARRE D'AVANCEMENT ---
+            total_taches = len(taches_data)
+            taches_faites = len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"])
+            
+            if total_taches > 0:
+                progression = taches_faites / total_taches
+                st.markdown(f"**Avancement : {taches_faites} / {total_taches} accomplie(s)**")
+                st.progress(progression)
+            else:
+                st.progress(0.0)
+
             cat_filter = st.selectbox("🔍 Filtrer par catégorie", ["Toutes", "Maison", "Admin", "Saiko", "Urgent", "Autre"])
             filtered_taches = [t for t in taches_data if cat_filter == "Toutes" or (len(t) > 1 and t[1] == cat_filter)] if taches_data else []
 
@@ -289,15 +300,24 @@ with tab_taches:
                 for idx, row in enumerate(filtered_taches):
                     nom_t = row[0] if len(row) > 0 else "Sans nom"
                     cat_t = row[1] if len(row) > 1 else "Général"
+                    statut_t = row[2] if len(row) > 2 else "À faire"
                     real_idx = all_vals.index(row) + 1
                     
                     col1, col2 = st.columns([3, 1])
                     with col1:
-                        st.markdown(f"- **{nom_t}** *[{cat_t}]*")
+                        if statut_t == "Fait":
+                            st.markdown(f"- ~~**{nom_t}**~~ *[{cat_t}]*")
+                        else:
+                            st.markdown(f"- **{nom_t}** *[{cat_t}]*")
                     with col2:
-                        if st.button("✔️ Fait", key=f"del_t_{idx}_{real_idx}"):
-                            taches_ws.delete_rows(real_idx)
-                            st.rerun()
+                        if statut_t != "Fait":
+                            if st.button("✔️ Fait", key=f"del_t_{idx}_{real_idx}"):
+                                taches_ws.update_cell(real_idx, 3, "Fait")
+                                st.rerun()
+                        else:
+                            if st.button("🗑️", key=f"del_t_{idx}_{real_idx}"):
+                                taches_ws.delete_rows(real_idx)
+                                st.rerun()
             else:
                 st.info("Aucune tâche dans cette catégorie.")
 
@@ -411,7 +431,7 @@ with tab_saiko:
         st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
 # ==========================================
-# ONGLET 5 : BUDGET PARTAGÉ (NOUVEAU)
+# ONGLET 5 : BUDGET (LUCAS & ALEX)
 # ==========================================
 with tab_budget:
     st.subheader("💶 Budget & Comptes du Couple")
@@ -428,7 +448,7 @@ with tab_budget:
 
             budget_data = all_vals[1:]
             total_lucas = 0.0
-            total_alexia = 0.0
+            total_alex = 0.0
 
             if budget_data:
                 for row in budget_data:
@@ -440,23 +460,29 @@ with tab_budget:
 
                     if payer == "Lucas":
                         total_lucas += amt
-                    elif payer == "Alexia":
-                        total_alexia += amt
+                    elif payer == "Alex":
+                        total_alex += amt
 
-                # Calcul du bilan
-                diff = (total_lucas - total_alexia) / 2
+                # --- GRAPHIQUE VISUEL DES DÉPENSES ---
+                chart_data = pd.DataFrame({
+                    "Personne": ["Lucas", "Alex"],
+                    "Total Dépensé (€)": [total_lucas, total_alex]
+                })
+                st.bar_chart(chart_data, x="Personne", y="Total Dépensé (€)")
+
+                diff = (total_lucas - total_alex) / 2
                 
                 b1, b2 = st.columns(2)
                 with b1:
                     st.metric(label="Total payé par Lucas", value=f"{total_lucas:.2f} €")
                 with b2:
-                    st.metric(label="Total payé par Alexia", value=f"{total_alexia:.2f} €")
+                    st.metric(label="Total payé par Alex", value=f"{total_alex:.2f} €")
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 if diff > 0:
-                    st.success(f"👉 **Alexia doit {diff:.2f} € à Lucas** pour équilibrer les comptes.")
+                    st.success(f"👉 **Alex doit {diff:.2f} € à Lucas** pour équilibrer les comptes.")
                 elif diff < 0:
-                    st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alexia** pour équilibrer les comptes.")
+                    st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alex** pour équilibrer les comptes.")
                 else:
                     st.info("⚖️ Les comptes sont parfaitement équilibrés !")
 
@@ -483,7 +509,7 @@ with tab_budget:
             with st.form("form_budget", clear_on_submit=True):
                 st.markdown("#### ➕ Ajouter une dépense commune")
                 b_date = st.date_input("Date", value=datetime.today())
-                b_payer = st.radio("Qui a payé ?", ["Lucas", "Alexia"], horizontal=True)
+                b_payer = st.radio("Qui a payé ?", ["Lucas", "Alex"], horizontal=True)
                 b_label = st.text_input("Intitulé (ex: Courses, Resto, Facture Internet...)")
                 b_amount = st.number_input("Montant (€)", min_value=0.0, step=0.5, format="%.2f")
                 if st.form_submit_button("Ajouter la dépense") and b_label and b_amount > 0:
@@ -495,7 +521,7 @@ with tab_budget:
         st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
 # ==========================================
-# ONGLET 6 : PLANNING REPAS (NOUVEAU)
+# ONGLET 6 : PLANNING REPAS
 # ==========================================
 with tab_repas:
     st.subheader("🍽️ Planning des Repas de la Semaine")
@@ -546,7 +572,7 @@ with tab_repas:
         st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
 # ==========================================
-# ONGLET 7 : LOGEMENT & ADMIN (NOUVEAU)
+# ONGLET 7 : LOGEMENT & ADMIN
 # ==========================================
 with tab_admin:
     st.subheader("🏡 Logement & Administratif")
@@ -593,7 +619,7 @@ with tab_admin:
         st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
 # ==========================================
-# ONGLET 8 : LISTES & CADEAUX (NOUVEAU)
+# ONGLET 8 : LISTES & CADEAUX
 # ==========================================
 with tab_listes:
     st.subheader("🧳 Checklists & Idées Cadeaux")
