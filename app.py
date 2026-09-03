@@ -7,13 +7,13 @@ from datetime import datetime
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
-    page_title="Notre Assistant Partagé", 
-    page_icon="✨", 
+    page_title="Notre Assistant", 
+    page_icon="⚡", 
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLE CSS DESIGN & ERGONOMIQUE ---
+# --- STYLE CSS DESIGN & MOBILE-FIRST ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -29,59 +29,65 @@ st.markdown("""
 
     /* Style des Onglets Principaux */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        background-color: #e2e8f0;
-        padding: 6px;
-        border-radius: 16px;
+        gap: 8px;
+        background-color: #f1f5f9;
+        padding: 8px;
+        border-radius: 20px;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 12px;
-        padding: 10px 14px;
+        border-radius: 14px;
+        padding: 10px 16px;
         font-weight: 700;
         font-size: 14px;
-        color: #475569;
+        color: #64748b;
         background-color: transparent;
         border: none;
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
-        color: #4f46e5 !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        color: #6366f1 !important;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.15);
     }
 
-    /* Style des cartes du Dashboard */
-    .dashboard-card {
+    /* Cartes Dashboard modernes */
+    .widget-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 18px;
-        padding: 16px;
-        text-align: center;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        border-radius: 20px;
+        padding: 18px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.03);
         margin-bottom: 12px;
+        transition: transform 0.2s ease;
     }
-    .card-title {
+    .widget-title {
         font-size: 12px;
-        font-weight: 700;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .card-value {
-        font-size: 26px;
         font-weight: 800;
-        color: #4f46e5;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+    }
+    .widget-value {
+        font-size: 28px;
+        font-weight: 800;
+        color: #0f172a;
         margin-top: 4px;
+    }
+    .widget-sub {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6366f1;
+        margin-top: 2px;
     }
 
     /* Boutons modernisés */
     .stButton button {
-        border-radius: 12px;
+        border-radius: 14px;
         font-weight: 700;
         background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
         color: white;
         border: none;
-        padding: 10px 16px;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        padding: 12px 18px;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -111,12 +117,12 @@ if "json_credentials_str" not in st.session_state:
     st.session_state["json_credentials_str"] = None
 
 # --- EN-TÊTE PRINCIPAL ---
-st.markdown("# ✨ Notre Assistant")
-st.caption("Espace personnel partagé — Lucas & Alex 🚀")
+st.markdown("# ⚡ Notre Espace")
+st.caption("Tableau de bord partagé — **Lucas & Alex**")
 
-# --- NAVIGATION RESTRUCTURÉE (4 GRANDS GROUPES) ---
+# --- NAVIGATION RESTRUCTURÉE (4 SUPER-ONGLETS) ---
 tab_dash, tab_quotidien, tab_vie_a_deux, tab_loisirs = st.tabs([
-    "🏠 Dashboard", "📋 Quotidien", "💡 Vie à Deux", "🐾 Saiko & Cuisine"
+    "🏠 Accueil", "📋 Quotidien", "💶 Vie à Deux", "🐾 Saiko & Cuisine"
 ])
 
 # ==========================================
@@ -156,26 +162,64 @@ with tab_dash:
     else:
         json_str = st.session_state["json_credentials_str"]
         
-        # Récupération rapide du nombre d'éléments pour les cartes
         taches_vals = fetch_sheet_data(json_str, "Taches")
         agenda_vals = fetch_sheet_data(json_str, "Agenda")
         courses_vals = fetch_sheet_data(json_str, "Courses")
-        notes_vals = fetch_sheet_data(json_str, "Notes")
+        budget_vals = fetch_sheet_data(json_str, "Budget")
         
-        nb_taches = max(0, len(taches_vals) - 1)
-        nb_agenda = max(0, len(agenda_vals) - 1)
+        taches_data = taches_vals[1:] if len(taches_vals) > 1 else []
+        taches_faites = len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"])
+        total_taches = len(taches_data)
+        
         nb_courses = max(0, len(courses_vals) - 1)
-        nb_notes = max(0, len(notes_vals) - 1)
+        nb_agenda = max(0, len(agenda_vals) - 1)
 
-        st.markdown("### 📊 Vue d'ensemble")
+        st.markdown("### ⚡ Vue Rapide")
         
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown(f'<div class="dashboard-card"><div class="card-title">✅ Tâches en cours</div><div class="card-value">{nb_taches}</div></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dashboard-card"><div class="card-title">🛒 Articles à acheter</div><div class="card-value">{nb_courses}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'''
+                <div class="widget-card">
+                    <div class="widget-title">✅ Tâches accomplies</div>
+                    <div class="widget-value">{taches_faites} / {total_taches}</div>
+                    <div class="widget-sub">{"🎉 Tout est à jour !" if total_taches == taches_faites and total_taches > 0 else "En cours..."}</div>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            st.markdown(f'''
+                <div class="widget-card">
+                    <div class="widget-title">🛒 À acheter</div>
+                    <div class="widget-value">{nb_courses}</div>
+                    <div class="widget-sub">Articles dans les courses</div>
+                </div>
+            ''', unsafe_allow_html=True)
+
         with c2:
-            st.markdown(f'<div class="dashboard-card"><div class="card-title">📅 Événements prévus</div><div class="card-value">{nb_agenda}</div></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="dashboard-card"><div class="card-title">📌 Notes mémorisées</div><div class="card-value">{nb_notes}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'''
+                <div class="widget-card">
+                    <div class="widget-title">📅 Agenda</div>
+                    <div class="widget-value">{nb_agenda}</div>
+                    <div class="widget-sub">Événement(s) à venir</div>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            # Calcul rapide de l'équilibre du budget
+            total_lucas, total_alex = 0.0, 0.0
+            for r in (budget_vals[1:] if len(budget_vals) > 1 else []):
+                payer = r[1] if len(r) > 1 else ""
+                try: amt = float(r[3].replace(',', '.')) if len(r) > 3 else 0.0
+                except ValueError: amt = 0.0
+                if payer == "Lucas": total_lucas += amt
+                elif payer == "Alex": total_alex += amt
+            diff = (total_lucas - total_alex) / 2
+            
+            st.markdown(f'''
+                <div class="widget-card">
+                    <div class="widget-title">💶 Bilan Budget</div>
+                    <div class="widget-value">{abs(diff):.2f} €</div>
+                    <div class="widget-sub">{"Alex doit à Lucas" if diff > 0 else ("Lucas doit à Alex" if diff < 0 else "Comptes équilibrés")}</div>
+                </div>
+            ''', unsafe_allow_html=True)
 
         st.divider()
         col_act1, col_act2 = st.columns(2)
@@ -198,7 +242,7 @@ with tab_quotidien:
     if json_str:
         sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda", "🛒 Courses", "🍽️ Repas"])
         
-        # --- SOUS-TAB : TÂCHES ---
+        # --- TÂCHES ---
         with sub_tab1:
             st.subheader("✅ Tâches à faire")
             all_vals = fetch_sheet_data(json_str, "Taches")
@@ -208,10 +252,9 @@ with tab_quotidien:
             taches_faites = len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"])
             
             if total_taches > 0:
-                st.markdown(f"**Avancement : {taches_faites} / {total_taches} accomplie(s)**")
                 st.progress(taches_faites / total_taches)
 
-            cat_filter = st.selectbox("🔍 Catégorie", ["Toutes", "Maison", "Admin", "Saiko", "Urgent", "Autre"])
+            cat_filter = st.selectbox("🔍 Filtrer", ["Toutes", "Maison", "Admin", "Saiko", "Urgent", "Autre"])
             filtered = [t for t in taches_data if cat_filter == "Toutes" or (len(t) > 1 and t[1] == cat_filter)]
 
             if filtered:
@@ -243,7 +286,7 @@ with tab_quotidien:
 
             st.divider()
             with st.form("form_tache", clear_on_submit=True):
-                st.markdown("#### ➕ Nouvelle tâche")
+                st.markdown("#### ➕ Ajouter une tâche")
                 n_tache = st.text_input("Intitulé")
                 n_cat = st.selectbox("Catégorie", ["Maison", "Admin", "Saiko", "Urgent", "Autre"])
                 if st.form_submit_button("Ajouter") and n_tache:
@@ -251,7 +294,7 @@ with tab_quotidien:
                     st.cache_data.clear()
                     st.rerun()
 
-        # --- SOUS-TAB : AGENDA ---
+        # --- AGENDA ---
         with sub_tab2:
             st.subheader("📅 Agenda")
             all_vals = fetch_sheet_data(json_str, "Agenda")
@@ -262,14 +305,12 @@ with tab_quotidien:
                     date_ev, heure_ev, titre_ev, desc_ev = (row + ["", "", "", ""])[:4]
                     real_idx = idx + 2
                     with st.expander(f"🗓️ {date_ev} {f'à {heure_ev}' if heure_ev else ''} — {titre_ev}"):
-                        if desc_ev:
-                            st.write(f"**Détails :** {desc_ev}")
+                        if desc_ev: st.write(f"**Détails :** {desc_ev}")
                         if st.button("🗑️ Supprimer", key=f"ev_del_{idx}"):
                             get_gspread_client(json_str).open("MonAssistantData").worksheet("Agenda").delete_rows(real_idx)
                             st.cache_data.clear()
                             st.rerun()
-            else:
-                st.info("Aucun événement.")
+            else: st.info("Aucun événement.")
 
             st.divider()
             with st.form("form_agenda", clear_on_submit=True):
@@ -283,7 +324,7 @@ with tab_quotidien:
                     st.cache_data.clear()
                     st.rerun()
 
-        # --- SOUS-TAB : COURSES ---
+        # --- COURSES ---
         with sub_tab3:
             st.subheader("🛒 Liste de Courses")
             all_vals = fetch_sheet_data(json_str, "Courses")
@@ -294,27 +335,25 @@ with tab_quotidien:
                     art, qte, cat = (row + ["Article", "1", "Général"])[:3]
                     real_idx = idx + 2
                     c1, c2 = st.columns([3, 1])
-                    with c1:
-                        st.markdown(f"- **{art}** *(Qté: {qte} | {cat})*")
+                    with c1: st.markdown(f"- **{art}** *(Qté: {qte} | {cat})*")
                     with c2:
                         if st.button("✔️ Acquis", key=f"c_del_{idx}"):
                             get_gspread_client(json_str).open("MonAssistantData").worksheet("Courses").delete_rows(real_idx)
                             st.cache_data.clear()
                             st.rerun()
-            else:
-                st.info("Liste de courses vide.")
+            else: st.info("Liste de courses vide.")
 
             st.divider()
             with st.form("form_courses", clear_on_submit=True):
                 c_art = st.text_input("Article")
                 c_qte = st.text_input("Quantité", value="1")
                 c_cat = st.selectbox("Rayon", ["Supermarché", "Frais", "Fruits & Légumes", "Boissons", "Entretien", "Autre"])
-                if st.form_submit_button("Ajouter aux courses") and c_art:
+                if st.form_submit_button("Ajouter") and c_art:
                     get_gspread_client(json_str).open("MonAssistantData").worksheet("Courses").append_row([c_art, c_qte, c_cat])
                     st.cache_data.clear()
                     st.rerun()
 
-        # --- SOUS-TAB : REPAS ---
+        # --- REPAS ---
         with sub_tab4:
             st.subheader("🍽️ Planning des Repas")
             all_vals = fetch_sheet_data(json_str, "Repas")
@@ -329,15 +368,13 @@ with tab_quotidien:
                         typ, plt = (r[1:] + ["", ""])[:2]
                         real_idx = all_vals.index(r) + 1
                         c1, c2 = st.columns([4, 1])
-                        with c1:
-                            st.write(f"- **{typ}** : {plt}")
+                        with c1: st.write(f"- **{typ}** : {plt}")
                         with c2:
                             if st.button("🗑️", key=f"rep_del_{real_idx}"):
                                 get_gspread_client(json_str).open("MonAssistantData").worksheet("Repas").delete_rows(real_idx)
                                 st.cache_data.clear()
                                 st.rerun()
-                else:
-                    st.caption("Rien de prévu")
+                else: st.caption("Rien de prévu")
 
             st.divider()
             with st.form("form_repas", clear_on_submit=True):
@@ -366,10 +403,8 @@ with tab_vie_a_deux:
             if budget_data:
                 for row in budget_data:
                     payer = row[1] if len(row) > 1 else ""
-                    try:
-                        amt = float(row[3].replace(',', '.')) if len(row) > 3 else 0.0
-                    except ValueError:
-                        amt = 0.0
+                    try: amt = float(row[3].replace(',', '.')) if len(row) > 3 else 0.0
+                    except ValueError: amt = 0.0
 
                     if payer == "Lucas": total_lucas += amt
                     elif payer == "Alex": total_alex += amt
@@ -379,8 +414,8 @@ with tab_vie_a_deux:
 
                 diff = (total_lucas - total_alex) / 2
                 b1, b2 = st.columns(2)
-                with b1: st.metric("Lucas a payé", f"{total_lucas:.2f} €")
-                with b2: st.metric("Alex a payé", f"{total_alex:.2f} €")
+                with b1: st.metric("Lucas", f"{total_lucas:.2f} €")
+                with b2: st.metric("Alex", f"{total_alex:.2f} €")
                 
                 if diff > 0: st.success(f"👉 **Alex doit {diff:.2f} € à Lucas**")
                 elif diff < 0: st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alex**")
@@ -572,4 +607,3 @@ with tab_loisirs:
                     get_gspread_client(json_str).open("MonAssistantData").worksheet("Recettes").append_row([r_titre, r_ing, r_inst])
                     st.cache_data.clear()
                     st.rerun()
-                
