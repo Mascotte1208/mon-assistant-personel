@@ -33,26 +33,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONNEXION GOOGLE SHEETS (Ultra-robuste) ---
+# --- CONNEXION GOOGLE SHEETS SÉCURISÉE ---
 @st.cache_resource
 def init_connection():
-    if "gcp_service_account" in st.secrets:
-        creds_dict = dict(st.secrets["gcp_service_account"])
-        
-        # Correction automatique des sauts de ligne de la clé privée pour éviter les erreurs
-        if "private_key" in creds_dict:
-            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-            
-        scope = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-        client = gspread.authorize(creds)
-        sheet = client.open("MonAssistantData")
-        return sheet
-    else:
+    try:
+        if "gcp_service_account" in st.secrets:
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            if "private_key" in creds_dict:
+                creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+                
+            scope = [
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive"
+            ]
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+            client = gspread.authorize(creds)
+            sheet = client.open("MonAssistantData")
+            return sheet
+    except Exception as e:
+        st.error(f"⚠️ Erreur de configuration des secrets Google Sheets : {e}")
         return None
+    return None
 
 sheet = init_connection()
 
@@ -86,7 +87,7 @@ with tab_accueil:
         except Exception as e:
             st.warning("Impossible de charger les statistiques d'accueil pour le moment.")
     else:
-        st.warning("⚠️ Connexion Google Sheets en attente de configuration.")
+        st.warning("⚠️ La connexion au Google Sheet est en attente ou la clé de sécurité dans les secrets Streamlit doit être ajustée.")
 
 # ==========================================
 # ONGLET 1 : ASSISTANT IA
@@ -159,6 +160,8 @@ with tab_notes:
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur avec l'onglet Notes : {e}")
+    else:
+        st.info("Connectez Google Sheets pour voir et ajouter des notes.")
 
 # ==========================================
 # ONGLET 3 : RECETTES
@@ -212,3 +215,5 @@ with tab_recettes:
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur avec l'onglet Recettes : {e}")
+    else:
+        st.info("Connectez Google Sheets pour voir et ajouter des recettes.")
