@@ -50,7 +50,6 @@ def connect_with_file(uploaded_file):
             sheet = client.open("MonAssistantData")
         except gspread.SpreadsheetNotFound:
             sheet = client.create("MonAssistantData")
-            # Création automatique des onglets si le fichier est neuf
             sheet.values_append("Sheet1", {'valueInputOption': 'RAW'}, {'values': [['Tache', 'Statut']]})
             sheet.rename_worksheet(sheet.worksheet("Sheet1"), "Taches")
             
@@ -89,7 +88,7 @@ if not sheet and "uploaded_sheet_data" in st.session_state:
 st.title("💡 Notre Tableau de Bord")
 st.caption("Partagé en direct entre vous et votre copine 🚀")
 
-# --- NAVIGATION PAR ONGLET (5 onglets) ---
+# --- NAVIGATION PAR ONGLET ---
 tab_accueil, tab_assistant, tab_taches, tab_notes, tab_recettes = st.tabs(["🏠 Accueil", "🤖 Assistant IA", "✅ Tâches", "📝 Notes", "🍲 Recettes"])
 
 # ==========================================
@@ -101,11 +100,12 @@ with tab_accueil:
     
     if sheet:
         try:
-            sheet_names = [w.title for w in sheet.worksheets()]
+            worksheets_dict = {w.title: w for w in sheet.worksheets()}
             
-            taches_count = len(sheet.worksheet("Taches").get_all_records()) if "Taches" in sheet_names else 0
-            notes_count = len(sheet.worksheet("Notes").get_all_records()) if "Notes" in sheet_names else 0
-            recettes_count = len(sheet.worksheet("Recettes").get_all_records()) if "Recettes" in sheet_names else 0
+            # Récupération précise du nombre de lignes de données
+            taches_count = len(worksheets_dict["Taches"].get_all_records()) if "Taches" in worksheets_dict else 0
+            notes_count = len(worksheets_dict["Notes"].get_all_records()) if "Notes" in worksheets_dict else 0
+            recettes_count = len(worksheets_dict["Recettes"].get_all_records()) if "Recettes" in worksheets_dict else 0
             
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -118,7 +118,7 @@ with tab_accueil:
             st.divider()
             st.info("💡 **Astuce mobile :** Vous pouvez ajouter cette application sur l'écran d'accueil de votre téléphone pour l'utiliser comme une vraie application native !")
         except Exception as e:
-            st.warning(f"Connecté, mais structure incomplète : {e}")
+            st.warning(f"Connecté, mais erreur de lecture du tableau : {e}")
     else:
         st.warning("⚠️ Connexion Google Sheets requise.")
         st.write("Pour activer l'application, **glissez et déposez votre fichier de clé JSON** ci-dessous :")
