@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+import json
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
@@ -33,33 +34,53 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONNEXION GOOGLE SHEETS SÉCURISÉE ---
+# --- CONNEXION GOOGLE SHEETS VIA FICHIER JSON ---
 @st.cache_resource
-def init_connection():
+def connect_with_file(uploaded_file):
+    try:
+        creds_dict = json.load(uploaded_file)
+        scope = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        sheet = client.open("MonAssistantData")
+        return sheet
+    except Exception as e:
+        return None
+
+@st.cache_resource
+def connect_with_secrets():
     try:
         if "gcp_service_account" in st.secrets:
             creds_dict = dict(st.secrets["gcp_service_account"])
             if "private_key" in creds_dict:
                 creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-                
             scope = [
                 "https://www.googleapis.com/auth/spreadsheets",
                 "https://www.googleapis.com/auth/drive"
             ]
             creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
             client = gspread.authorize(creds)
-            sheet = client.open("MonAssistantData")
-            return sheet
-    except Exception as e:
-        st.error(f"⚠️ Erreur de configuration des secrets Google Sheets : {e}")
+            return client.open("MonAssistantData")
+    except Exception:
         return None
     return None
 
-sheet = init_connection()
+# Tentative de connexion via les secrets, sinon via le fichier téléchargé
+sheet = connect_with_secrets()
 
 # --- EN-TÊTE DE L'APPLICATION ---
 st.title("💡 Notre Tableau de Bord")
 st.caption("Partagé en direct entre vous et votre copine 🚀")
+
+# Si la connexion n'est pas établie, on propose d'importer le fichier JSON directement
+if not sheet:
+    st.sidebar.header("🔑 Configuration Google Sheets")
+    uploaded_json = st.sidebar.file_uploader("Glissez-déposez votre fichier JSON Google Cloud ici", type=["json"])
+    if uploaded_json is not للص: # simple check
+        sheet = connect_with_file(uploaded_json)
 
 # --- NAVIGATION PAR ONGLET ---
 tab_accueil, tab_assistant, tab_notes, tab_recettes = st.tabs(["🏠 Accueil", "🤖 Assistant IA", "📝 Notes", "🍲 Recettes"])
@@ -87,7 +108,7 @@ with tab_accueil:
         except Exception as e:
             st.warning("Impossible de charger les statistiques d'accueil pour le moment.")
     else:
-        st.warning("⚠️ La connexion au Google Sheet est en attente ou la clé de sécurité dans les secrets Streamlit doit être ajustée.")
+        st.warning("⚠️ Pour activer le tableau partagé, veuillez glisser-déposer votre fichier de clé JSON dans le menu latéral (icône ☰ ou > en haut à gauche sur mobile).")
 
 # ==========================================
 # ONGLET 1 : ASSISTANT IA
@@ -161,7 +182,7 @@ with tab_notes:
         except Exception as e:
             st.error(f"Erreur avec l'onglet Notes : {e}")
     else:
-        st.info("Connectez Google Sheets pour voir et ajouter des notes.")
+        st.info("Veuillez importer votre fichier de clés dans le menu latéral pour accéder aux notes.")
 
 # ==========================================
 # ONGLET 3 : RECETTES
@@ -216,4 +237,4 @@ with tab_recettes:
         except Exception as e:
             st.error(f"Erreur avec l'onglet Recettes : {e}")
     else:
-        st.info("Connectez Google Sheets pour voir et ajouter des recettes.")
+        st.info("Veuillez importer votre fichier de clés dans le menu latéral pour accéder aux recettes.")
