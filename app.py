@@ -89,6 +89,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- FONCTION DE CACHE POUR ÉVITER LE QUOTA 429 ---
+def get_worksheet_values(sheet, worksheet_name):
+    try:
+        ws = sheet.worksheet(worksheet_name)
+        return ws.get_all_values()
+    except Exception:
+        return []
+
 # --- CONNEXION GOOGLE SHEETS VIA FICHIER JSON ---
 def connect_with_file(uploaded_file):
     try:
@@ -107,32 +115,19 @@ def connect_with_file(uploaded_file):
             sheet.values_append("Sheet1", {'valueInputOption': 'RAW'}, {'values': [['Tache', 'Categorie', 'Statut']]})
             sheet.rename_worksheet(sheet.worksheet("Sheet1"), "Taches")
             
-            sheet.add_worksheet(title="Agenda", rows="100", cols="20")
-            sheet.values_append("Agenda", {'valueInputOption': 'RAW'}, {'values': [['Date', 'Heure', 'Titre', 'Description']]})
-            
-            sheet.add_worksheet(title="Courses", rows="100", cols="20")
-            sheet.values_append("Courses", {'valueInputOption': 'RAW'}, {'values': [['Article', 'Quantite', 'Categorie']]})
-            
-            sheet.add_worksheet(title="Notes", rows="100", cols="20")
-            sheet.values_append("Notes", {'valueInputOption': 'RAW'}, {'values': [['Titre', 'Contenu']]})
-            
-            sheet.add_worksheet(title="Recettes", rows="100", cols="20")
-            sheet.values_append("Recettes", {'valueInputOption': 'RAW'}, {'values': [['Titre', 'Ingrédients', 'Instructions']]})
-            
-            sheet.add_worksheet(title="Saiko", rows="100", cols="20")
-            sheet.values_append("Saiko", {'valueInputOption': 'RAW'}, {'values': [['Date', 'Type', 'Sujet', 'Notes']]})
-            
-            sheet.add_worksheet(title="Budget", rows="100", cols="20")
-            sheet.values_append("Budget", {'valueInputOption': 'RAW'}, {'values': [['Date', 'Payé Par', 'Intitulé', 'Montant']]})
-
-            sheet.add_worksheet(title="Repas", rows="100", cols="20")
-            sheet.values_append("Repas", {'valueInputOption': 'RAW'}, {'values': [['Jour', 'Repas', 'Plat']]})
-
-            sheet.add_worksheet(title="Admin", rows="100", cols="20")
-            sheet.values_append("Admin", {'valueInputOption': 'RAW'}, {'values': [['Sujet', 'Echéance', 'Détails']]})
-
-            sheet.add_worksheet(title="Listes", rows="100", cols="20")
-            sheet.values_append("Listes", {'valueInputOption': 'RAW'}, {'values': [['Catégorie', 'Élément', 'Notes']]})
+            for ws_title, headers in [
+                ("Agenda", [['Date', 'Heure', 'Titre', 'Description']]),
+                ("Courses", [['Article', 'Quantite', 'Categorie']]),
+                ("Notes", [['Titre', 'Contenu']]),
+                ("Recettes", [['Titre', 'Ingrédients', 'Instructions']]),
+                ("Saiko", [['Date', 'Type', 'Sujet', 'Notes']]),
+                ("Budget", [['Date', 'Payé Par', 'Intitulé', 'Montant']]),
+                ("Repas", [['Jour', 'Repas', 'Plat']]),
+                ("Admin", [['Sujet', 'Echéance', 'Détails']]),
+                ("Listes", [['Catégorie', 'Élément', 'Notes']])
+            ]:
+                sheet.add_worksheet(title=ws_title, rows="100", cols="20")
+                sheet.values_append(ws_title, {'valueInputOption': 'RAW'}, {'values': headers})
             
         return sheet, None
     except Exception as e:
@@ -174,14 +169,14 @@ tab_accueil, tab_agenda, tab_taches, tab_courses, tab_saiko, tab_budget, tab_rep
 with tab_accueil:
     if sheet:
         try:
-            ws_dict = {w.title: w for w in sheet.worksheets()}
+            ws_names = [w.title for w in sheet.worksheets()]
             
-            taches_count = max(0, len(ws_dict["Taches"].get_all_values()) - 1) if "Taches" in ws_dict else 0
-            agenda_count = max(0, len(ws_dict["Agenda"].get_all_values()) - 1) if "Agenda" in ws_dict else 0
-            courses_count = max(0, len(ws_dict["Courses"].get_all_values()) - 1) if "Courses" in ws_dict else 0
-            notes_count = max(0, len(ws_dict["Notes"].get_all_values()) - 1) if "Notes" in ws_dict else 0
-            recettes_count = max(0, len(ws_dict["Recettes"].get_all_values()) - 1) if "Recettes" in ws_dict else 0
-            saiko_count = max(0, len(ws_dict["Saiko"].get_all_values()) - 1) if "Saiko" in ws_dict else 0
+            taches_count = max(0, len(get_worksheet_values(sheet, "Taches")) - 1) if "Taches" in ws_names else 0
+            agenda_count = max(0, len(get_worksheet_values(sheet, "Agenda")) - 1) if "Agenda" in ws_names else 0
+            courses_count = max(0, len(get_worksheet_values(sheet, "Courses")) - 1) if "Courses" in ws_names else 0
+            notes_count = max(0, len(get_worksheet_values(sheet, "Notes")) - 1) if "Notes" in ws_names else 0
+            recettes_count = max(0, len(get_worksheet_values(sheet, "Recettes")) - 1) if "Recettes" in ws_names else 0
+            saiko_count = max(0, len(get_worksheet_values(sheet, "Saiko")) - 1) if "Saiko" in ws_names else 0
             
             st.markdown("### 📊 Vue d'ensemble")
             
@@ -227,9 +222,8 @@ with tab_agenda:
             ws_names = [w.title for w in sheet.worksheets()]
             agenda_ws = sheet.worksheet("Agenda") if "Agenda" in ws_names else sheet.add_worksheet(title="Agenda", rows="100", cols="20")
             
-            all_vals = agenda_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Agenda")
             if len(all_vals) <= 1:
-                agenda_ws.append_row(["Date", "Heure", "Titre", "Description"])
                 all_vals = [["Date", "Heure", "Titre", "Description"]]
 
             events_data = all_vals[1:]
@@ -275,14 +269,12 @@ with tab_taches:
             ws_names = [w.title for w in sheet.worksheets()]
             taches_ws = sheet.worksheet("Taches") if "Taches" in ws_names else sheet.add_worksheet(title="Taches", rows="100", cols="20")
             
-            all_vals = taches_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Taches")
             if len(all_vals) <= 1:
-                taches_ws.append_row(["Tache", "Categorie", "Statut"])
                 all_vals = [["Tache", "Categorie", "Statut"]]
 
             taches_data = all_vals[1:]
             
-            # --- BARRE D'AVANCEMENT ---
             total_taches = len(taches_data)
             taches_faites = len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"])
             
@@ -344,9 +336,8 @@ with tab_courses:
             ws_names = [w.title for w in sheet.worksheets()]
             courses_ws = sheet.worksheet("Courses") if "Courses" in ws_names else sheet.add_worksheet(title="Courses", rows="100", cols="20")
             
-            all_vals = courses_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Courses")
             if len(all_vals) <= 1:
-                courses_ws.append_row(["Article", "Quantite", "Categorie"])
                 all_vals = [["Article", "Quantite", "Categorie"]]
 
             courses_data = all_vals[1:]
@@ -392,9 +383,8 @@ with tab_saiko:
             ws_names = [w.title for w in sheet.worksheets()]
             saiko_ws = sheet.worksheet("Saiko") if "Saiko" in ws_names else sheet.add_worksheet(title="Saiko", rows="100", cols="20")
             
-            all_vals = saiko_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Saiko")
             if len(all_vals) <= 1:
-                saiko_ws.append_row(["Date", "Type", "Sujet", "Notes"])
                 all_vals = [["Date", "Type", "Sujet", "Notes"]]
 
             saiko_data = all_vals[1:]
@@ -431,7 +421,7 @@ with tab_saiko:
         st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
 # ==========================================
-# ONGLET 5 : BUDGET (LUCAS & ALEX)
+# ONGLET 5 : BUDGET
 # ==========================================
 with tab_budget:
     st.subheader("💶 Budget & Comptes du Couple")
@@ -441,9 +431,8 @@ with tab_budget:
             ws_names = [w.title for w in sheet.worksheets()]
             budget_ws = sheet.worksheet("Budget") if "Budget" in ws_names else sheet.add_worksheet(title="Budget", rows="100", cols="20")
             
-            all_vals = budget_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Budget")
             if len(all_vals) <= 1:
-                budget_ws.append_row(["Date", "Payé Par", "Intitulé", "Montant"])
                 all_vals = [["Date", "Payé Par", "Intitulé", "Montant"]]
 
             budget_data = all_vals[1:]
@@ -463,7 +452,6 @@ with tab_budget:
                     elif payer == "Alex":
                         total_alex += amt
 
-                # --- GRAPHIQUE VISUEL DES DÉPENSES ---
                 chart_data = pd.DataFrame({
                     "Personne": ["Lucas", "Alex"],
                     "Total Dépensé (€)": [total_lucas, total_alex]
@@ -530,9 +518,8 @@ with tab_repas:
             ws_names = [w.title for w in sheet.worksheets()]
             repas_ws = sheet.worksheet("Repas") if "Repas" in ws_names else sheet.add_worksheet(title="Repas", rows="100", cols="20")
             
-            all_vals = repas_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Repas")
             if len(all_vals) <= 1:
-                repas_ws.append_row(["Jour", "Repas", "Plat"])
                 all_vals = [["Jour", "Repas", "Plat"]]
 
             repas_data = all_vals[1:]
@@ -582,9 +569,8 @@ with tab_admin:
             ws_names = [w.title for w in sheet.worksheets()]
             admin_ws = sheet.worksheet("Admin") if "Admin" in ws_names else sheet.add_worksheet(title="Admin", rows="100", cols="20")
             
-            all_vals = admin_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Admin")
             if len(all_vals) <= 1:
-                admin_ws.append_row(["Sujet", "Echéance", "Détails"])
                 all_vals = [["Sujet", "Echéance", "Détails"]]
 
             admin_data = all_vals[1:]
@@ -628,9 +614,8 @@ with tab_listes:
             ws_names = [w.title for w in sheet.worksheets()]
             listes_ws = sheet.worksheet("Listes") if "Listes" in ws_names else sheet.add_worksheet(title="Listes", rows="100", cols="20")
             
-            all_vals = listes_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Listes")
             if len(all_vals) <= 1:
-                listes_ws.append_row(["Catégorie", "Élément", "Notes"])
                 all_vals = [["Catégorie", "Élément", "Notes"]]
 
             listes_data = all_vals[1:]
@@ -678,9 +663,8 @@ with tab_notes:
             ws_names = [w.title for w in sheet.worksheets()]
             notes_ws = sheet.worksheet("Notes") if "Notes" in ws_names else sheet.add_worksheet(title="Notes", rows="100", cols="20")
             
-            all_vals = notes_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Notes")
             if len(all_vals) <= 1:
-                notes_ws.append_row(["Titre", "Contenu"])
                 all_vals = [["Titre", "Contenu"]]
 
             search_note = st.text_input("🔍 Rechercher dans les notes...", placeholder="Mot-clé...")
@@ -729,9 +713,8 @@ with tab_recettes:
             recettes_ws = sheet.worksheet("Recettes") if "Recettes" in ws_names else sheet.add_worksheet(title="Recettes", rows="100", cols="20")
             courses_ws = sheet.worksheet("Courses") if "Courses" in ws_names else sheet.add_worksheet(title="Courses", rows="100", cols="20")
             
-            all_vals = recettes_ws.get_all_values()
+            all_vals = get_worksheet_values(sheet, "Recettes")
             if len(all_vals) <= 1:
-                recettes_ws.append_row(["Titre", "Ingrédients", "Instructions"])
                 all_vals = [["Titre", "Ingrédients", "Instructions"]]
 
             search_recette = st.text_input("🔍 Rechercher une recette...", placeholder="Nom ou ingrédient...")
