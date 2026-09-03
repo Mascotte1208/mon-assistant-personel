@@ -13,449 +13,356 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLE CSS ULTRA-MODERNE ---
+# --- STYLE CSS DESIGN & ERGONOMIQUE ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: #f8fafc;
     }
     
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
+    /* Style des Onglets Principaux */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 4px;
-        background-color: #f1f5f9;
+        gap: 6px;
+        background-color: #e2e8f0;
         padding: 6px;
         border-radius: 16px;
-        overflow-x: auto;
     }
     .stTabs [data-baseweb="tab"] {
         border-radius: 12px;
-        padding: 8px 12px;
-        font-weight: 600;
-        font-size: 13px;
-        color: #64748b;
+        padding: 10px 14px;
+        font-weight: 700;
+        font-size: 14px;
+        color: #475569;
         background-color: transparent;
         border: none;
-        white-space: nowrap;
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
-        color: #0f172a !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        color: #4f46e5 !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
 
-    .stButton button {
-        border-radius: 12px;
-        width: 100%;
-        font-weight: 600;
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-        color: white;
-        border: none;
-        padding: 10px 16px;
-        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
-        transition: all 0.2s ease;
-    }
-    .stButton button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
-    }
-
-    .metric-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    /* Style des cartes du Dashboard */
+    .dashboard-card {
+        background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        padding: 14px;
+        border-radius: 18px;
+        padding: 16px;
         text-align: center;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
-        margin-bottom: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        margin-bottom: 12px;
     }
-    .metric-value {
-        font-size: 22px;
+    .card-title {
+        font-size: 12px;
         font-weight: 700;
-        color: #4f46e5;
-    }
-    .metric-label {
-        font-size: 11px;
-        font-weight: 600;
         color: #64748b;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+    .card-value {
+        font-size: 26px;
+        font-weight: 800;
+        color: #4f46e5;
+        margin-top: 4px;
+    }
+
+    /* Boutons modernisés */
+    .stButton button {
+        border-radius: 12px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- CACHE STREAMLIT ANTI-QUOTA (60s) ---
-@st.cache_data(ttl=60)
-def fetch_worksheet_values(_sheet, worksheet_name):
+# --- CACHE DONNÉES GOOGLE SHEETS (30 SECONDES) ---
+@st.cache_data(ttl=30, show_spinner=False)
+def fetch_sheet_data(json_str, sheet_name):
     try:
-        ws = _sheet.worksheet(worksheet_name)
+        creds_dict = json.loads(json_str)
+        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        sheet = client.open("MonAssistantData")
+        ws = sheet.worksheet(sheet_name)
         return ws.get_all_values()
     except Exception:
         return []
 
-def clear_app_cache():
-    st.cache_data.clear()
+def get_gspread_client(json_str):
+    creds_dict = json.loads(json_str)
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    return gspread.authorize(creds)
 
-# --- CONNEXION GOOGLE SHEETS VIA FICHIER JSON ---
-def connect_with_file(uploaded_file):
-    try:
-        creds_dict = json.load(uploaded_file)
-        scope = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-        client = gspread.authorize(creds)
-        
-        try:
-            sheet = client.open("MonAssistantData")
-        except gspread.SpreadsheetNotFound:
-            sheet = client.create("MonAssistantData")
-            sheet.values_append("Sheet1", {'valueInputOption': 'RAW'}, {'values': [['Tache', 'Categorie', 'Statut']]})
-            sheet.rename_worksheet(sheet.worksheet("Sheet1"), "Taches")
-            
-            for ws_title, headers in [
-                ("Agenda", [['Date', 'Heure', 'Titre', 'Description']]),
-                ("Courses", [['Article', 'Quantite', 'Categorie']]),
-                ("Notes", [['Titre', 'Contenu']]),
-                ("Recettes", [['Titre', 'Ingrédients', 'Instructions']]),
-                ("Saiko", [['Date', 'Type', 'Sujet', 'Notes']]),
-                ("Budget", [['Date', 'Payé Par', 'Intitulé', 'Montant']]),
-                ("Repas", [['Jour', 'Repas', 'Plat']]),
-                ("Admin", [['Sujet', 'Echéance', 'Détails']]),
-                ("Listes", [['Catégorie', 'Élément', 'Notes']])
-            ]:
-                sheet.add_worksheet(title=ws_title, rows="100", cols="20")
-                sheet.values_append(ws_title, {'valueInputOption': 'RAW'}, {'values': headers})
-            
-        return sheet, None
-    except Exception as e:
-        return None, str(e)
+# --- SESSION CONFIGURATION ---
+if "json_credentials_str" not in st.session_state:
+    st.session_state["json_credentials_str"] = None
 
-def connect_with_secrets():
-    try:
-        if "gcp_service_account" in st.secrets:
-            creds_dict = dict(st.secrets["gcp_service_account"])
-            if "private_key" in creds_dict:
-                creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-            scope = [
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive"
-            ]
-            creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-            client = gspread.authorize(creds)
-            return client.open("MonAssistantData")
-    except Exception:
-        return None
-    return None
+# --- EN-TÊTE PRINCIPAL ---
+st.markdown("# ✨ Notre Assistant")
+st.caption("Espace personnel partagé — Lucas & Alex 🚀")
 
-sheet = connect_with_secrets()
-if not sheet and "uploaded_sheet_data" in st.session_state:
-    sheet = st.session_state["uploaded_sheet_data"]
-
-# --- EN-TÊTE ---
-st.markdown("## ✨ Notre Espace Partagé")
-st.caption("Centralisez votre quotidien à deux, en toute simplicité 🚀")
-
-# --- NAVIGATION PAR ONGLETS ---
-tab_accueil, tab_agenda, tab_taches, tab_courses, tab_saiko, tab_budget, tab_repas, tab_admin, tab_listes, tab_notes, tab_recettes = st.tabs([
-    "🏠 Accueil", "📅 Agenda", "✅ Tâches", "🛒 Courses", "🐶 Saiko", "💶 Budget", "🍽️ Repas", "🏡 Admin", "🧳 Listes", "📝 Notes", "🍲 Recettes"
+# --- NAVIGATION RESTRUCTURÉE (4 GRANDS GROUPES) ---
+tab_dash, tab_quotidien, tab_vie_a_deux, tab_loisirs = st.tabs([
+    "🏠 Dashboard", "📋 Quotidien", "💡 Vie à Deux", "🐾 Saiko & Cuisine"
 ])
 
 # ==========================================
-# ONGLET 0 : ACCUEIL
+# SUPER-ONGLET 1 : DASHBOARD VISUEL
 # ==========================================
-with tab_accueil:
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            
-            taches_count = max(0, len(fetch_worksheet_values(sheet, "Taches")) - 1) if "Taches" in ws_names else 0
-            agenda_count = max(0, len(fetch_worksheet_values(sheet, "Agenda")) - 1) if "Agenda" in ws_names else 0
-            courses_count = max(0, len(fetch_worksheet_values(sheet, "Courses")) - 1) if "Courses" in ws_names else 0
-            notes_count = max(0, len(fetch_worksheet_values(sheet, "Notes")) - 1) if "Notes" in ws_names else 0
-            recettes_count = max(0, len(fetch_worksheet_values(sheet, "Recettes")) - 1) if "Recettes" in ws_names else 0
-            saiko_count = max(0, len(fetch_worksheet_values(sheet, "Saiko")) - 1) if "Saiko" in ws_names else 0
-            
-            st.markdown("### 📊 Vue d'ensemble")
-            
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{agenda_count}</div><div class="metric-label">📅 Agenda</div></div>', unsafe_allow_html=True)
-            with c2:
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{taches_count}</div><div class="metric-label">✅ Tâches</div></div>', unsafe_allow_html=True)
-            with c3:
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{courses_count}</div><div class="metric-label">🛒 Courses</div></div>', unsafe_allow_html=True)
-                
-            c4, c5, c6 = st.columns(3)
-            with c4:
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{saiko_count}</div><div class="metric-label">🐶 Saiko</div></div>', unsafe_allow_html=True)
-            with c5:
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{notes_count}</div><div class="metric-label">📌 Notes</div></div>', unsafe_allow_html=True)
-            with c6:
-                st.markdown(f'<div class="metric-card"><div class="metric-value">{recettes_count}</div><div class="metric-label">🍲 Recettes</div></div>', unsafe_allow_html=True)
-                
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🔄 Actualiser les données en direct"):
-                clear_app_cache()
-                st.rerun()
-            st.info("💡 **Astuce mobile :** Enregistrez cette page sur l'écran d'accueil de votre smartphone pour l'ouvrir comme une application native !")
-        except Exception as e:
-            st.warning(f"Erreur de chargement du dashboard : {e}")
-    else:
+with tab_dash:
+    if not st.session_state["json_credentials_str"]:
         st.warning("⚠️ Connexion Google Sheets requise.")
         uploaded_json = st.file_uploader("Glissez votre fichier JSON de configuration ici", type=["json"])
         if uploaded_json is not None:
-            connected_sheet, error_msg = connect_with_file(uploaded_json)
-            if connected_sheet:
-                st.session_state["uploaded_sheet_data"] = connected_sheet
-                clear_app_cache()
-                st.success("Connexion réussie !")
-                st.rerun()
-            else:
-                st.error(f"Erreur : {error_msg}")
-
-# ==========================================
-# ONGLET 1 : AGENDA
-# ==========================================
-with tab_agenda:
-    st.subheader("📅 Agenda & Événements")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            agenda_ws = sheet.worksheet("Agenda") if "Agenda" in ws_names else sheet.add_worksheet(title="Agenda", rows="100", cols="20")
+            raw_json = uploaded_json.read().decode("utf-8")
+            st.session_state["json_credentials_str"] = raw_json
             
-            all_vals = fetch_worksheet_values(sheet, "Agenda")
-            if len(all_vals) <= 1:
-                all_vals = [["Date", "Heure", "Titre", "Description"]]
-
-            events_data = all_vals[1:]
-            if events_data:
-                for idx, row in enumerate(events_data):
-                    date_ev = row[0] if len(row) > 0 else ""
-                    heure_ev = row[1] if len(row) > 1 else ""
-                    titre_ev = row[2] if len(row) > 2 else "Sans titre"
-                    desc_ev = row[3] if len(row) > 3 else ""
-                    real_idx = all_vals.index(row) + 1
-                    
-                    with st.expander(f"🗓️ {date_ev} {f'à {heure_ev}' if heure_ev else ''} — {titre_ev}"):
-                        if desc_ev:
-                            st.write(f"**Détails :** {desc_ev}")
-                        if st.button("🗑️ Supprimer l'événement", key=f"del_ev_{idx}_{real_idx}"):
-                            agenda_ws.delete_rows(real_idx)
-                            clear_app_cache()
-                            st.rerun()
-            else:
-                st.info("Aucun événement prévu.")
-
-            st.divider()
-            with st.form("form_agenda", clear_on_submit=True):
-                st.markdown("#### ➕ Ajouter un événement")
-                e_date = st.date_input("Date", value=datetime.today())
-                e_heure = st.time_input("Heure", value=datetime.now().time())
-                e_titre = st.text_input("Titre de l'événement")
-                e_desc = st.text_area("Description / Lieu (optionnel)")
-                if st.form_submit_button("Enregistrer l'événement") and e_titre:
-                    agenda_ws.append_row([str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
-                    clear_app_cache()
-                    st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Agenda : {e}")
+            client = get_gspread_client(raw_json)
+            try:
+                doc = client.open("MonAssistantData")
+            except gspread.SpreadsheetNotFound:
+                doc = client.create("MonAssistantData")
+                doc.values_append("Sheet1", {'valueInputOption': 'RAW'}, {'values': [['Tache', 'Categorie', 'Statut']]})
+                doc.rename_worksheet(doc.worksheet("Sheet1"), "Taches")
+                for ws_title, headers in [
+                    ("Agenda", [['Date', 'Heure', 'Titre', 'Description']]),
+                    ("Courses", [['Article', 'Quantite', 'Categorie']]),
+                    ("Notes", [['Titre', 'Contenu']]),
+                    ("Recettes", [['Titre', 'Ingrédients', 'Instructions']]),
+                    ("Saiko", [['Date', 'Type', 'Sujet', 'Notes']]),
+                    ("Budget", [['Date', 'Payé Par', 'Intitulé', 'Montant']]),
+                    ("Repas", [['Jour', 'Repas', 'Plat']]),
+                    ("Admin", [['Sujet', 'Echéance', 'Détails']]),
+                    ("Listes", [['Catégorie', 'Élément', 'Notes']])
+                ]:
+                    doc.add_worksheet(title=ws_title, rows="100", cols="20")
+                    doc.values_append(ws_title, {'valueInputOption': 'RAW'}, {'values': headers})
+            
+            st.success("Connexion réussie !")
+            st.rerun()
     else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
+        json_str = st.session_state["json_credentials_str"]
+        
+        # Récupération rapide du nombre d'éléments pour les cartes
+        taches_vals = fetch_sheet_data(json_str, "Taches")
+        agenda_vals = fetch_sheet_data(json_str, "Agenda")
+        courses_vals = fetch_sheet_data(json_str, "Courses")
+        notes_vals = fetch_sheet_data(json_str, "Notes")
+        
+        nb_taches = max(0, len(taches_vals) - 1)
+        nb_agenda = max(0, len(agenda_vals) - 1)
+        nb_courses = max(0, len(courses_vals) - 1)
+        nb_notes = max(0, len(notes_vals) - 1)
+
+        st.markdown("### 📊 Vue d'ensemble")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(f'<div class="dashboard-card"><div class="card-title">✅ Tâches en cours</div><div class="card-value">{nb_taches}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dashboard-card"><div class="card-title">🛒 Articles à acheter</div><div class="card-value">{nb_courses}</div></div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown(f'<div class="dashboard-card"><div class="card-title">📅 Événements prévus</div><div class="card-value">{nb_agenda}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="dashboard-card"><div class="card-title">📌 Notes mémorisées</div><div class="card-value">{nb_notes}</div></div>', unsafe_allow_html=True)
+
+        st.divider()
+        col_act1, col_act2 = st.columns(2)
+        with col_act1:
+            if st.button("🔄 Rafraîchir les données"):
+                st.cache_data.clear()
+                st.rerun()
+        with col_act2:
+            if st.button("🔴 Déconnexion JSON"):
+                st.session_state["json_credentials_str"] = None
+                st.cache_data.clear()
+                st.rerun()
+
+json_str = st.session_state["json_credentials_str"]
 
 # ==========================================
-# ONGLET 2 : TÂCHES
+# SUPER-ONGLET 2 : QUOTIDIEN
 # ==========================================
-with tab_taches:
-    st.subheader("✅ Tâches à faire")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            taches_ws = sheet.worksheet("Taches") if "Taches" in ws_names else sheet.add_worksheet(title="Taches", rows="100", cols="20")
-            
-            all_vals = fetch_worksheet_values(sheet, "Taches")
-            if len(all_vals) <= 1:
-                all_vals = [["Tache", "Categorie", "Statut"]]
-
-            taches_data = all_vals[1:]
+with tab_quotidien:
+    if json_str:
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda", "🛒 Courses", "🍽️ Repas"])
+        
+        # --- SOUS-TAB : TÂCHES ---
+        with sub_tab1:
+            st.subheader("✅ Tâches à faire")
+            all_vals = fetch_sheet_data(json_str, "Taches")
+            taches_data = all_vals[1:] if len(all_vals) > 1 else []
             
             total_taches = len(taches_data)
             taches_faites = len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"])
             
             if total_taches > 0:
-                progression = taches_faites / total_taches
                 st.markdown(f"**Avancement : {taches_faites} / {total_taches} accomplie(s)**")
-                st.progress(progression)
-            else:
-                st.progress(0.0)
+                st.progress(taches_faites / total_taches)
 
-            cat_filter = st.selectbox("🔍 Filtrer par catégorie", ["Toutes", "Maison", "Admin", "Saiko", "Urgent", "Autre"])
-            filtered_taches = [t for t in taches_data if cat_filter == "Toutes" or (len(t) > 1 and t[1] == cat_filter)] if taches_data else []
+            cat_filter = st.selectbox("🔍 Catégorie", ["Toutes", "Maison", "Admin", "Saiko", "Urgent", "Autre"])
+            filtered = [t for t in taches_data if cat_filter == "Toutes" or (len(t) > 1 and t[1] == cat_filter)]
 
-            if filtered_taches:
-                for idx, row in enumerate(filtered_taches):
+            if filtered:
+                for idx, row in enumerate(filtered):
                     nom_t = row[0] if len(row) > 0 else "Sans nom"
                     cat_t = row[1] if len(row) > 1 else "Général"
                     statut_t = row[2] if len(row) > 2 else "À faire"
                     real_idx = all_vals.index(row) + 1
                     
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
                         if statut_t == "Fait":
                             st.markdown(f"- ~~**{nom_t}**~~ *[{cat_t}]*")
                         else:
                             st.markdown(f"- **{nom_t}** *[{cat_t}]*")
-                    with col2:
+                    with c2:
                         if statut_t != "Fait":
-                            if st.button("✔️ Fait", key=f"del_t_{idx}_{real_idx}"):
-                                taches_ws.update_cell(real_idx, 3, "Fait")
-                                clear_app_cache()
+                            if st.button("✔️", key=f"t_fait_{idx}"):
+                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Taches").update_cell(real_idx, 3, "Fait")
+                                st.cache_data.clear()
                                 st.rerun()
                         else:
-                            if st.button("🗑️", key=f"del_t_{idx}_{real_idx}"):
-                                taches_ws.delete_rows(real_idx)
-                                clear_app_cache()
+                            if st.button("🗑️", key=f"t_del_{idx}"):
+                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Taches").delete_rows(real_idx)
+                                st.cache_data.clear()
                                 st.rerun()
             else:
-                st.info("Aucune tâche dans cette catégorie.")
+                st.info("Aucune tâche.")
 
             st.divider()
             with st.form("form_tache", clear_on_submit=True):
                 st.markdown("#### ➕ Nouvelle tâche")
-                n_tache = st.text_input("Intitulé de la tâche")
+                n_tache = st.text_input("Intitulé")
                 n_cat = st.selectbox("Catégorie", ["Maison", "Admin", "Saiko", "Urgent", "Autre"])
-                if st.form_submit_button("Ajouter la tâche") and n_tache:
-                    taches_ws.append_row([n_tache, n_cat, "À faire"])
-                    clear_app_cache()
+                if st.form_submit_button("Ajouter") and n_tache:
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Taches").append_row([n_tache, n_cat, "À faire"])
+                    st.cache_data.clear()
                     st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Tâches : {e}")
-    else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
-# ==========================================
-# ONGLET 3 : COURSES
-# ==========================================
-with tab_courses:
-    st.subheader("🛒 Liste de Courses")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            courses_ws = sheet.worksheet("Courses") if "Courses" in ws_names else sheet.add_worksheet(title="Courses", rows="100", cols="20")
-            
-            all_vals = fetch_worksheet_values(sheet, "Courses")
-            if len(all_vals) <= 1:
-                all_vals = [["Article", "Quantite", "Categorie"]]
+        # --- SOUS-TAB : AGENDA ---
+        with sub_tab2:
+            st.subheader("📅 Agenda")
+            all_vals = fetch_sheet_data(json_str, "Agenda")
+            events_data = all_vals[1:] if len(all_vals) > 1 else []
 
-            courses_data = all_vals[1:]
-            if courses_data:
-                for idx, row in enumerate(courses_data):
-                    art = row[0] if len(row) > 0 else "Article"
-                    qte = row[1] if len(row) > 1 else "1"
-                    cat = row[2] if len(row) > 2 else "Général"
-                    real_idx = all_vals.index(row) + 1
-                    
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.markdown(f"- **{art}** *(Qté: {qte} | {cat})*")
-                    with col2:
-                        if st.button("✔️ Acquis", key=f"del_c_{idx}_{real_idx}"):
-                            courses_ws.delete_rows(real_idx)
-                            clear_app_cache()
+            if events_data:
+                for idx, row in enumerate(events_data):
+                    date_ev, heure_ev, titre_ev, desc_ev = (row + ["", "", "", ""])[:4]
+                    real_idx = idx + 2
+                    with st.expander(f"🗓️ {date_ev} {f'à {heure_ev}' if heure_ev else ''} — {titre_ev}"):
+                        if desc_ev:
+                            st.write(f"**Détails :** {desc_ev}")
+                        if st.button("🗑️ Supprimer", key=f"ev_del_{idx}"):
+                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Agenda").delete_rows(real_idx)
+                            st.cache_data.clear()
                             st.rerun()
             else:
-                st.info("La liste de courses est vide.")
+                st.info("Aucun événement.")
+
+            st.divider()
+            with st.form("form_agenda", clear_on_submit=True):
+                st.markdown("#### ➕ Nouvel événement")
+                e_date = st.date_input("Date", value=datetime.today())
+                e_heure = st.time_input("Heure", value=datetime.now().time())
+                e_titre = st.text_input("Titre")
+                e_desc = st.text_area("Description")
+                if st.form_submit_button("Enregistrer") and e_titre:
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Agenda").append_row([str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
+                    st.cache_data.clear()
+                    st.rerun()
+
+        # --- SOUS-TAB : COURSES ---
+        with sub_tab3:
+            st.subheader("🛒 Liste de Courses")
+            all_vals = fetch_sheet_data(json_str, "Courses")
+            courses_data = all_vals[1:] if len(all_vals) > 1 else []
+
+            if courses_data:
+                for idx, row in enumerate(courses_data):
+                    art, qte, cat = (row + ["Article", "1", "Général"])[:3]
+                    real_idx = idx + 2
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
+                        st.markdown(f"- **{art}** *(Qté: {qte} | {cat})*")
+                    with c2:
+                        if st.button("✔️ Acquis", key=f"c_del_{idx}"):
+                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Courses").delete_rows(real_idx)
+                            st.cache_data.clear()
+                            st.rerun()
+            else:
+                st.info("Liste de courses vide.")
 
             st.divider()
             with st.form("form_courses", clear_on_submit=True):
-                st.markdown("#### ➕ Ajouter un article")
-                c_art = st.text_input("Article (ex: Pain, Lait...)")
+                c_art = st.text_input("Article")
                 c_qte = st.text_input("Quantité", value="1")
                 c_cat = st.selectbox("Rayon", ["Supermarché", "Frais", "Fruits & Légumes", "Boissons", "Entretien", "Autre"])
                 if st.form_submit_button("Ajouter aux courses") and c_art:
-                    courses_ws.append_row([c_art, c_qte, c_cat])
-                    clear_app_cache()
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Courses").append_row([c_art, c_qte, c_cat])
+                    st.cache_data.clear()
                     st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Courses : {e}")
-    else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
-# ==========================================
-# ONGLET 4 : SAIKO 🐾
-# ==========================================
-with tab_saiko:
-    st.subheader("🐶 Espace Saiko")
-    st.caption("Suivi des soins, rendez-vous vétérinaire et santé")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            saiko_ws = sheet.worksheet("Saiko") if "Saiko" in ws_names else sheet.add_worksheet(title="Saiko", rows="100", cols="20")
-            
-            all_vals = fetch_worksheet_values(sheet, "Saiko")
-            if len(all_vals) <= 1:
-                all_vals = [["Date", "Type", "Sujet", "Notes"]]
+        # --- SOUS-TAB : REPAS ---
+        with sub_tab4:
+            st.subheader("🍽️ Planning des Repas")
+            all_vals = fetch_sheet_data(json_str, "Repas")
+            repas_data = all_vals[1:] if len(all_vals) > 1 else []
+            jours = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
-            saiko_data = all_vals[1:]
-            if saiko_data:
-                for idx, row in enumerate(saiko_data):
-                    dt = row[0] if len(row) > 0 else ""
-                    tp = row[1] if len(row) > 1 else "Soin"
-                    sj = row[2] if len(row) > 2 else "Remarque"
-                    nt = row[3] if len(row) > 3 else ""
-                    real_idx = all_vals.index(row) + 1
-                    
-                    with st.expander(f"🐾 [{tp}] {sj} ({dt})"):
-                        if nt:
-                            st.write(nt)
-                        if st.button("🗑️ Supprimer", key=f"del_sk_{idx}_{real_idx}"):
-                            saiko_ws.delete_rows(real_idx)
-                            clear_app_cache()
-                            st.rerun()
-            else:
-                st.info("Aucun rappel ni soin enregistré pour Saiko.")
+            for jour in jours:
+                st.markdown(f"##### 📅 {jour}")
+                repas_j = [r for r in repas_data if len(r) > 0 and r[0] == jour]
+                if repas_j:
+                    for r in repas_j:
+                        typ, plt = (r[1:] + ["", ""])[:2]
+                        real_idx = all_vals.index(r) + 1
+                        c1, c2 = st.columns([4, 1])
+                        with c1:
+                            st.write(f"- **{typ}** : {plt}")
+                        with c2:
+                            if st.button("🗑️", key=f"rep_del_{real_idx}"):
+                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Repas").delete_rows(real_idx)
+                                st.cache_data.clear()
+                                st.rerun()
+                else:
+                    st.caption("Rien de prévu")
 
             st.divider()
-            with st.form("form_saiko", clear_on_submit=True):
-                st.markdown("#### ➕ Ajouter un suivi pour Saiko")
-                s_date = st.date_input("Date", value=datetime.today())
-                s_type = st.selectbox("Type", ["Vétérinaire / Vaccin", "Anti-puces / Vermifuge", "Achat Croquettes / Matériel", "Soin / Toilettage", "Autre"])
-                s_sujet = st.text_input("Titre / Sujet")
-                s_notes = st.text_area("Notes complémentaires")
-                if st.form_submit_button("Enregistrer pour Saiko") and s_sujet:
-                    saiko_ws.append_row([str(s_date), s_type, s_sujet, s_notes])
-                    clear_app_cache()
+            with st.form("form_repas", clear_on_submit=True):
+                r_jour = st.selectbox("Jour", jours)
+                r_type = st.radio("Repas", ["Midi", "Soir"], horizontal=True)
+                r_plat = st.text_input("Plat")
+                if st.form_submit_button("Ajouter au planning") and r_plat:
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Repas").append_row([r_jour, r_type, r_plat])
+                    st.cache_data.clear()
                     st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Saiko : {e}")
-    else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
 # ==========================================
-# ONGLET 5 : BUDGET
+# SUPER-ONGLET 3 : VIE À DEUX
 # ==========================================
-with tab_budget:
-    st.subheader("💶 Budget & Comptes du Couple")
-    st.caption("Équilibrez vos dépenses communes en toute simplicité")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            budget_ws = sheet.worksheet("Budget") if "Budget" in ws_names else sheet.add_worksheet(title="Budget", rows="100", cols="20")
-            
-            all_vals = fetch_worksheet_values(sheet, "Budget")
-            if len(all_vals) <= 1:
-                all_vals = [["Date", "Payé Par", "Intitulé", "Montant"]]
+with tab_vie_a_deux:
+    if json_str:
+        sub_tab_b, sub_tab_n, sub_tab_a, sub_tab_l = st.tabs(["💶 Budget", "📝 Notes", "🏡 Admin", "🧳 Listes"])
 
-            budget_data = all_vals[1:]
-            total_lucas = 0.0
-            total_alex = 0.0
+        # --- BUDGET ---
+        with sub_tab_b:
+            st.subheader("💶 Budget Commune")
+            all_vals = fetch_sheet_data(json_str, "Budget")
+            budget_data = all_vals[1:] if len(all_vals) > 1 else []
 
+            total_lucas, total_alex = 0.0, 0.0
             if budget_data:
                 for row in budget_data:
                     payer = row[1] if len(row) > 1 else ""
@@ -464,333 +371,205 @@ with tab_budget:
                     except ValueError:
                         amt = 0.0
 
-                    if payer == "Lucas":
-                        total_lucas += amt
-                    elif payer == "Alex":
-                        total_alex += amt
+                    if payer == "Lucas": total_lucas += amt
+                    elif payer == "Alex": total_alex += amt
 
-                chart_data = pd.DataFrame({
-                    "Personne": ["Lucas", "Alex"],
-                    "Total Dépensé (€)": [total_lucas, total_alex]
-                })
+                chart_data = pd.DataFrame({"Personne": ["Lucas", "Alex"], "Total Dépensé (€)": [total_lucas, total_alex]})
                 st.bar_chart(chart_data, x="Personne", y="Total Dépensé (€)")
 
                 diff = (total_lucas - total_alex) / 2
-                
                 b1, b2 = st.columns(2)
-                with b1:
-                    st.metric(label="Total payé par Lucas", value=f"{total_lucas:.2f} €")
-                with b2:
-                    st.metric(label="Total payé par Alex", value=f"{total_alex:.2f} €")
+                with b1: st.metric("Lucas a payé", f"{total_lucas:.2f} €")
+                with b2: st.metric("Alex a payé", f"{total_alex:.2f} €")
                 
-                st.markdown("<br>", unsafe_allow_html=True)
-                if diff > 0:
-                    st.success(f"👉 **Alex doit {diff:.2f} € à Lucas** pour équilibrer les comptes.")
-                elif diff < 0:
-                    st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alex** pour équilibrer les comptes.")
-                else:
-                    st.info("⚖️ Les comptes sont parfaitement équilibrés !")
+                if diff > 0: st.success(f"👉 **Alex doit {diff:.2f} € à Lucas**")
+                elif diff < 0: st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alex**")
+                else: st.info("⚖️ Comptes équilibrés !")
 
                 st.divider()
-                st.markdown("#### Historique des dépenses")
                 for idx, row in enumerate(budget_data):
-                    dt = row[0] if len(row) > 0 else ""
-                    pyr = row[1] if len(row) > 1 else ""
-                    lbl = row[2] if len(row) > 2 else ""
-                    val = row[3] if len(row) > 3 else "0"
-                    real_idx = all_vals.index(row) + 1
-                    
-                    c_info, c_del = st.columns([4, 1])
-                    with c_info:
-                        st.markdown(f"- **{lbl}** : {val} € *(Payé par {pyr} le {dt})*")
-                    with c_del:
-                        if st.button("🗑️", key=f"del_b_{idx}_{real_idx}"):
-                            budget_ws.delete_rows(real_idx)
-                            clear_app_cache()
+                    dt, pyr, lbl, val = (row + ["", "", "", "0"])[:4]
+                    real_idx = idx + 2
+                    c1, c2 = st.columns([4, 1])
+                    with c1: st.markdown(f"- **{lbl}** : {val} € *(par {pyr} le {dt})*")
+                    with c2:
+                        if st.button("🗑️", key=f"b_del_{idx}"):
+                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Budget").delete_rows(real_idx)
+                            st.cache_data.clear()
                             st.rerun()
-            else:
-                st.info("Aucune dépense enregistrée pour le moment.")
 
             st.divider()
             with st.form("form_budget", clear_on_submit=True):
-                st.markdown("#### ➕ Ajouter une dépense commune")
                 b_date = st.date_input("Date", value=datetime.today())
                 b_payer = st.radio("Qui a payé ?", ["Lucas", "Alex"], horizontal=True)
-                b_label = st.text_input("Intitulé (ex: Courses, Resto, Facture Internet...)")
-                b_amount = st.number_input("Montant (€)", min_value=0.0, step=0.5, format="%.2f")
-                if st.form_submit_button("Ajouter la dépense") and b_label and b_amount > 0:
-                    budget_ws.append_row([str(b_date), b_payer, b_label, str(b_amount)])
-                    clear_app_cache()
+                b_label = st.text_input("Intitulé (ex: Courses, Resto...)")
+                b_amount = st.number_input("Montant (€)", min_value=0.0, step=0.5)
+                if st.form_submit_button("Ajouter dépense") and b_label and b_amount > 0:
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Budget").append_row([str(b_date), b_payer, b_label, str(b_amount)])
+                    st.cache_data.clear()
                     st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Budget : {e}")
-    else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
 
-# ==========================================
-# ONGLET 6 : PLANNING REPAS
-# ==========================================
-with tab_repas:
-    st.subheader("🍽️ Planning des Repas de la Semaine")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            repas_ws = sheet.worksheet("Repas") if "Repas" in ws_names else sheet.add_worksheet(title="Repas", rows="100", cols="20")
-            
-            all_vals = fetch_worksheet_values(sheet, "Repas")
-            if len(all_vals) <= 1:
-                all_vals = [["Jour", "Repas", "Plat"]]
+        # --- NOTES ---
+        with sub_tab_n:
+            st.subheader("📝 Notes Partagées")
+            all_vals = fetch_sheet_data(json_str, "Notes")
+            notes_data = all_vals[1:] if len(all_vals) > 1 else []
 
-            repas_data = all_vals[1:]
-            jours = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
-
-            for jour in jours:
-                st.markdown(f"##### 📅 {jour}")
-                repas_j = [r for r in repas_data if len(r) > 0 and r[0] == jour]
-                if repas_j:
-                    for r in repas_j:
-                        typ = r[1] if len(r) > 1 else ""
-                        plt = r[2] if len(r) > 2 else ""
-                        real_idx = all_vals.index(r) + 1
-                        
-                        col_m, col_d = st.columns([4, 1])
-                        with col_m:
-                            st.write(f"- **{typ}** : {plt}")
-                        with col_d:
-                            if st.button("🗑️", key=f"del_rep_{real_idx}"):
-                                repas_ws.delete_rows(real_idx)
-                                clear_app_cache()
-                                st.rerun()
-                else:
-                    st.caption("Rien de prévu")
-
-            st.divider()
-            with st.form("form_repas", clear_on_submit=True):
-                st.markdown("#### ➕ Ajouter un plat au planning")
-                r_jour = st.selectbox("Jour", jours)
-                r_type = st.radio("Repas", ["Midi", "Soir"], horizontal=True)
-                r_plat = st.text_input("Nom du plat / Recette")
-                if st.form_submit_button("Ajouter au planning") and r_plat:
-                    repas_ws.append_row([r_jour, r_type, r_plat])
-                    clear_app_cache()
-                    st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Repas : {e}")
-    else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
-
-# ==========================================
-# ONGLET 7 : LOGEMENT & ADMIN
-# ==========================================
-with tab_admin:
-    st.subheader("🏡 Logement & Administratif")
-    st.caption("Rappels de factures, documents, bail & contacts importants")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            admin_ws = sheet.worksheet("Admin") if "Admin" in ws_names else sheet.add_worksheet(title="Admin", rows="100", cols="20")
-            
-            all_vals = fetch_worksheet_values(sheet, "Admin")
-            if len(all_vals) <= 1:
-                all_vals = [["Sujet", "Echéance", "Détails"]]
-
-            admin_data = all_vals[1:]
-            if admin_data:
-                for idx, row in enumerate(admin_data):
-                    sj = row[0] if len(row) > 0 else "Sujet"
-                    ec = row[1] if len(row) > 1 else ""
-                    dt = row[2] if len(row) > 2 else ""
-                    real_idx = all_vals.index(row) + 1
-                    
-                    with st.expander(f"📋 {sj} {f'(Échéance : {ec})' if ec else ''}"):
-                        if dt:
-                            st.write(dt)
-                        if st.button("🗑️ Supprimer", key=f"del_adm_{idx}_{real_idx}"):
-                            admin_ws.delete_rows(real_idx)
-                            clear_app_cache()
-                            st.rerun()
-            else:
-                st.info("Aucun mémo administratif enregistré.")
-
-            st.divider()
-            with st.form("form_admin", clear_on_submit=True):
-                st.markdown("#### ➕ Ajouter une note administrative")
-                a_sujet = st.text_input("Sujet (ex: Contrôle technique, Assurance, Propriétaire...)")
-                a_echeance = st.text_input("Date / Échéance (ex: 15/10/2026, Annuel...)")
-                a_details = st.text_area("Détails / N° de contrat / Téléphone")
-                if st.form_submit_button("Enregistrer") and a_sujet:
-                    admin_ws.append_row([a_sujet, a_echeance, a_details])
-                    clear_app_cache()
-                    st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Admin : {e}")
-    else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
-
-# ==========================================
-# ONGLET 8 : LISTES & CADEAUX
-# ==========================================
-with tab_listes:
-    st.subheader("🧳 Checklists & Idées Cadeaux")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            listes_ws = sheet.worksheet("Listes") if "Listes" in ws_names else sheet.add_worksheet(title="Listes", rows="100", cols="20")
-            
-            all_vals = fetch_worksheet_values(sheet, "Listes")
-            if len(all_vals) <= 1:
-                all_vals = [["Catégorie", "Élément", "Notes"]]
-
-            listes_data = all_vals[1:]
-            cat_listes = st.radio("Type de liste", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
-
-            filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_listes] if listes_data else []
+            search_note = st.text_input("🔍 Rechercher...", placeholder="Mot-clé...")
+            filtered = [n for n in notes_data if search_note.lower() in " ".join(n).lower()] if search_note else notes_data
 
             if filtered:
                 for idx, row in enumerate(filtered):
-                    elm = row[1] if len(row) > 1 else ""
-                    nts = row[2] if len(row) > 2 else ""
+                    titre, contenu = (row + ["Sans titre", ""])[:2]
                     real_idx = all_vals.index(row) + 1
-                    
-                    c_i, c_d = st.columns([4, 1])
-                    with c_i:
-                        st.markdown(f"- **{elm}** {f'(*{nts}*)' if nts else ''}")
-                    with c_d:
-                        if st.button("🗑️", key=f"del_lst_{idx}_{real_idx}"):
-                            listes_ws.delete_rows(real_idx)
-                            clear_app_cache()
-                            st.rerun()
-            else:
-                st.info("Aucun élément dans cette liste.")
-
-            st.divider()
-            with st.form("form_listes", clear_on_submit=True):
-                st.markdown("#### ➕ Ajouter un élément")
-                l_cat = st.selectbox("Liste", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"])
-                l_elem = st.text_input("Élément / Idée")
-                l_notes = st.text_input("Notes / Taille / Prix (optionnel)")
-                if st.form_submit_button("Ajouter à la liste") and l_elem:
-                    listes_ws.append_row([l_cat, l_elem, l_notes])
-                    clear_app_cache()
-                    st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Listes : {e}")
-    else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
-
-# ==========================================
-# ONGLET 9 : NOTES
-# ==========================================
-with tab_notes:
-    st.subheader("📝 Notes Partagées")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            notes_ws = sheet.worksheet("Notes") if "Notes" in ws_names else sheet.add_worksheet(title="Notes", rows="100", cols="20")
-            
-            all_vals = fetch_worksheet_values(sheet, "Notes")
-            if len(all_vals) <= 1:
-                all_vals = [["Titre", "Contenu"]]
-
-            search_note = st.text_input("🔍 Rechercher dans les notes...", placeholder="Mot-clé...")
-            notes_data = all_vals[1:]
-
-            if search_note and notes_data:
-                filtered_notes = [n for n in notes_data if search_note.lower() in " ".join(n).lower()]
-            else:
-                filtered_notes = notes_data
-
-            if filtered_notes:
-                for idx, row in enumerate(filtered_notes):
-                    titre = row[0] if len(row) > 0 and row[0] else "Sans titre"
-                    contenu = row[1] if len(row) > 1 else ""
-                    real_idx = all_vals.index(row) + 1
-                    
                     with st.expander(f"📌 {titre}"):
                         st.write(contenu)
-                        if st.button("🗑️ Supprimer", key=f"del_n_{idx}_{real_idx}"):
-                            notes_ws.delete_rows(real_idx)
-                            clear_app_cache()
+                        if st.button("🗑️ Supprimer", key=f"n_del_{idx}"):
+                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Notes").delete_rows(real_idx)
+                            st.cache_data.clear()
                             st.rerun()
-            else:
-                st.info("Aucune note trouvée.")
 
             st.divider()
             with st.form("form_note", clear_on_submit=True):
-                st.markdown("#### ➕ Nouvelle note")
                 n_titre = st.text_input("Titre")
                 n_contenu = st.text_area("Contenu")
                 if st.form_submit_button("Enregistrer la note") and n_titre:
-                    notes_ws.append_row([n_titre, n_contenu])
-                    clear_app_cache()
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Notes").append_row([n_titre, n_contenu])
+                    st.cache_data.clear()
                     st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Notes : {e}")
-    else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
+
+        # --- ADMIN ---
+        with sub_tab_a:
+            st.subheader("🏡 Logement & Admin")
+            all_vals = fetch_sheet_data(json_str, "Admin")
+            admin_data = all_vals[1:] if len(all_vals) > 1 else []
+
+            if admin_data:
+                for idx, row in enumerate(admin_data):
+                    sj, ec, dt = (row + ["Sujet", "", ""])[:3]
+                    real_idx = idx + 2
+                    with st.expander(f"📋 {sj} {f'(Échéance : {ec})' if ec else ''}"):
+                        if dt: st.write(dt)
+                        if st.button("🗑️ Supprimer", key=f"adm_del_{idx}"):
+                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Admin").delete_rows(real_idx)
+                            st.cache_data.clear()
+                            st.rerun()
+
+            st.divider()
+            with st.form("form_admin", clear_on_submit=True):
+                a_sujet = st.text_input("Sujet")
+                a_echeance = st.text_input("Échéance / Date")
+                a_details = st.text_area("Détails")
+                if st.form_submit_button("Enregistrer") and a_sujet:
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Admin").append_row([a_sujet, a_echeance, a_details])
+                    st.cache_data.clear()
+                    st.rerun()
+
+        # --- LISTES & CADEAUX ---
+        with sub_tab_l:
+            st.subheader("🧳 Listes & Cadeaux")
+            all_vals = fetch_sheet_data(json_str, "Listes")
+            listes_data = all_vals[1:] if len(all_vals) > 1 else []
+            cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
+
+            filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_l]
+            if filtered:
+                for idx, row in enumerate(filtered):
+                    elm, nts = (row[1:] + ["", ""])[:2]
+                    real_idx = all_vals.index(row) + 1
+                    c1, c2 = st.columns([4, 1])
+                    with c1: st.markdown(f"- **{elm}** {f'(*{nts}*)' if nts else ''}")
+                    with c2:
+                        if st.button("🗑️", key=f"lst_del_{idx}"):
+                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Listes").delete_rows(real_idx)
+                            st.cache_data.clear()
+                            st.rerun()
+
+            st.divider()
+            with st.form("form_listes", clear_on_submit=True):
+                l_cat = st.selectbox("Liste", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"])
+                l_elem = st.text_input("Élément")
+                l_notes = st.text_input("Notes (optionnel)")
+                if st.form_submit_button("Ajouter") and l_elem:
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Listes").append_row([l_cat, l_elem, l_notes])
+                    st.cache_data.clear()
+                    st.rerun()
 
 # ==========================================
-# ONGLET 10 : RECETTES
+# SUPER-ONGLET 4 : SAIKO & CUISINE
 # ==========================================
-with tab_recettes:
-    st.subheader("🍲 Recettes de Cuisine")
-    if sheet:
-        try:
-            ws_names = [w.title for w in sheet.worksheets()]
-            recettes_ws = sheet.worksheet("Recettes") if "Recettes" in ws_names else sheet.add_worksheet(title="Recettes", rows="100", cols="20")
-            courses_ws = sheet.worksheet("Courses") if "Courses" in ws_names else sheet.add_worksheet(title="Courses", rows="100", cols="20")
-            
-            all_vals = fetch_worksheet_values(sheet, "Recettes")
-            if len(all_vals) <= 1:
-                all_vals = [["Titre", "Ingrédients", "Instructions"]]
+with tab_loisirs:
+    if json_str:
+        sub_tab_s, sub_tab_r = st.tabs(["🐶 Saiko", "🍲 Recettes"])
+
+        # --- SAIKO ---
+        with sub_tab_s:
+            st.subheader("🐶 Espace Saiko")
+            all_vals = fetch_sheet_data(json_str, "Saiko")
+            saiko_data = all_vals[1:] if len(all_vals) > 1 else []
+
+            if saiko_data:
+                for idx, row in enumerate(saiko_data):
+                    dt, tp, sj, nt = (row + ["", "Soin", "Remarque", ""])[:4]
+                    real_idx = idx + 2
+                    with st.expander(f"🐾 [{tp}] {sj} ({dt})"):
+                        if nt: st.write(nt)
+                        if st.button("🗑️ Supprimer", key=f"sk_del_{idx}"):
+                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Saiko").delete_rows(real_idx)
+                            st.cache_data.clear()
+                            st.rerun()
+
+            st.divider()
+            with st.form("form_saiko", clear_on_submit=True):
+                s_date = st.date_input("Date", value=datetime.today())
+                s_type = st.selectbox("Type", ["Vétérinaire / Vaccin", "Anti-puces / Vermifuge", "Achat Croquettes / Matériel", "Soin / Toilettage", "Autre"])
+                s_sujet = st.text_input("Titre / Sujet")
+                s_notes = st.text_area("Notes")
+                if st.form_submit_button("Enregistrer pour Saiko") and s_sujet:
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Saiko").append_row([str(s_date), s_type, s_sujet, s_notes])
+                    st.cache_data.clear()
+                    st.rerun()
+
+        # --- RECETTES ---
+        with sub_tab_r:
+            st.subheader("🍲 Recettes de Cuisine")
+            all_vals = fetch_sheet_data(json_str, "Recettes")
+            recettes_data = all_vals[1:] if len(all_vals) > 1 else []
 
             search_recette = st.text_input("🔍 Rechercher une recette...", placeholder="Nom ou ingrédient...")
-            recettes_data = all_vals[1:]
+            filtered = [r for r in recettes_data if search_recette.lower() in " ".join(r).lower()] if search_recette else recettes_data
 
-            if search_recette and recettes_data:
-                filtered_recettes = [r for r in recettes_data if search_recette.lower() in " ".join(r).lower()]
-            else:
-                filtered_recettes = recettes_data
-
-            if filtered_recettes:
-                for idx, row in enumerate(filtered_recettes):
-                    titre = row[0] if len(row) > 0 and row[0] else "Sans titre"
-                    ingredients = row[1] if len(row) > 1 else ""
-                    instructions = row[2] if len(row) > 2 else ""
+            if filtered:
+                for idx, row in enumerate(filtered):
+                    titre, ing, inst = (row + ["Sans titre", "", ""])[:3]
                     real_idx = all_vals.index(row) + 1
-                    
                     with st.expander(f"🍲 {titre}"):
-                        st.markdown(f"**🛒 Ingrédients :**\n{ingredients}")
-                        st.markdown(f"**👨‍🍳 Instructions :**\n{instructions}")
+                        st.markdown(f"**🛒 Ingrédients :**\n{ing}")
+                        st.markdown(f"**👨‍🍳 Instructions :**\n{inst}")
                         
-                        col_act1, col_act2 = st.columns(2)
-                        with col_act1:
-                            if st.button("🛒 Envoyer aux courses", key=f"send_c_{idx}_{real_idx}"):
-                                lines_ing = [l.strip() for l in ingredients.split('\n') if l.strip()]
-                                for ing in lines_ing:
-                                    courses_ws.append_row([ing, "1", f"Recette: {titre}"])
-                                clear_app_cache()
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("🛒 Envoyer aux courses", key=f"r_send_{idx}"):
+                                client = get_gspread_client(json_str)
+                                courses_ws = client.open("MonAssistantData").worksheet("Courses")
+                                for line in [l.strip() for l in ing.split('\n') if l.strip()]:
+                                    courses_ws.append_row([line, "1", f"Recette: {titre}"])
+                                st.cache_data.clear()
                                 st.success("Ingrédients ajoutés aux courses !")
                                 st.rerun()
-                        with col_act2:
-                            if st.button("🗑️ Supprimer", key=f"del_r_{idx}_{real_idx}"):
-                                recettes_ws.delete_rows(real_idx)
-                                clear_app_cache()
+                        with col2:
+                            if st.button("🗑️ Supprimer", key=f"r_del_{idx}"):
+                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Recettes").delete_rows(real_idx)
+                                st.cache_data.clear()
                                 st.rerun()
-            else:
-                st.info("Aucune recette trouvée.")
 
             st.divider()
             with st.form("form_recette", clear_on_submit=True):
-                st.markdown("#### ➕ Nouvelle recette")
                 r_titre = st.text_input("Nom de la recette")
                 r_ing = st.text_area("Ingrédients (un par ligne)")
                 r_inst = st.text_area("Instructions")
                 if st.form_submit_button("Enregistrer la recette") and r_titre:
-                    recettes_ws.append_row([r_titre, r_ing, r_inst])
-                    clear_app_cache()
+                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Recettes").append_row([r_titre, r_ing, r_inst])
+                    st.cache_data.clear()
                     st.rerun()
-        except Exception as e:
-            st.error(f"Erreur Recettes : {e}")
-    else:
-        st.info("Veuillez connecter votre fichier dans l'Accueil.")
+                
