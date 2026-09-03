@@ -8,31 +8,86 @@ from datetime import datetime
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
     page_title="Notre Assistant Partagé", 
-    page_icon="💡", 
+    page_icon="✨", 
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# --- STYLE CSS PERSONNALISÉ ---
+# --- STYLE CSS ULTRA-MODERNISÉ ---
 st.markdown("""
     <style>
-    .stButton button {
-        border-radius: 12px;
-        width: 100%;
-        font-weight: bold;
+    /* Style général et typographie douce */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta+Sans', sans-serif;
     }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px 8px 0px 0px;
-        padding: 8px 12px;
-        font-weight: 600;
-        font-size: 14px;
-    }
+    
+    /* Supprimer les éléments par défaut de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+
+    /* Style des onglets modernes */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #f8fafc;
+        padding: 6px;
+        border-radius: 16px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 12px;
+        padding: 10px 18px;
+        font-weight: 600;
+        font-size: 14px;
+        color: #64748b;
+        background-color: transparent;
+        border: none;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Boutons stylisés */
+    .stButton button {
+        border-radius: 12px;
+        width: 100%;
+        font-weight: 600;
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+        transition: all 0.3s ease;
+    }
+    .stButton button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    /* Cartes de statistiques personnalisées */
+    .metric-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    }
+    .metric-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #4f46e5;
+    }
+    .metric-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -47,12 +102,10 @@ def connect_with_json_file(uploaded_file):
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Ouvre ou crée automatiquement le Google Sheet "MonAssistantData"
         try:
             sheet = client.open("MonAssistantData")
         except gspread.SpreadsheetNotFound:
             sheet = client.create("MonAssistantData")
-            # Crée les onglets de base si le fichier est neuf
             sheet.values_append("Sheet1", {'valueInputOption': 'RAW'}, {'values': [['Date', 'Heure', 'Titre', 'Description']]})
             sheet.rename_worksheet(sheet.worksheet("Sheet1"), "Agenda")
             sheet.add_worksheet(title="Notes", rows="100", cols="20")
@@ -64,33 +117,30 @@ def connect_with_json_file(uploaded_file):
     except Exception as e:
         return None, str(e)
 
-# --- EN-TÊTE DE LA PAGE ---
-st.title("💡 Notre Tableau de Bord")
-st.caption("Partagé en direct 🚀")
+# --- EN-TÊTE ---
+st.markdown("## ✨ Notre Espace Partagé")
+st.caption("Centralisez votre quotidien à deux, en toute simplicité 🚀")
+st.markdown("---")
 
-# Récupération de la session
 sheet = st.session_state.get("sheet_instance", None)
 
-# NAVIGATION PAR ONGLETS
+# --- NAVIGATION PAR ONGLETS ---
 tab_accueil, tab_agenda, tab_notes, tab_recettes = st.tabs(["🏠 Accueil", "📅 Agenda", "📝 Notes", "🍲 Recettes"])
 
 # ==========================================
 # ONGLET 0 : ACCUEIL
 # ==========================================
 with tab_accueil:
-    st.header("Bienvenue sur votre espace !")
-    st.write("Ce tableau de bord centralise votre agenda, vos notes et vos recettes partagées.")
-    
     if not sheet:
-        st.warning("⚠️ Clé de configuration requise.")
-        st.write("Pour connecter l'application, déposez simplement votre fichier de clé JSON Google Cloud ci-dessous :")
+        st.markdown("### 🔐 Connexion requise")
+        st.write("Glissez votre fichier de clé JSON Google Cloud ci-dessous pour lancer l'application :")
         
-        uploaded_json = st.file_uploader("Glissez votre fichier JSON ici", type=["json"])
+        uploaded_json = st.file_uploader("Fichier JSON de configuration", type=["json"])
         if uploaded_json is not None:
             connected_sheet, error_msg = connect_with_json_file(uploaded_json)
             if connected_sheet:
                 st.session_state["sheet_instance"] = connected_sheet
-                st.success("Connexion réussie ! Actualisation...")
+                st.success("Connexion établie avec succès ! ✨")
                 st.rerun()
             else:
                 st.error(f"Erreur de connexion : {error_msg}")
@@ -100,13 +150,33 @@ with tab_accueil:
             notes_count = len(sheet.worksheet("Notes").get_all_records()) if "Notes" in [w.title for w in sheet.worksheets()] else 0
             recettes_count = len(sheet.worksheet("Recettes").get_all_records()) if "Recettes" in [w.title for w in sheet.worksheets()] else 0
             
-            c1, c2, c3 = st.columns(3)
-            with c1: st.metric(label="📅 Événements", value=agenda_count)
-            with c2: st.metric(label="📌 Notes", value=notes_count)
-            with c3: st.metric(label="🍲 Recettes", value=recettes_count)
+            st.markdown("### 📊 Vue d'ensemble")
             
-            st.divider()
-            st.info("💡 **Astuce mobile :** Ajoutez cette application à l'écran d'accueil de votre téléphone pour l'utiliser comme une appli native !")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{agenda_count}</div>
+                        <div class="metric-label">📅 Événements</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{notes_count}</div>
+                        <div class="metric-label">📌 Notes</div>
+                    </div>
+                """, unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"""
+                    <div class="metric-card">
+                        <div class="metric-value">{recettes_count}</div>
+                        <div class="metric-label">🍲 Recettes</div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.info("💡 **Astuce mobile :** Enregistrez cette application sur l'écran d'accueil de votre téléphone pour y accéder comme une application native.")
         except Exception as e:
             st.warning(f"Connecté, mais structure des onglets incomplète : {e}")
 
@@ -114,8 +184,6 @@ with tab_accueil:
 # ONGLET 1 : AGENDA
 # ==========================================
 with tab_agenda:
-    st.header("📅 Agenda Partagé")
-    
     if sheet:
         try:
             sheet_names = [w.title for w in sheet.worksheets()]
@@ -128,54 +196,42 @@ with tab_agenda:
             all_events = agenda_ws.get_all_records()
             
             if all_events:
-                st.write(f"*{len(all_events)} événement(s) prévu(s)*")
+                st.markdown(f"**{len(all_events)} événement(s) à venir**")
                 for index, row in enumerate(all_events):
-                    date_ev = row.get('Date', '')
-                    heure_ev = row.get('Heure', '')
-                    titre_ev = row.get('Titre', 'Sans titre')
-                    desc_ev = row.get('Description', '')
-                    
-                    with st.expander(f"🗓️ {date_ev} à {heure_ev} - {titre_ev}"):
-                        if desc_ev:
-                            st.write(f"**Détails :** {desc_ev}")
-                        if st.button("🗑️ Supprimer cet événement", key=f"del_ev_{index}"):
-                            real_row_index = all_events.index(row) + 2
-                            agenda_ws.delete_rows(real_row_index)
-                            st.success("Événement supprimé !")
+                    with st.expander(f"🗓️ {row.get('Date', '')} à {row.get('Heure', '')} — {row.get('Titre', 'Sans titre')}"):
+                        if row.get('Description'):
+                            st.write(row.get('Description'))
+                        if st.button("🗑️ Supprimer", key=f"del_ev_{index}"):
+                            agenda_ws.delete_rows(all_events.index(row) + 2)
                             st.rerun()
             else:
-                st.info("Aucun événement dans l'agenda pour l'instant.")
+                st.info("Aucun événement prévu pour le moment.")
                 
-            st.divider()
-            
+            st.markdown("---")
             with st.form("form_agenda", clear_on_submit=True):
-                st.subheader("➕ Ajouter un événement")
-                e_date = st.date_input("Date de l'événement", value=datetime.today())
+                st.markdown("#### ➕ Nouvel événement")
+                e_date = st.date_input("Date", value=datetime.today())
                 e_heure = st.time_input("Heure", value=datetime.now().time())
-                e_titre = st.text_input("Titre de l'événement")
+                e_titre = st.text_input("Titre")
                 e_desc = st.text_area("Description (optionnel)")
-                submitted_ev = st.form_submit_button("Ajouter à l'agenda")
-                
-                if submitted_ev and e_titre:
+                if st.form_submit_button("Ajouter à l'agenda") and e_titre:
                     agenda_ws.append_row([str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
-                    st.success("Événement ajouté avec succès !")
                     st.rerun()
         except Exception as e:
-            st.error(f"Erreur dans l'onglet Agenda : {e}")
+            st.error(f"Erreur : {e}")
     else:
-        st.info("Veuillez d'abord déposer votre fichier JSON dans l'onglet Accueil.")
+        st.info("Veuillez connecter votre fichier dans l'onglet Accueil.")
 
 # ==========================================
 # ONGLET 2 : NOTES
 # ==========================================
 with tab_notes:
-    st.header("Nos Notes Partagées")
     if sheet:
         try:
             notes_ws = sheet.worksheet("Notes")
             all_notes = notes_ws.get_all_records()
             
-            search_note = st.text_input("🔍 Rechercher dans les notes", placeholder="Mot-clé...")
+            search_note = st.text_input("🔍 Rechercher...", placeholder="Mot-clé dans les notes")
             filtered_notes = [n for n in all_notes if search_note.lower() in str(n.get('Titre','')).lower() or search_note.lower() in str(n.get('Contenu','')).lower()] if search_note else all_notes
 
             if filtered_notes:
@@ -186,26 +242,25 @@ with tab_notes:
                             notes_ws.delete_rows(all_notes.index(row) + 2)
                             st.rerun()
             else:
-                st.info("Aucune note.")
+                st.info("Aucune note trouvée.")
                 
-            st.divider()
+            st.markdown("---")
             with st.form("form_note", clear_on_submit=True):
-                st.subheader("➕ Nouvelle note")
+                st.markdown("#### ➕ Nouvelle note")
                 n_titre = st.text_input("Titre")
                 n_contenu = st.text_area("Contenu")
-                if st.form_submit_button("Enregistrer") and n_titre:
+                if st.form_submit_button("Enregistrer la note") and n_titre:
                     notes_ws.append_row([n_titre, n_contenu])
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur : {e}")
     else:
-        st.info("Fichier JSON requis dans l'Accueil.")
+        st.info("Connexion requise dans l'Accueil.")
 
 # ==========================================
 # ONGLET 3 : RECETTES
 # ==========================================
 with tab_recettes:
-    st.header("Nos Recettes de Cuisine")
     if sheet:
         try:
             recettes_ws = sheet.worksheet("Recettes")
@@ -217,24 +272,24 @@ with tab_recettes:
             if filtered_rec:
                 for index, row in enumerate(filtered_rec):
                     with st.expander(f"🍲 {row.get('Titre', 'Sans titre')}"):
-                        st.markdown(f"**Ingrédients :**\n{row.get('Ingrédients', '')}")
-                        st.markdown(f"**Instructions :**\n{row.get('Instructions', '')}")
+                        st.markdown(f"**🛒 Ingrédients :**\n{row.get('Ingrédients', '')}")
+                        st.markdown(f"**👨‍🍳 Instructions :**\n{row.get('Instructions', '')}")
                         if st.button("🗑️ Supprimer", key=f"del_r_{index}"):
                             recettes_ws.delete_rows(all_recettes.index(row) + 2)
                             st.rerun()
             else:
-                st.info("Aucune recette.")
+                st.info("Aucune recette trouvée.")
                 
-            st.divider()
+            st.markdown("---")
             with st.form("form_recette", clear_on_submit=True):
-                st.subheader("➕ Nouvelle recette")
-                r_titre = st.text_input("Nom")
+                st.markdown("#### ➕ Nouvelle recette")
+                r_titre = st.text_input("Nom de la recette")
                 r_ing = st.text_input("Ingrédients")
                 r_inst = st.text_area("Instructions")
-                if st.form_submit_button("Enregistrer") and r_titre:
+                if st.form_submit_button("Enregistrer la recette") and r_titre:
                     recettes_ws.append_row([r_titre, r_ing, r_inst])
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur : {e}")
     else:
-        st.info("Fichier JSON requis dans l'Accueil.")
+        st.info("Connexion requise dans l'Accueil.")
