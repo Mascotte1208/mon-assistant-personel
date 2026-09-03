@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import gspread
+from google.oauth2.service_account import Credentials
+import json
 from datetime import datetime
 
 # --- CONFIGURATION DE LA PAGE ---
@@ -34,31 +36,40 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONNEXION GOOGLE SHEETS SIMPLIFIÉE ---
-@st.cache_resource
-def get_sheet_connection(sheet_url):
+# --- CONNEXION VIA FICHIER JSON ---
+def connect_with_json_file(uploaded_file):
     try:
-        client = gspread.service_account(filename="secrets.json")
-        sheet = client.open_by_url(sheet_url)
-        return sheet
-    except Exception:
+        creds_dict = json.load(uploaded_file)
+        scope = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+        client = gspread.authorize(creds)
+        
+        # Ouvre ou crée automatiquement le Google Sheet "MonAssistantData"
         try:
-            client = gspread.no_credentials()
-            sheet = client.open_by_url(sheet_url)
-            return sheet
-        except Exception as e:
-            return None
+            sheet = client.open("MonAssistantData")
+        except gspread.SpreadsheetNotFound:
+            sheet = client.create("MonAssistantData")
+            # Crée les onglets de base si le fichier est neuf
+            sheet.values_append("Sheet1", {'valueInputOption': 'RAW'}, {'values': [['Date', 'Heure', 'Titre', 'Description']]})
+            sheet.rename_worksheet(sheet.worksheet("Sheet1"), "Agenda")
+            sheet.add_worksheet(title="Notes", rows="100", cols="20")
+            sheet.values_append("Notes", {'valueInputOption': 'RAW'}, {'values': [['Titre', 'Contenu']]})
+            sheet.add_worksheet(title="Recettes", rows="100", cols="20")
+            sheet.values_append("Recettes", {'valueInputOption': 'RAW'}, {'values': [['Titre', 'Ingrédients', 'Instructions']]})
+            
+        return sheet, None
+    except Exception as e:
+        return None, str(e)
 
 # --- EN-TÊTE DE LA PAGE ---
 st.title("💡 Notre Tableau de Bord")
 st.caption("Partagé en direct 🚀")
 
-# Récupération de l'URL depuis les secrets ou la session
-sheet_url = st.secrets.get("sheet_url", st.session_state.get("sheet_url", ""))
-
-sheet = None
-if sheet_url:
-    sheet = get_sheet_connection(sheet_url)
+# Récupération de la session
+sheet = st.session_state.get("sheet_instance", None)
 
 # NAVIGATION PAR ONGLETS
 tab_accueil, tab_agenda, tab_notes, tab_recettes = st.tabs(["🏠 Accueil", "📅 Agenda", "📝 Notes", "🍲 Recettes"])
@@ -70,13 +81,20 @@ with tab_accueil:
     st.header("Bienvenue sur votre espace !")
     st.write("Ce tableau de bord centralise votre agenda, vos notes et vos recettes partagées.")
     
-    if not sheet_url:
-        st.warning("⚠️ Veuillez configurer l'URL de votre Google Sheet.")
-        new_url = st.text_input("Collez le lien de votre Google Sheet ici :")
-        if new_url:
-            st.session_state["sheet_url"] = new_url
-            st.rerun()
-    elif sheet:
+    if not sheet:
+        st.warning("⚠️ Clé de configuration requise.")
+        st.write("Pour connecter l'application, déposez simplement votre fichier de clé JSON Google Cloud ci-dessous :")
+        
+        uploaded_json = st.file_uploader("Glissez votre fichier JSON ici", type=["json"])
+        if uploaded_json is not None:
+            connected_sheet, error_msg = connect_with_json_file(uploaded_json)
+            if connected_sheet:
+                st.session_state["sheet_instance"] = connected_sheet
+                st.success("Connexion réussie ! Actualisation...")
+                st.rerun()
+            else:
+                st.error(f"Erreur de connexion : {error_msg}")
+    else:
         try:
             agenda_count = len(sheet.worksheet("Agenda").get_all_records()) if "Agenda" in [w.title for w in sheet.worksheets()] else 0
             notes_count = len(sheet.worksheet("Notes").get_all_records()) if "Notes" in [w.title for w in sheet.worksheets()] else 0
@@ -91,8 +109,6 @@ with tab_accueil:
             st.info("💡 **Astuce mobile :** Ajoutez cette application à l'écran d'accueil de votre téléphone pour l'utiliser comme une appli native !")
         except Exception as e:
             st.warning(f"Connecté, mais structure des onglets incomplète : {e}")
-    else:
-        st.error("Impossible d'accéder au Google Sheet. Vérifiez que le lien est correct et accessible.")
 
 # ==========================================
 # ONGLET 1 : AGENDA
@@ -147,7 +163,7 @@ with tab_agenda:
         except Exception as e:
             st.error(f"Erreur dans l'onglet Agenda : {e}")
     else:
-        st.info("Veuillez d'abord configurer le lien Google Sheet dans l'accueil.")
+        st.info("Veuillez d'abord déposer votre fichier JSON dans l'onglet Accueil.")
 
 # ==========================================
 # ONGLET 2 : NOTES
@@ -183,7 +199,7 @@ with tab_notes:
         except Exception as e:
             st.error(f"Erreur : {e}")
     else:
-        st.info("Connexion requise.")
+        st.info("Fichier JSON requis dans l'Accueil.")
 
 # ==========================================
 # ONGLET 3 : RECETTES
@@ -213,7 +229,7 @@ with tab_recettes:
             with st.form("form_recette", clear_on_submit=True):
                 st.subheader("➕ Nouvelle recette")
                 r_titre = st.text_input("Nom")
-                r_ing = st.text_area("Ingrédients")
+                r_ing = st.text_input("Ingrédients")
                 r_inst = st.text_area("Instructions")
                 if st.form_submit_button("Enregistrer") and r_titre:
                     recettes_ws.append_row([r_titre, r_ing, r_inst])
@@ -221,4 +237,4 @@ with tab_recettes:
         except Exception as e:
             st.error(f"Erreur : {e}")
     else:
-        st.info("Connexion requise.")
+        st.info("Fichier JSON requis dans l'Accueil.")
