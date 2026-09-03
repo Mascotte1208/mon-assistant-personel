@@ -89,13 +89,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FONCTION DE CACHE POUR ÉVITER LE QUOTA 429 ---
-def get_worksheet_values(sheet, worksheet_name):
+# --- CACHE STREAMLIT ANTI-QUOTA (60s) ---
+@st.cache_data(ttl=60)
+def fetch_worksheet_values(_sheet, worksheet_name):
     try:
-        ws = sheet.worksheet(worksheet_name)
+        ws = _sheet.worksheet(worksheet_name)
         return ws.get_all_values()
     except Exception:
         return []
+
+def clear_app_cache():
+    st.cache_data.clear()
 
 # --- CONNEXION GOOGLE SHEETS VIA FICHIER JSON ---
 def connect_with_file(uploaded_file):
@@ -171,12 +175,12 @@ with tab_accueil:
         try:
             ws_names = [w.title for w in sheet.worksheets()]
             
-            taches_count = max(0, len(get_worksheet_values(sheet, "Taches")) - 1) if "Taches" in ws_names else 0
-            agenda_count = max(0, len(get_worksheet_values(sheet, "Agenda")) - 1) if "Agenda" in ws_names else 0
-            courses_count = max(0, len(get_worksheet_values(sheet, "Courses")) - 1) if "Courses" in ws_names else 0
-            notes_count = max(0, len(get_worksheet_values(sheet, "Notes")) - 1) if "Notes" in ws_names else 0
-            recettes_count = max(0, len(get_worksheet_values(sheet, "Recettes")) - 1) if "Recettes" in ws_names else 0
-            saiko_count = max(0, len(get_worksheet_values(sheet, "Saiko")) - 1) if "Saiko" in ws_names else 0
+            taches_count = max(0, len(fetch_worksheet_values(sheet, "Taches")) - 1) if "Taches" in ws_names else 0
+            agenda_count = max(0, len(fetch_worksheet_values(sheet, "Agenda")) - 1) if "Agenda" in ws_names else 0
+            courses_count = max(0, len(fetch_worksheet_values(sheet, "Courses")) - 1) if "Courses" in ws_names else 0
+            notes_count = max(0, len(fetch_worksheet_values(sheet, "Notes")) - 1) if "Notes" in ws_names else 0
+            recettes_count = max(0, len(fetch_worksheet_values(sheet, "Recettes")) - 1) if "Recettes" in ws_names else 0
+            saiko_count = max(0, len(fetch_worksheet_values(sheet, "Saiko")) - 1) if "Saiko" in ws_names else 0
             
             st.markdown("### 📊 Vue d'ensemble")
             
@@ -197,6 +201,9 @@ with tab_accueil:
                 st.markdown(f'<div class="metric-card"><div class="metric-value">{recettes_count}</div><div class="metric-label">🍲 Recettes</div></div>', unsafe_allow_html=True)
                 
             st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔄 Actualiser les données en direct"):
+                clear_app_cache()
+                st.rerun()
             st.info("💡 **Astuce mobile :** Enregistrez cette page sur l'écran d'accueil de votre smartphone pour l'ouvrir comme une application native !")
         except Exception as e:
             st.warning(f"Erreur de chargement du dashboard : {e}")
@@ -207,6 +214,7 @@ with tab_accueil:
             connected_sheet, error_msg = connect_with_file(uploaded_json)
             if connected_sheet:
                 st.session_state["uploaded_sheet_data"] = connected_sheet
+                clear_app_cache()
                 st.success("Connexion réussie !")
                 st.rerun()
             else:
@@ -222,7 +230,7 @@ with tab_agenda:
             ws_names = [w.title for w in sheet.worksheets()]
             agenda_ws = sheet.worksheet("Agenda") if "Agenda" in ws_names else sheet.add_worksheet(title="Agenda", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Agenda")
+            all_vals = fetch_worksheet_values(sheet, "Agenda")
             if len(all_vals) <= 1:
                 all_vals = [["Date", "Heure", "Titre", "Description"]]
 
@@ -240,6 +248,7 @@ with tab_agenda:
                             st.write(f"**Détails :** {desc_ev}")
                         if st.button("🗑️ Supprimer l'événement", key=f"del_ev_{idx}_{real_idx}"):
                             agenda_ws.delete_rows(real_idx)
+                            clear_app_cache()
                             st.rerun()
             else:
                 st.info("Aucun événement prévu.")
@@ -253,6 +262,7 @@ with tab_agenda:
                 e_desc = st.text_area("Description / Lieu (optionnel)")
                 if st.form_submit_button("Enregistrer l'événement") and e_titre:
                     agenda_ws.append_row([str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Agenda : {e}")
@@ -269,7 +279,7 @@ with tab_taches:
             ws_names = [w.title for w in sheet.worksheets()]
             taches_ws = sheet.worksheet("Taches") if "Taches" in ws_names else sheet.add_worksheet(title="Taches", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Taches")
+            all_vals = fetch_worksheet_values(sheet, "Taches")
             if len(all_vals) <= 1:
                 all_vals = [["Tache", "Categorie", "Statut"]]
 
@@ -305,10 +315,12 @@ with tab_taches:
                         if statut_t != "Fait":
                             if st.button("✔️ Fait", key=f"del_t_{idx}_{real_idx}"):
                                 taches_ws.update_cell(real_idx, 3, "Fait")
+                                clear_app_cache()
                                 st.rerun()
                         else:
                             if st.button("🗑️", key=f"del_t_{idx}_{real_idx}"):
                                 taches_ws.delete_rows(real_idx)
+                                clear_app_cache()
                                 st.rerun()
             else:
                 st.info("Aucune tâche dans cette catégorie.")
@@ -320,6 +332,7 @@ with tab_taches:
                 n_cat = st.selectbox("Catégorie", ["Maison", "Admin", "Saiko", "Urgent", "Autre"])
                 if st.form_submit_button("Ajouter la tâche") and n_tache:
                     taches_ws.append_row([n_tache, n_cat, "À faire"])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Tâches : {e}")
@@ -336,7 +349,7 @@ with tab_courses:
             ws_names = [w.title for w in sheet.worksheets()]
             courses_ws = sheet.worksheet("Courses") if "Courses" in ws_names else sheet.add_worksheet(title="Courses", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Courses")
+            all_vals = fetch_worksheet_values(sheet, "Courses")
             if len(all_vals) <= 1:
                 all_vals = [["Article", "Quantite", "Categorie"]]
 
@@ -354,6 +367,7 @@ with tab_courses:
                     with col2:
                         if st.button("✔️ Acquis", key=f"del_c_{idx}_{real_idx}"):
                             courses_ws.delete_rows(real_idx)
+                            clear_app_cache()
                             st.rerun()
             else:
                 st.info("La liste de courses est vide.")
@@ -366,6 +380,7 @@ with tab_courses:
                 c_cat = st.selectbox("Rayon", ["Supermarché", "Frais", "Fruits & Légumes", "Boissons", "Entretien", "Autre"])
                 if st.form_submit_button("Ajouter aux courses") and c_art:
                     courses_ws.append_row([c_art, c_qte, c_cat])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Courses : {e}")
@@ -383,7 +398,7 @@ with tab_saiko:
             ws_names = [w.title for w in sheet.worksheets()]
             saiko_ws = sheet.worksheet("Saiko") if "Saiko" in ws_names else sheet.add_worksheet(title="Saiko", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Saiko")
+            all_vals = fetch_worksheet_values(sheet, "Saiko")
             if len(all_vals) <= 1:
                 all_vals = [["Date", "Type", "Sujet", "Notes"]]
 
@@ -401,6 +416,7 @@ with tab_saiko:
                             st.write(nt)
                         if st.button("🗑️ Supprimer", key=f"del_sk_{idx}_{real_idx}"):
                             saiko_ws.delete_rows(real_idx)
+                            clear_app_cache()
                             st.rerun()
             else:
                 st.info("Aucun rappel ni soin enregistré pour Saiko.")
@@ -414,6 +430,7 @@ with tab_saiko:
                 s_notes = st.text_area("Notes complémentaires")
                 if st.form_submit_button("Enregistrer pour Saiko") and s_sujet:
                     saiko_ws.append_row([str(s_date), s_type, s_sujet, s_notes])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Saiko : {e}")
@@ -431,7 +448,7 @@ with tab_budget:
             ws_names = [w.title for w in sheet.worksheets()]
             budget_ws = sheet.worksheet("Budget") if "Budget" in ws_names else sheet.add_worksheet(title="Budget", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Budget")
+            all_vals = fetch_worksheet_values(sheet, "Budget")
             if len(all_vals) <= 1:
                 all_vals = [["Date", "Payé Par", "Intitulé", "Montant"]]
 
@@ -489,6 +506,7 @@ with tab_budget:
                     with c_del:
                         if st.button("🗑️", key=f"del_b_{idx}_{real_idx}"):
                             budget_ws.delete_rows(real_idx)
+                            clear_app_cache()
                             st.rerun()
             else:
                 st.info("Aucune dépense enregistrée pour le moment.")
@@ -502,6 +520,7 @@ with tab_budget:
                 b_amount = st.number_input("Montant (€)", min_value=0.0, step=0.5, format="%.2f")
                 if st.form_submit_button("Ajouter la dépense") and b_label and b_amount > 0:
                     budget_ws.append_row([str(b_date), b_payer, b_label, str(b_amount)])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Budget : {e}")
@@ -518,7 +537,7 @@ with tab_repas:
             ws_names = [w.title for w in sheet.worksheets()]
             repas_ws = sheet.worksheet("Repas") if "Repas" in ws_names else sheet.add_worksheet(title="Repas", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Repas")
+            all_vals = fetch_worksheet_values(sheet, "Repas")
             if len(all_vals) <= 1:
                 all_vals = [["Jour", "Repas", "Plat"]]
 
@@ -540,6 +559,7 @@ with tab_repas:
                         with col_d:
                             if st.button("🗑️", key=f"del_rep_{real_idx}"):
                                 repas_ws.delete_rows(real_idx)
+                                clear_app_cache()
                                 st.rerun()
                 else:
                     st.caption("Rien de prévu")
@@ -552,6 +572,7 @@ with tab_repas:
                 r_plat = st.text_input("Nom du plat / Recette")
                 if st.form_submit_button("Ajouter au planning") and r_plat:
                     repas_ws.append_row([r_jour, r_type, r_plat])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Repas : {e}")
@@ -569,7 +590,7 @@ with tab_admin:
             ws_names = [w.title for w in sheet.worksheets()]
             admin_ws = sheet.worksheet("Admin") if "Admin" in ws_names else sheet.add_worksheet(title="Admin", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Admin")
+            all_vals = fetch_worksheet_values(sheet, "Admin")
             if len(all_vals) <= 1:
                 all_vals = [["Sujet", "Echéance", "Détails"]]
 
@@ -586,6 +607,7 @@ with tab_admin:
                             st.write(dt)
                         if st.button("🗑️ Supprimer", key=f"del_adm_{idx}_{real_idx}"):
                             admin_ws.delete_rows(real_idx)
+                            clear_app_cache()
                             st.rerun()
             else:
                 st.info("Aucun mémo administratif enregistré.")
@@ -598,6 +620,7 @@ with tab_admin:
                 a_details = st.text_area("Détails / N° de contrat / Téléphone")
                 if st.form_submit_button("Enregistrer") and a_sujet:
                     admin_ws.append_row([a_sujet, a_echeance, a_details])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Admin : {e}")
@@ -614,7 +637,7 @@ with tab_listes:
             ws_names = [w.title for w in sheet.worksheets()]
             listes_ws = sheet.worksheet("Listes") if "Listes" in ws_names else sheet.add_worksheet(title="Listes", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Listes")
+            all_vals = fetch_worksheet_values(sheet, "Listes")
             if len(all_vals) <= 1:
                 all_vals = [["Catégorie", "Élément", "Notes"]]
 
@@ -635,6 +658,7 @@ with tab_listes:
                     with c_d:
                         if st.button("🗑️", key=f"del_lst_{idx}_{real_idx}"):
                             listes_ws.delete_rows(real_idx)
+                            clear_app_cache()
                             st.rerun()
             else:
                 st.info("Aucun élément dans cette liste.")
@@ -647,6 +671,7 @@ with tab_listes:
                 l_notes = st.text_input("Notes / Taille / Prix (optionnel)")
                 if st.form_submit_button("Ajouter à la liste") and l_elem:
                     listes_ws.append_row([l_cat, l_elem, l_notes])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Listes : {e}")
@@ -663,7 +688,7 @@ with tab_notes:
             ws_names = [w.title for w in sheet.worksheets()]
             notes_ws = sheet.worksheet("Notes") if "Notes" in ws_names else sheet.add_worksheet(title="Notes", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Notes")
+            all_vals = fetch_worksheet_values(sheet, "Notes")
             if len(all_vals) <= 1:
                 all_vals = [["Titre", "Contenu"]]
 
@@ -685,6 +710,7 @@ with tab_notes:
                         st.write(contenu)
                         if st.button("🗑️ Supprimer", key=f"del_n_{idx}_{real_idx}"):
                             notes_ws.delete_rows(real_idx)
+                            clear_app_cache()
                             st.rerun()
             else:
                 st.info("Aucune note trouvée.")
@@ -696,6 +722,7 @@ with tab_notes:
                 n_contenu = st.text_area("Contenu")
                 if st.form_submit_button("Enregistrer la note") and n_titre:
                     notes_ws.append_row([n_titre, n_contenu])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Notes : {e}")
@@ -713,7 +740,7 @@ with tab_recettes:
             recettes_ws = sheet.worksheet("Recettes") if "Recettes" in ws_names else sheet.add_worksheet(title="Recettes", rows="100", cols="20")
             courses_ws = sheet.worksheet("Courses") if "Courses" in ws_names else sheet.add_worksheet(title="Courses", rows="100", cols="20")
             
-            all_vals = get_worksheet_values(sheet, "Recettes")
+            all_vals = fetch_worksheet_values(sheet, "Recettes")
             if len(all_vals) <= 1:
                 all_vals = [["Titre", "Ingrédients", "Instructions"]]
 
@@ -742,11 +769,13 @@ with tab_recettes:
                                 lines_ing = [l.strip() for l in ingredients.split('\n') if l.strip()]
                                 for ing in lines_ing:
                                     courses_ws.append_row([ing, "1", f"Recette: {titre}"])
+                                clear_app_cache()
                                 st.success("Ingrédients ajoutés aux courses !")
                                 st.rerun()
                         with col_act2:
                             if st.button("🗑️ Supprimer", key=f"del_r_{idx}_{real_idx}"):
                                 recettes_ws.delete_rows(real_idx)
+                                clear_app_cache()
                                 st.rerun()
             else:
                 st.info("Aucune recette trouvée.")
@@ -759,6 +788,7 @@ with tab_recettes:
                 r_inst = st.text_area("Instructions")
                 if st.form_submit_button("Enregistrer la recette") and r_titre:
                     recettes_ws.append_row([r_titre, r_ing, r_inst])
+                    clear_app_cache()
                     st.rerun()
         except Exception as e:
             st.error(f"Erreur Recettes : {e}")
