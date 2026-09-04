@@ -186,22 +186,22 @@ def get_gspread_client(json_str):
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
 
-def get_data(sheet_name):
-    cache_key = f"data_{sheet_name}"
-    if cache_key not in st.session_state:
-        if st.session_state.get("json_credentials_str"):
-            try:
-                client = get_gspread_client(st.session_state["json_credentials_str"])
-                ws = client.open("MonAssistantData").worksheet(sheet_name)
-                st.session_state[cache_key] = ws.get_all_values()
-            except Exception:
-                st.session_state[cache_key] = []
-        else:
-            st.session_state[cache_key] = []
-    return st.session_state[cache_key]
+@st.cache_data(ttl=60)
+def fetch_sheet_data(json_str, sheet_name):
+    try:
+        client = get_gspread_client(json_str)
+        ws = client.open("MonAssistantData").worksheet(sheet_name)
+        return ws.get_all_values()
+    except Exception:
+        return []
 
-def sync_sheet_to_state(sheet_name, data):
-    st.session_state[f"data_{sheet_name}"] = data
+def get_data(sheet_name):
+    if f"data_{sheet_name}" not in st.session_state:
+        if st.session_state.get("json_credentials_str"):
+            st.session_state[f"data_{sheet_name}"] = fetch_sheet_data(st.session_state["json_credentials_str"], sheet_name)
+        else:
+            st.session_state[f"data_{sheet_name}"] = []
+    return st.session_state[f"data_{sheet_name}"]
 
 def append_row_fast(sheet_name, row):
     data = get_data(sheet_name)
@@ -218,47 +218,51 @@ def append_row_fast(sheet_name, row):
             old_qte = data[found_idx][1] if len(data[found_idx]) > 1 else "1"
             new_qte = f"{old_qte} + {row[1]}"
             data[found_idx][1] = new_qte
-            sync_sheet_to_state(sheet_name, data)
+            st.session_state[f"data_{sheet_name}"] = data
             if st.session_state.get("json_credentials_str"):
                 try:
                     client = get_gspread_client(st.session_state["json_credentials_str"])
                     client.open("MonAssistantData").worksheet(sheet_name).update_cell(found_idx + 1, 2, new_qte)
                 except Exception:
                     pass
+            st.cache_data.clear()
             return
 
     data.append(row)
-    sync_sheet_to_state(sheet_name, data)
+    st.session_state[f"data_{sheet_name}"] = data
     if st.session_state.get("json_credentials_str"):
         try:
             client = get_gspread_client(st.session_state["json_credentials_str"])
             client.open("MonAssistantData").worksheet(sheet_name).append_row(row)
         except Exception:
             pass
+    st.cache_data.clear()
 
 def delete_row_fast(sheet_name, index):
     data = get_data(sheet_name)
     if 0 <= index < len(data):
         data.pop(index)
-        sync_sheet_to_state(sheet_name, data)
+        st.session_state[f"data_{sheet_name}"] = data
         if st.session_state.get("json_credentials_str"):
             try:
                 client = get_gspread_client(st.session_state["json_credentials_str"])
                 client.open("MonAssistantData").worksheet(sheet_name).delete_rows(index + 1)
             except Exception:
                 pass
+        st.cache_data.clear()
 
 def update_cell_fast(sheet_name, row_idx, col_idx, value):
     data = get_data(sheet_name)
     if 0 <= row_idx < len(data):
         data[row_idx][col_idx - 1] = value
-        sync_sheet_to_state(sheet_name, data)
+        st.session_state[f"data_{sheet_name}"] = data
         if st.session_state.get("json_credentials_str"):
             try:
                 client = get_gspread_client(st.session_state["json_credentials_str"])
                 client.open("MonAssistantData").worksheet(sheet_name).update_cell(row_idx + 1, col_idx, value)
             except Exception:
                 pass
+        st.cache_data.clear()
 
 if "json_credentials_str" not in st.session_state:
     st.session_state["json_credentials_str"] = None
@@ -274,8 +278,18 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# --- MENU DE NAVIGATION SOUS FORME DE BOUTONS ---
-st.markdown("<p style='font-size: 11px; font-weight: 800; color: #be185d; text-transform: uppercase; letter-spacing: 0.9px; margin-bottom: 8px;'>Navigation</p>", unsafe_allow_html=True)
+# --- MENU DE NAVIGATION ET BOUTON DE SYNCHRONISATION ---
+col_nav1, col_nav2 = st.columns([3, 1])
+with col_nav1:
+    st.markdown("<p style='font-size: 11px; font-weight: 800; color: #be185d; text-transform: uppercase; letter-spacing: 0.9px; margin-bottom: 8px;'>Navigation</p>", unsafe_allow_html=True)
+with col_nav2:
+    if st.button("🔄 Sync"):
+        st.cache_data.clear()
+        for key in list(st.session_state.keys()):
+            if key.startswith("data_"):
+                del st.session_state[key]
+        st.rerun()
+
 b1, b2 = st.columns(2)
 with b1:
     if st.button("🏠 Dashboard"):
