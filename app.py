@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.23"
+VERSION = "2.24"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Rose plus foncé, profond et cadres ultra-marqués)
+# 2. STYLE (Lignes de texte ultra-contrastées et encadrées individuellement)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -125,7 +125,7 @@ def slug(texte):
 
 
 CSS_CATEGORIES = "".join(
-    f".st-key-grp-{slug(rayon)}{{border-left:5px solid {couleur};"
+    f".st-key-grp-{slug(rayon)}{{border-left:6px solid {couleur};"
     f"padding-left:14px; margin:14px 0 4px;}}"
     f".st-key-grp-{slug(rayon)} .rayon{{color:{couleur};}}"
     for rayon, couleur in RAYON_COULEURS.items()
@@ -144,7 +144,6 @@ html, body, [class*="css"], .stApp{
   font-family:'Plus Jakarta Sans', sans-serif !important;
   color:var(--prune); -webkit-tap-highlight-color:transparent;
 }
-/* Fond rose plus prononcé et chaleureux */
 .stApp{
   background:linear-gradient(180deg,#fbcfe8 0%,#f472b6 40%,#e879f9 100%) fixed !important;
 }
@@ -187,7 +186,7 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:2px solid #831843 !important; outline-offset:2px;}
 
-/* CADRES TRÈS MARQUÉS ET BIEN VISIBLES SUR FOND BLANC */
+/* CADRES DES BLOCS GÉNÉRAUX */
 [data-testid="stVerticalBlockBorderWrapper"], 
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
 [data-baseweb="block"] {
@@ -209,16 +208,25 @@ div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapp
 .jour-titre{font-size:13.5px; font-weight:800; color:var(--rose-vif); padding:8px 0 4px;}
 .section{font-weight:800; font-size:16px; color:var(--rose-fonce); margin:18px 0 6px;}
 
-.line{font-size:14.5px; font-weight:600; color:#311026; padding:10px 0;}
+/* LIGNES INDIVIDUELLES ENCADRÉES (POUR COURSES, TÂCHES, AGENDA) */
+.ligne-cadre {
+  background: #fff5f8 !important;
+  border: 2px solid #f472b6 !important;
+  border-radius: 14px !important;
+  padding: 10px 14px !important;
+  margin-bottom: 8px !important;
+  box-shadow: 0 3px 10px rgba(157, 23, 77, 0.08) !important;
+}
+.line{font-size:14.5px; font-weight:700; color:#311026;}
 .line.done{color:#a3a3a3; text-decoration:line-through;}
-.line .q{font-weight:600; color:var(--rose-vif); font-size:12.5px;}
+.line .q{font-weight:700; color:var(--rose-vif); font-size:13px;}
 
-.tag{display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700;
-     background:#fce7f3; color:var(--rose-vif); margin-left:6px; vertical-align:middle;}
+.tag{display:inline-block; padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:800;
+     background:#fce7f3; color:var(--rose-vif); margin-left:6px; vertical-align:middle; border:1px solid #f472b6;}
 .rayon{font-size:13px; font-weight:800; color:var(--rose-vif); background:#fdf2f8;
-       display:inline-block; padding:4px 10px; border-radius:12px; margin:12px 0 4px;}
-.empty{text-align:center; padding:22px 14px; border-radius:18px; background:#fff;
-       border:3.5px dashed var(--bord-cadre); color:var(--rose-fonce); font-weight:600; font-size:13.5px;}
+       display:inline-block; padding:4px 10px; border-radius:12px; margin:12px 0 6px; border:1.5px solid #f472b6;}
+.empty{text-align:center; padding:22px 14px; border-radius:18px; background:#fff5f8;
+       border:3px dashed var(--bord-cadre); color:var(--rose-fonce); font-weight:600; font-size:13.5px;}
 .today-none{font-size:13.5px; color:var(--rose-fonce); font-weight:600; opacity:.85; padding:8px 0;}
 
 .solde{border-radius:18px; padding:16px 20px; margin:14px 0; font-weight:700; font-size:15px;
@@ -283,21 +291,30 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--ros
 .st-key-mtabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
 .st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
 
+/* Espacement et style propre des lignes alignées */
 [data-testid="stHorizontalBlock"]:has(.line){
-  border-bottom:1.5px solid #fce7f3; align-items:center !important; gap:6px !important;
+  background: #fff5f8 !important;
+  border: 2px solid #f472b6 !important;
+  border-radius: 14px !important;
+  padding: 6px 12px !important;
+  margin-bottom: 8px !important;
+  align-items:center !important; 
+  gap: 8px !important;
+  box-shadow: 0 3px 10px rgba(157, 23, 77, 0.08) !important;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button{
-  background:transparent !important; border:none !important; box-shadow:none !important;
-  color:var(--rose-vif) !important; padding:6px 0 !important; font-size:14.5px !important;
-  opacity:.5; transition:opacity .15s ease;
+  background:#ffffff !important; border:1.5px solid #f472b6 !important; box-shadow:0 2px 6px rgba(157,23,77,0.15) !important;
+  color:var(--rose-vif) !important; padding:6px 10px !important; font-size:13.5px !important;
+  border-radius:10px !important; transition:transform .1s ease;
 }
-[data-testid="stHorizontalBlock"]:has(.line) button:hover{opacity:1;}
-.line{padding:11px 0; line-height:1.4;}
-.line .q{font-variant-numeric:tabular-nums; opacity:.85;}
+[data-testid="stHorizontalBlock"]:has(.line) button:active{transform:scale(.95);}
+
+.line{padding:6px 0; line-height:1.4;}
+.line .q{font-variant-numeric:tabular-nums; opacity:.9;}
 .solde .m{font-variant-numeric:tabular-nums;}
 
-.rayon{background:transparent; padding:0 0 4px; margin:0; font-size:13px; letter-spacing:-.1px;}
-.rayon .c{opacity:.55; font-weight:700;}
+.rayon{background:#fdf2f8; padding:4px 10px; border-radius:10px; margin:8px 0 6px; font-size:13px; font-weight:800; border:1.5px solid #f472b6;}
+.rayon .c{opacity:.7; font-weight:700;}
 
 .today-none{padding:12px 0;}
 .empty{padding:24px 14px;}
