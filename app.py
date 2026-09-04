@@ -11,7 +11,7 @@ st.set_page_config(
     page_title="Notre Assistant Shared", 
     page_icon="✨", 
     layout="centered",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # --- BALISES PWA & NATIVE MOBILE ---
@@ -45,6 +45,15 @@ st.markdown("""
         padding-top: 1rem !important;
         padding-bottom: 4rem !important;
         max-width: 550px !important;
+    }
+
+    /* Style de la Sidebar (Marge latérale) */
+    [data-testid="stSidebar"] {
+        background-color: #1e1b18 !important;
+        padding: 20px 10px;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
+        color: #ffffff !important;
     }
 
     .hero-banner {
@@ -114,32 +123,6 @@ st.markdown("""
         display: inline-block;
     }
 
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        background-color: rgba(229, 229, 224, 0.8);
-        backdrop-filter: blur(10px);
-        padding: 6px;
-        border-radius: 24px;
-        overflow-x: auto;
-        margin-bottom: 16px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 16px;
-        padding: 8px 14px;
-        font-weight: 700;
-        font-size: 12px;
-        color: #78716c;
-        background-color: transparent;
-        border: none;
-        white-space: nowrap;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #ffffff !important;
-        color: #3730a3 !important;
-        box-shadow: 0 4px 12px rgba(55, 48, 163, 0.12);
-    }
-
-    /* Mini Cartes Épurées Dashboard */
     .metric-card {
         background: #ffffff;
         border-radius: 18px;
@@ -282,6 +265,20 @@ def update_cell_fast(sheet_name, row_idx, col_idx, value):
 if "json_credentials_str" not in st.session_state:
     st.session_state["json_credentials_str"] = None
 
+# --- MENU NAVIGATION DANS LA MARGE (SIDEBAR) ---
+with st.sidebar:
+    st.markdown("### 🧭 Menu Principal")
+    selected_page = st.radio(
+        "Navigation", 
+        ["🏠 Dashboard", "📋 Quotidien", "📊 Budget", "🐾 Maison & Loisirs"],
+        label_visibility="collapsed"
+    )
+    st.divider()
+    if st.button("🔄 Actualiser les données"):
+        for key in list(st.session_state.keys()):
+            if key.startswith("data_"): del st.session_state[key]
+        st.rerun()
+
 # --- HERO BANNER ---
 st.markdown("""
     <div class="hero-banner">
@@ -307,15 +304,10 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- NAVIGATION ---
-tab_dash, tab_quotidien, tab_budget_adv, tab_loisirs = st.tabs([
-    "🏠 Dashboard", "📋 Quotidien", "📊 Budget", "🐾 Maison & Loisirs"
-])
-
 # ==========================================
-# 1. DASHBOARD ULTRA CLAIR & ÉPURÉ
+# 1. DASHBOARD
 # ==========================================
-with tab_dash:
+if selected_page == "🏠 Dashboard":
     if not st.session_state["json_credentials_str"]:
         st.warning("⚠️ Connexion Google Sheets requise.")
         uploaded_json = st.file_uploader("Glissez votre fichier JSON de configuration ici", type=["json"])
@@ -365,7 +357,6 @@ with tab_dash:
 
         st.markdown("<p style='font-weight: 800; font-size: 15px; color: #1c1917; margin-bottom: 12px;'>📊 Vue d'ensemble</p>", unsafe_allow_html=True)
 
-        # Lignes épurées sous forme de mini-cartes clean
         st.markdown(f"""
             <div class="metric-card">
                 <span class="metric-title">✅ Tâches du jour</span>
@@ -382,307 +373,297 @@ with tab_dash:
         """, unsafe_allow_html=True)
 
         st.divider()
-        col_act1, col_act2 = st.columns(2)
-        with col_act1:
-            if st.button("🔄 Actualiser"):
-                for key in list(st.session_state.keys()):
-                    if key.startswith("data_"): del st.session_state[key]
-                st.rerun()
-        with col_act2:
-            if st.button("🔴 Déconnexion"):
-                st.session_state["json_credentials_str"] = None
-                for key in list(st.session_state.keys()):
-                    if key.startswith("data_"): del st.session_state[key]
-                st.rerun()
+        if st.button("🔴 Déconnexion du compte Google"):
+            st.session_state["json_credentials_str"] = None
+            for key in list(st.session_state.keys()):
+                if key.startswith("data_"): del st.session_state[key]
+            st.rerun()
 
-json_str = st.session_state["json_credentials_str"]
+json_str = st.session_state.get("json_credentials_str")
 
 # ==========================================
 # 2. QUOTIDIEN
 # ==========================================
-with tab_quotidien:
-    if json_str:
-        sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda", "🛒 Courses", "🍽️ Repas"])
+if selected_page == "📋 Quotidien" and json_str:
+    sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda", "🛒 Courses", "🍽️ Repas"])
+    
+    with sub_tab1:
+        st.subheader("✅ Tâches à faire")
+        all_vals = get_data("Taches")
+        taches_data = all_vals[1:] if len(all_vals) > 1 else []
         
-        with sub_tab1:
-            st.subheader("✅ Tâches à faire")
-            all_vals = get_data("Taches")
-            taches_data = all_vals[1:] if len(all_vals) > 1 else []
-            
-            if taches_data: st.progress(len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"]) / len(taches_data))
+        if taches_data: st.progress(len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"]) / len(taches_data))
 
-            cat_filter = st.selectbox("🔍 Filtrer", ["Toutes", "Maison", "Urgent", "Autre"])
-            filtered = [t for t in taches_data if cat_filter == "Toutes" or (len(t) > 1 and t[1] == cat_filter)]
+        cat_filter = st.selectbox("🔍 Filtrer", ["Toutes", "Maison", "Urgent", "Autre"])
+        filtered = [t for t in taches_data if cat_filter == "Toutes" or (len(t) > 1 and t[1] == cat_filter)]
 
-            if filtered:
-                for idx, row in enumerate(filtered):
-                    nom_t, cat_t, statut_t = (row + ["Sans nom", "Général", "À faire"])[:3]
-                    real_idx = all_vals.index(row)
-                    c1, c2 = st.columns([3, 1])
-                    with c1:
-                        if statut_t == "Fait": st.markdown(f"- ~~**{nom_t}**~~ <span class='badge-tag'>{cat_t}</span>", unsafe_allow_html=True)
-                        else: st.markdown(f"- **{nom_t}** <span class='badge-tag'>{cat_t}</span>", unsafe_allow_html=True)
-                    with c2:
-                        if statut_t != "Fait":
-                            if st.button("✔️", key=f"t_fait_{real_idx}"):
-                                update_cell_fast("Taches", real_idx, 3, "Fait")
-                                st.rerun()
-                        else:
-                            if st.button("🗑️", key=f"t_del_{real_idx}"):
-                                delete_row_fast("Taches", real_idx)
-                                st.rerun()
-            else: st.info("Aucune tâche.")
-
-            st.divider()
-            with st.form("form_tache", clear_on_submit=True):
-                n_tache = st.text_input("Intitulé")
-                n_cat = st.selectbox("Catégorie", ["Maison", "Urgent", "Autre"])
-                if st.form_submit_button("Ajouter") and n_tache:
-                    append_row_fast("Taches", [n_tache, n_cat, "À faire"])
-                    st.rerun()
-
-        with sub_tab2:
-            st.subheader("📅 Agenda")
-            all_agenda_vals = get_data("Agenda")
-            agenda_events_data = all_agenda_vals[1:] if len(all_agenda_vals) > 1 else []
-            
-            if agenda_events_data:
-                for idx, row in enumerate(agenda_events_data):
-                    date_ev, heure_ev, titre_ev, desc_ev = (row + ["", "", "", ""])[:4]
-                    real_idx = idx + 1
-                    with st.expander(f"🗓️ {date_ev} {f'à {heure_ev}' if heure_ev else ''} — {titre_ev}"):
-                        if desc_ev: st.write(f"**Détails :** {desc_ev}")
-                        if st.button("🗑️ Supprimer", key=f"ev_del_{real_idx}"):
-                            delete_row_fast("Agenda", real_idx)
+        if filtered:
+            for idx, row in enumerate(filtered):
+                nom_t, cat_t, statut_t = (row + ["Sans nom", "Général", "À faire"])[:3]
+                real_idx = all_vals.index(row)
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    if statut_t == "Fait": st.markdown(f"- ~~**{nom_t}**~~ <span class='badge-tag'>{cat_t}</span>", unsafe_allow_html=True)
+                    else: st.markdown(f"- **{nom_t}** <span class='badge-tag'>{cat_t}</span>", unsafe_allow_html=True)
+                with c2:
+                    if statut_t != "Fait":
+                        if st.button("✔️", key=f"t_fait_{real_idx}"):
+                            update_cell_fast("Taches", real_idx, 3, "Fait")
                             st.rerun()
-            else: st.info("Aucun événement.")
+                    else:
+                        if st.button("🗑️", key=f"t_del_{real_idx}"):
+                            delete_row_fast("Taches", real_idx)
+                            st.rerun()
+        else: st.info("Aucune tâche.")
 
-            st.divider()
-            with st.form("form_agenda", clear_on_submit=True):
-                e_date = st.date_input("Date", value=datetime.today())
-                e_heure = st.time_input("Heure", value=datetime.now().time())
-                e_titre = st.text_input("Titre")
-                e_desc = st.text_area("Description")
-                if st.form_submit_button("Enregistrer") and e_titre:
-                    append_row_fast("Agenda", [str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
-                    st.rerun()
+        st.divider()
+        with st.form("form_tache", clear_on_submit=True):
+            n_tache = st.text_input("Intitulé")
+            n_cat = st.selectbox("Catégorie", ["Maison", "Urgent", "Autre"])
+            if st.form_submit_button("Ajouter") and n_tache:
+                append_row_fast("Taches", [n_tache, n_cat, "À faire"])
+                st.rerun()
 
-        with sub_tab3:
-            st.subheader("🛒 Liste de Courses Organisée")
-            
-            with st.expander("🧠 Piocher dans mes articles habituels"):
-                rayons_dispos = sorted(list(set(item["rayon"] for item in MEMOIRE_COURSES)))
-                selected_rayon = st.selectbox("Filtrer par rayon :", rayons_dispos)
-                filtered_memo = [m for m in MEMOIRE_COURSES if m["rayon"] == selected_rayon]
-                memo_noms = [m["article"] for m in filtered_memo]
-                
-                chosen_memo = st.multiselect(f"Articles ({selected_rayon}) :", memo_noms)
-                if st.button("➕ Ajouter la sélection"):
-                    if chosen_memo:
-                        for article_name in chosen_memo:
-                            match = next((m for m in MEMOIRE_COURSES if m["article"] == article_name), None)
-                            if match:
-                                append_row_fast("Courses", [match["article"], match["qte"], match["rayon"]])
-                        st.success("Ajouté !")
+    with sub_tab2:
+        st.subheader("📅 Agenda")
+        all_agenda_vals = get_data("Agenda")
+        agenda_events_data = all_agenda_vals[1:] if len(all_agenda_vals) > 1 else []
+        
+        if agenda_events_data:
+            for idx, row in enumerate(agenda_events_data):
+                date_ev, heure_ev, titre_ev, desc_ev = (row + ["", "", "", ""])[:4]
+                real_idx = idx + 1
+                with st.expander(f"🗓️ {date_ev} {f'à {heure_ev}' if heure_ev else ''} — {titre_ev}"):
+                    if desc_ev: st.write(f"**Détails :** {desc_ev}")
+                    if st.button("🗑️ Supprimer", key=f"ev_del_{real_idx}"):
+                        delete_row_fast("Agenda", real_idx)
                         st.rerun()
+        else: st.info("Aucun événement.")
 
-            st.divider()
-            all_vals = get_data("Courses")
-            courses_data = all_vals[1:] if len(all_vals) > 1 else []
+        st.divider()
+        with st.form("form_agenda", clear_on_submit=True):
+            e_date = st.date_input("Date", value=datetime.today())
+            e_heure = st.time_input("Heure", value=datetime.now().time())
+            e_titre = st.text_input("Titre")
+            e_desc = st.text_area("Description")
+            if st.form_submit_button("Enregistrer") and e_titre:
+                append_row_fast("Agenda", [str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
+                st.rerun()
 
-            if courses_data:
-                rayons_ordre = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
-                for rayon in rayons_ordre:
-                    articles_du_rayon = [r for r in courses_data if (r[2] if len(r) > 2 else "Autre") == rayon]
-                    if articles_du_rayon:
-                        st.markdown(f"**🏷️ {rayon}**")
-                        for row in articles_du_rayon:
-                            art, qte = (row + ["Article", "1"])[:2]
-                            real_idx = all_vals.index(row)
-                            c1, c2 = st.columns([3, 1])
-                            with c1: st.markdown(f"- {art} *(Qté: {qte})*")
-                            with c2:
-                                if st.button("✔️", key=f"c_del_{real_idx}"):
-                                    delete_row_fast("Courses", real_idx)
-                                    st.rerun()
-                st.divider()
-            else: st.info("Panier vide.")
-
-            with st.form("form_courses", clear_on_submit=True):
-                c_art = st.text_input("Article libre")
-                c_qte = st.text_input("Quantité", value="1")
-                c_cat = st.selectbox("Rayon", ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"])
-                if st.form_submit_button("Ajouter") and c_art:
-                    append_row_fast("Courses", [c_art, c_qte, c_cat])
+    with sub_tab3:
+        st.subheader("🛒 Liste de Courses Organisée")
+        
+        with st.expander("🧠 Piocher dans mes articles habituels"):
+            rayons_dispos = sorted(list(set(item["rayon"] for item in MEMOIRE_COURSES)))
+            selected_rayon = st.selectbox("Filtrer par rayon :", rayons_dispos)
+            filtered_memo = [m for m in MEMOIRE_COURSES if m["rayon"] == selected_rayon]
+            memo_noms = [m["article"] for m in filtered_memo]
+            
+            chosen_memo = st.multiselect(f"Articles ({selected_rayon}) :", memo_noms)
+            if st.button("➕ Ajouter la sélection"):
+                if chosen_memo:
+                    for article_name in chosen_memo:
+                        match = next((m for m in MEMOIRE_COURSES if m["article"] == article_name), None)
+                        if match:
+                            append_row_fast("Courses", [match["article"], match["qte"], match["rayon"]])
+                    st.success("Ajouté !")
                     st.rerun()
 
-        with sub_tab4:
-            st.subheader("🍽️ Planning des Repas")
-            all_vals = get_data("Repas")
-            repas_data = all_vals[1:] if len(all_vals) > 1 else []
-            jours = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+        st.divider()
+        all_vals = get_data("Courses")
+        courses_data = all_vals[1:] if len(all_vals) > 1 else []
 
-            for jour in jours:
-                st.markdown(f"##### 📅 {jour}")
-                repas_j = [r for r in repas_data if len(r) > 0 and r[0] == jour]
-                if repas_j:
-                    for r in repas_j:
-                        typ, plt = (r[1:] + ["", ""])[:2]
-                        real_idx = all_vals.index(r)
-                        c1, c2 = st.columns([4, 1])
-                        with c1: st.write(f"- **{typ}** : {plt}")
+        if courses_data:
+            rayons_ordre = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
+            for rayon in rayons_ordre:
+                articles_du_rayon = [r for r in courses_data if (r[2] if len(r) > 2 else "Autre") == rayon]
+                if articles_du_rayon:
+                    st.markdown(f"**🏷️ {rayon}**")
+                    for row in articles_du_rayon:
+                        art, qte = (row + ["Article", "1"])[:2]
+                        real_idx = all_vals.index(row)
+                        c1, c2 = st.columns([3, 1])
+                        with c1: st.markdown(f"- {art} *(Qté: {qte})*")
                         with c2:
-                            if st.button("🗑️", key=f"rep_del_{real_idx}"):
-                                delete_row_fast("Repas", real_idx)
+                            if st.button("✔️", key=f"c_del_{real_idx}"):
+                                delete_row_fast("Courses", real_idx)
                                 st.rerun()
-                else: st.caption("Rien de prévu")
-
             st.divider()
-            with st.form("form_repas", clear_on_submit=True):
-                r_jour = st.selectbox("Jour", jours)
-                r_type = st.radio("Repas", ["Midi", "Soir"], horizontal=True)
-                r_plat = st.text_input("Plat")
-                if st.form_submit_button("Ajouter au planning") and r_plat:
-                    append_row_fast("Repas", [r_jour, r_type, r_plat])
-                    st.rerun()
+        else: st.info("Panier vide.")
+
+        with st.form("form_courses", clear_on_submit=True):
+            c_art = st.text_input("Article libre")
+            c_qte = st.text_input("Quantité", value="1")
+            c_cat = st.selectbox("Rayon", ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"])
+            if st.form_submit_button("Ajouter") and c_art:
+                append_row_fast("Courses", [c_art, c_qte, c_cat])
+                st.rerun()
+
+    with sub_tab4:
+        st.subheader("🍽️ Planning des Repas")
+        all_vals = get_data("Repas")
+        repas_data = all_vals[1:] if len(all_vals) > 1 else []
+        jours = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+
+        for jour in jours:
+            st.markdown(f"##### 📅 {jour}")
+            repas_j = [r for r in repas_data if len(r) > 0 and r[0] == jour]
+            if repas_j:
+                for r in repas_j:
+                    typ, plt = (r[1:] + ["", ""])[:2]
+                    real_idx = all_vals.index(r)
+                    c1, c2 = st.columns([4, 1])
+                    with c1: st.write(f"- **{typ}** : {plt}")
+                    with c2:
+                        if st.button("🗑️", key=f"rep_del_{real_idx}"):
+                            delete_row_fast("Repas", real_idx)
+                            st.rerun()
+            else: st.caption("Rien de prévu")
+
+        st.divider()
+        with st.form("form_repas", clear_on_submit=True):
+            r_jour = st.selectbox("Jour", jours)
+            r_type = st.radio("Repas", ["Midi", "Soir"], horizontal=True)
+            r_plat = st.text_input("Plat")
+            if st.form_submit_button("Ajouter au planning") and r_plat:
+                append_row_fast("Repas", [r_jour, r_type, r_plat])
+                st.rerun()
 
 # ==========================================
 # 3. BUDGET
 # ==========================================
-with tab_budget_adv:
-    if json_str:
-        st.subheader("📊 Tableau de Bord Financier")
-        all_vals = get_data("Budget")
-        budget_data = all_vals[1:] if len(all_vals) > 1 else []
+if selected_page == "📊 Budget" and json_str:
+    st.subheader("📊 Tableau de Bord Financier")
+    all_vals = get_data("Budget")
+    budget_data = all_vals[1:] if len(all_vals) > 1 else []
 
-        if budget_data:
-            parsed_rows = []
-            for r in budget_data:
-                dt_str, pyr, lbl = (r + ["", "", ""])[:3]
-                try: amt = float(r[3].replace(',', '.')) if len(r) > 3 else 0.0
-                except ValueError: amt = 0.0
-                cat_str = r[4] if len(r) > 4 else "Alimentation"
-                parsed_rows.append({"Date": dt_str, "Payeur": pyr, "Intitulé": lbl, "Montant (€)": amt, "Catégorie": cat_str})
-            
-            df_budget = pd.DataFrame(parsed_rows)
-            total_lucas = df_budget[df_budget["Payeur"] == "Lucas"]["Montant (€)"].sum()
-            total_alex = df_budget[df_budget["Payeur"] == "Alex"]["Montant (€)"].sum()
-            diff = (total_lucas - total_alex) / 2
+    if budget_data:
+        parsed_rows = []
+        for r in budget_data:
+            dt_str, pyr, lbl = (r + ["", "", ""])[:3]
+            try: amt = float(r[3].replace(',', '.')) if len(r) > 3 else 0.0
+            except ValueError: amt = 0.0
+            cat_str = r[4] if len(r) > 4 else "Alimentation"
+            parsed_rows.append({"Date": dt_str, "Payeur": pyr, "Intitulé": lbl, "Montant (€)": amt, "Catégorie": cat_str})
+        
+        df_budget = pd.DataFrame(parsed_rows)
+        total_lucas = df_budget[df_budget["Payeur"] == "Lucas"]["Montant (€)"].sum()
+        total_alex = df_budget[df_budget["Payeur"] == "Alex"]["Montant (€)"].sum()
+        diff = (total_lucas - total_alex) / 2
 
-            b1, b2 = st.columns(2)
-            with b1: st.metric("Payé par Lucas", f"{total_lucas:.2f} €")
-            with b2: st.metric("Payé par Alex", f"{total_alex:.2f} €")
+        b1, b2 = st.columns(2)
+        with b1: st.metric("Payé par Lucas", f"{total_lucas:.2f} €")
+        with b2: st.metric("Payé par Alex", f"{total_alex:.2f} €")
 
-            if diff > 0: st.success(f"👉 **Alex doit {diff:.2f} € à Lucas**")
-            elif diff < 0: st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alex**")
-            else: st.info("⚖️ Comptes parfaitement équilibrés !")
-
-            st.divider()
-            for idx, row in enumerate(budget_data):
-                dt, pyr, lbl = (row + ["", "", ""])[:3]
-                val = row[3] if len(row) > 3 else "0"
-                cat = row[4] if len(row) > 4 else "Alimentation"
-                real_idx = idx + 1
-                c1, c2 = st.columns([4, 1])
-                with c1: st.markdown(f"- **{lbl}** <span class='badge-tag'>{cat}</span> : {val} € *(par {pyr} le {dt})*", unsafe_allow_html=True)
-                with c2:
-                    if st.button("🗑️", key=f"adv_b_del_{real_idx}"):
-                        delete_row_fast("Budget", real_idx)
-                        st.rerun()
-        else: st.info("Aucune dépense enregistrée.")
+        if diff > 0: st.success(f"👉 **Alex doit {diff:.2f} € à Lucas**")
+        elif diff < 0: st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alex**")
+        else: st.info("⚖️ Comptes parfaitement équilibrés !")
 
         st.divider()
-        with st.form("form_budget_adv", clear_on_submit=True):
-            b_date = st.date_input("Date", value=datetime.today())
-            b_payer = st.radio("Qui a payé ?", ["Lucas", "Alex"], horizontal=True)
-            b_label = st.text_input("Intitulé")
-            b_cat = st.selectbox("Catégorie", ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"])
-            b_amount = st.number_input("Montant (€)", min_value=0.0, step=0.5)
-            if st.form_submit_button("Enregistrer la dépense") and b_label and b_amount > 0:
-                append_row_fast("Budget", [str(b_date), b_payer, b_label, str(b_amount), b_cat])
-                st.rerun()
+        for idx, row in enumerate(budget_data):
+            dt, pyr, lbl = (row + ["", "", ""])[:3]
+            val = row[3] if len(row) > 3 else "0"
+            cat = row[4] if len(row) > 4 else "Alimentation"
+            real_idx = idx + 1
+            c1, c2 = st.columns([4, 1])
+            with c1: st.markdown(f"- **{lbl}** <span class='badge-tag'>{cat}</span> : {val} € *(par {pyr} le {dt})*", unsafe_allow_html=True)
+            with c2:
+                if st.button("🗑️", key=f"adv_b_del_{real_idx}"):
+                    delete_row_fast("Budget", real_idx)
+                    st.rerun()
+    else: st.info("Aucune dépense enregistrée.")
+
+    st.divider()
+    with st.form("form_budget_adv", clear_on_submit=True):
+        b_date = st.date_input("Date", value=datetime.today())
+        b_payer = st.radio("Qui a payé ?", ["Lucas", "Alex"], horizontal=True)
+        b_label = st.text_input("Intitulé")
+        b_cat = st.selectbox("Catégorie", ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"])
+        b_amount = st.number_input("Montant (€)", min_value=0.0, step=0.5)
+        if st.form_submit_button("Enregistrer la dépense") and b_label and b_amount > 0:
+            append_row_fast("Budget", [str(b_date), b_payer, b_label, str(b_amount), b_cat])
+            st.rerun()
 
 # ==========================================
 # 4. MAISON & LOISIRS
 # ==========================================
-with tab_loisirs:
-    if json_str:
-        sub_tab_r, sub_tab_n, sub_tab_l = st.tabs(["🍲 Recettes", "📝 Notes", "🧳 Listes & Cadeaux"])
+if selected_page == "🐾 Maison & Loisirs" and json_str:
+    sub_tab_r, sub_tab_n, sub_tab_l = st.tabs(["🍲 Recettes", "📝 Notes", "🧳 Listes & Cadeaux"])
 
-        with sub_tab_r:
-            st.subheader("🍲 Recettes de Cuisine")
-            all_vals = get_data("Recettes")
-            recettes_data = all_vals[1:] if len(all_vals) > 1 else []
+    with sub_tab_r:
+        st.subheader("🍲 Recettes de Cuisine")
+        all_vals = get_data("Recettes")
+        recettes_data = all_vals[1:] if len(all_vals) > 1 else []
 
-            if recettes_data:
-                for idx, row in enumerate(recettes_data):
-                    titre, ing, inst = (row + ["Sans titre", "", ""])[:3]
-                    real_idx = all_vals.index(row)
-                    with st.expander(f"🍲 {titre}"):
-                        st.markdown(f"**🛒 Ingrédients :**\n{ing}")
-                        st.markdown(f"**👨‍🍳 Instructions :**\n{inst}")
-                        if st.button("🗑️ Supprimer", key=f"r_del_{real_idx}"):
-                            delete_row_fast("Recettes", real_idx)
-                            st.rerun()
-            else: st.info("Aucune recette.")
+        if recettes_data:
+            for idx, row in enumerate(recettes_data):
+                titre, ing, inst = (row + ["Sans titre", "", ""])[:3]
+                real_idx = all_vals.index(row)
+                with st.expander(f"🍲 {titre}"):
+                    st.markdown(f"**🛒 Ingrédients :**\n{ing}")
+                    st.markdown(f"**👨‍🍳 Instructions :**\n{inst}")
+                    if st.button("🗑️ Supprimer", key=f"r_del_{real_idx}"):
+                        delete_row_fast("Recettes", real_idx)
+                        st.rerun()
+        else: st.info("Aucune recette.")
 
-            st.divider()
-            with st.form("form_recette", clear_on_submit=True):
-                r_titre = st.text_input("Nom de la recette")
-                r_ing = st.text_area("Ingrédients (un par ligne)")
-                r_inst = st.text_area("Instructions")
-                if st.form_submit_button("Enregistrer la recette") and r_titre:
-                    append_row_fast("Recettes", [r_titre, r_ing, r_inst])
-                    st.rerun()
+        st.divider()
+        with st.form("form_recette", clear_on_submit=True):
+            r_titre = st.text_input("Nom de la recette")
+            r_ing = st.text_area("Ingrédients (un par ligne)")
+            r_inst = st.text_area("Instructions")
+            if st.form_submit_button("Enregistrer la recette") and r_titre:
+                append_row_fast("Recettes", [r_titre, r_ing, r_inst])
+                st.rerun()
 
-        with sub_tab_n:
-            st.subheader("📝 Notes Partagées")
-            all_vals = get_data("Notes")
-            notes_data = all_vals[1:] if len(all_vals) > 1 else []
+    with sub_tab_n:
+        st.subheader("📝 Notes Partagées")
+        all_vals = get_data("Notes")
+        notes_data = all_vals[1:] if len(all_vals) > 1 else []
 
-            if notes_data:
-                for idx, row in enumerate(notes_data):
-                    titre, contenu = (row + ["Sans titre", ""])[:2]
-                    real_idx = all_vals.index(row)
-                    with st.expander(f"📌 {titre}"):
-                        st.write(contenu)
-                        if st.button("🗑️ Supprimer", key=f"n_del_{real_idx}"):
-                            delete_row_fast("Notes", real_idx)
-                            st.rerun()
-            else: st.info("Aucune note.")
+        if notes_data:
+            for idx, row in enumerate(notes_data):
+                titre, contenu = (row + ["Sans titre", ""])[:2]
+                real_idx = all_vals.index(row)
+                with st.expander(f"📌 {titre}"):
+                    st.write(contenu)
+                    if st.button("🗑️ Supprimer", key=f"n_del_{real_idx}"):
+                        delete_row_fast("Notes", real_idx)
+                        st.rerun()
+        else: st.info("Aucune note.")
 
-            st.divider()
-            with st.form("form_note", clear_on_submit=True):
-                n_titre = st.text_input("Titre")
-                n_contenu = st.text_area("Contenu")
-                if st.form_submit_button("Enregistrer la note") and n_titre:
-                    append_row_fast("Notes", [n_titre, n_contenu])
-                    st.rerun()
+        st.divider()
+        with st.form("form_note", clear_on_submit=True):
+            n_titre = st.text_input("Titre")
+            n_contenu = st.text_area("Contenu")
+            if st.form_submit_button("Enregistrer la note") and n_titre:
+                append_row_fast("Notes", [n_titre, n_contenu])
+                st.rerun()
 
-        with sub_tab_l:
-            st.subheader("🧳 Listes & Cadeaux")
-            all_vals = get_data("Listes")
-            listes_data = all_vals[1:] if len(all_vals) > 1 else []
-            cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
+    with sub_tab_l:
+        st.subheader("🧳 Listes & Cadeaux")
+        all_vals = get_data("Listes")
+        listes_data = all_vals[1:] if len(listes_data) > 1 else []
+        cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
 
-            filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_l]
-            if filtered:
-                for idx, row in enumerate(filtered):
-                    elm, nts = (row[1:] + ["", ""])[:2]
-                    real_idx = all_vals.index(row)
-                    c1, c2 = st.columns([4, 1])
-                    with c1: st.markdown(f"- **{elm}** {f'(*{nts}*)' if nts else ''}")
-                    with c2:
-                        if st.button("🗑️", key=f"lst_del_{real_idx}"):
-                            delete_row_fast("Listes", real_idx)
-                            st.rerun()
-            else: st.info("Rien dans cette liste.")
+        filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_l]
+        if filtered:
+            for idx, row in enumerate(filtered):
+                elm, nts = (row[1:] + ["", ""])[:2]
+                real_idx = all_vals.index(row)
+                c1, c2 = st.columns([4, 1])
+                with c1: st.markdown(f"- **{elm}** {f'(*{nts}*)' if nts else ''}")
+                with c2:
+                    if st.button("🗑️", key=f"lst_del_{real_idx}"):
+                        delete_row_fast("Listes", real_idx)
+                        st.rerun()
+        else: st.info("Rien dans cette liste.")
 
-            st.divider()
-            with st.form("form_listes", clear_on_submit=True):
-                l_cat = st.selectbox("Liste", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"])
-                l_elem = st.text_input("Élément")
-                l_notes = st.text_input("Notes (optionnel)")
-                if st.form_submit_button("Ajouter") and l_elem:
-                    append_row_fast("Listes", [l_cat, l_elem, l_notes])
-                    st.rerun()
+        st.divider()
+        with st.form("form_listes", clear_on_submit=True):
+            l_cat = st.selectbox("Liste", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"])
+            l_elem = st.text_input("Élément")
+            l_notes = st.text_input("Notes (optionnel)")
+            if st.form_submit_button("Ajouter") and l_elem:
+                append_row_fast("Listes", [l_cat, l_elem, l_notes])
+                st.rerun()
