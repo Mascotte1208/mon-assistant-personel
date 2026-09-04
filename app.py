@@ -263,6 +263,22 @@ label p{font-weight:700 !important; font-size:13px !important; color:var(--prune
 }
 .cal-title{text-align:center; font-size:16px; font-weight:800; color:var(--prune-clair); padding-top:10px;}
 
+/* --- Cases cliquables du calendrier --- */
+.st-key-cal-grid [data-testid="column"]{padding:0 2px !important; min-width:0 !important;}
+[class*="st-key-cal_"] button{
+  min-height:0 !important; padding:9px 0 !important; border-radius:12px !important;
+  font-size:12px !important; font-weight:700 !important;
+  background:#fdf2f8 !important; color:var(--prune) !important;
+  border:1.5px solid transparent !important; box-shadow:none !important;
+}
+[class*="st-key-cal_"] button p{font-size:12px !important; font-weight:700 !important;}
+[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#ecd9f5 !important; opacity:1 !important;}
+[class*="st-key-cal_"] button[kind="primary"],
+[class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
+  background:linear-gradient(135deg,#ec4899,#a855f7) !important; color:#fff !important;
+  box-shadow:0 5px 12px -3px rgba(219,39,119,.55) !important;
+}
+
 /* --- Divers --- */
 .stProgress > div > div > div > div{background-image:linear-gradient(90deg,#f472b6,#a855f7) !important;}
 [data-testid="stExpander"]{
@@ -518,6 +534,38 @@ def evenements_tries():
     return sorted(out, key=lambda e: (e[0], e[1] or "99:99"))
 
 
+def grille_mois_cliquable(annee, mois, par_jour, aujourd, selection):
+    """Grille de boutons : renvoie le jour cliqué, sinon None."""
+    st.markdown("<div class='cal-week'>" + "".join(f"<span>{j}</span>" for j in JOURS_COURT) + "</div>",
+                unsafe_allow_html=True)
+    choisi, styles = None, []
+    with conteneur("cal-grid"):
+        for semaine in calendar.Calendar(firstweekday=0).monthdatescalendar(annee, mois):
+            cols = st.columns(7)
+            for col, jour in zip(cols, semaine):
+                with col:
+                    cle = f"cal_{jour.isoformat()}"
+                    if jour.month != mois:
+                        st.button(str(jour.day), key=cle, disabled=True)
+                        continue
+                    nb = len(par_jour.get(jour, []))
+                    if st.button(f"{jour.day}•" if nb else str(jour.day), key=cle,
+                                 type="primary" if jour == selection else "secondary"):
+                        choisi = jour
+                    if jour == selection:
+                        continue
+                    if nb:
+                        styles.append(f".st-key-{cle} button{{background:"
+                                      f"linear-gradient(135deg,#fce7f3,#fae8ff) !important;"
+                                      f"color:#9d174d !important;}}")
+                    if jour == aujourd:
+                        styles.append(f".st-key-{cle} button{{border:2px solid #db2777 !important;"
+                                      f"color:#db2777 !important;}}")
+    if styles:
+        st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
+    return choisi
+
+
 def grille_mois(annee, mois, par_jour, aujourd):
     """Rend le mois en grille HTML, avec un point par événement (3 max)."""
     semaines = calendar.Calendar(firstweekday=0).monthdatescalendar(annee, mois)
@@ -631,10 +679,13 @@ if page == "🏠 Accueil":
                 delete_row("Repas", idx)
                 st.rerun()
 
-    # ---------- 2. Le mois, toujours visible ----------
+    # ---------- 2. Le mois, toujours visible et cliquable ----------
     if "dash_ym" not in st.session_state:
         st.session_state["dash_ym"] = (ajd.year, ajd.month)
+    if "dash_jour" not in st.session_state:
+        st.session_state["dash_jour"] = ajd
     d_annee, d_mois = st.session_state["dash_ym"]
+    jour_sel = st.session_state["dash_jour"]
 
     with conteneur("dash-cal", bordure=True):
         m1, m2, m3 = st.columns([1, 3, 1])
@@ -650,11 +701,44 @@ if page == "🏠 Accueil":
                 st.session_state["dash_ym"] = (d_annee + 1, 1) if d_mois == 12 else (d_annee, d_mois + 1)
                 st.rerun()
 
-        st.markdown(grille_mois(d_annee, d_mois, par_jour, ajd), unsafe_allow_html=True)
+        clic = grille_mois_cliquable(d_annee, d_mois, par_jour, ajd, jour_sel)
+        if clic:
+            st.session_state["dash_jour"] = clic
+            st.rerun()
 
         if (d_annee, d_mois) != (ajd.year, ajd.month):
             if st.button("↩️ Revenir à ce mois-ci", key="dash_cal_today"):
                 st.session_state["dash_ym"] = (ajd.year, ajd.month)
+                st.session_state["dash_jour"] = ajd
+                st.rerun()
+
+        # --- Le jour choisi ---
+        marque = " · aujourd'hui" if jour_sel == ajd else ""
+        st.markdown(f"<div class='day-head'>{JOURS[jour_sel.weekday()]} {jour_sel.day} "
+                    f"{MOIS[jour_sel.month - 1]}{marque}</div>", unsafe_allow_html=True)
+
+        du_jour = par_jour.get(jour_sel, [])
+        for jd, h, ti, desc, idx in du_jour:
+            detail = f"<br><span class='q'>{desc}</span>" if desc else ""
+            if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}",
+                            [("🗑️", f"cal_ev_{idx}")]):
+                delete_row("Agenda", idx)
+                st.rerun()
+        if not du_jour:
+            st.markdown("<div class='today-none'>Rien de prévu ce jour-là.</div>", unsafe_allow_html=True)
+
+        na, nb, nc = st.columns([1.2, 3, 1])
+        with na:
+            n_heure = st.text_input("Heure", key="dash_eheure", placeholder="19:30",
+                                    label_visibility="collapsed")
+        with nb:
+            n_titre = st.text_input("Événement", key="dash_etitre", placeholder="Ajouter ici…",
+                                    label_visibility="collapsed")
+        with nc:
+            if st.button("＋", key="dash_add_ev", type="primary") and n_titre.strip():
+                add_row("Agenda", [str(jour_sel), n_heure.strip(), n_titre.strip(), ""])
+                reset_after(dash_etitre="", dash_eheure="")
+                st.toast("Événement ajouté 💖", icon="📅")
                 st.rerun()
 
     # ---------- 3. Note épinglée ----------
@@ -764,19 +848,8 @@ if page == "🏠 Accueil":
                     st.rerun()
             if not du_mois:
                 st.markdown("<div class='today-none'>Rien de prévu sur ce mois.</div>", unsafe_allow_html=True)
-
-            ea, eb, ec = st.columns([2, 3, 1])
-            with ea:
-                dash_edate = st.date_input("Date", key="dash_edate", value=ajd, label_visibility="collapsed")
-            with eb:
-                dash_etitre = st.text_input("Événement", key="dash_etitre",
-                                            placeholder="Nouvel événement…", label_visibility="collapsed")
-            with ec:
-                if st.button("＋", key="dash_add_ev", type="primary") and dash_etitre.strip():
-                    add_row("Agenda", [str(dash_edate), "", dash_etitre.strip(), ""])
-                    st.session_state["dash_ym"] = (dash_edate.year, dash_edate.month)
-                    reset_after(dash_etitre="")
-                    st.rerun()
+            else:
+                st.caption("Touchez un jour du calendrier pour le remplir.")
 
     # ---------- 4. Budget partagé ----------
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
