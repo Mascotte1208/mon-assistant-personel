@@ -46,7 +46,6 @@ st.markdown("""
         max-width: 520px !important;
     }
 
-    /* Bannière Douce & Girly */
     .hero-banner {
         background: linear-gradient(135deg, #ec4899 0%, #d946ef 50%, #8b5cf6 100%);
         border-radius: 30px;
@@ -78,7 +77,6 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* Cartes Dashboard & Notes Importantes */
     .metric-card {
         background: #ffffff;
         border-radius: 20px;
@@ -112,7 +110,6 @@ st.markdown("""
         box-shadow: 0 6px 16px rgba(217, 70, 239, 0.08);
     }
 
-    /* Boutons de Navigation Stylés */
     .stButton button {
         border-radius: 20px;
         font-weight: 800;
@@ -127,7 +124,6 @@ st.markdown("""
     }
     .stButton button:active { transform: scale(0.97); }
 
-    /* Inputs & Formulaires Doux */
     .stTextInput input, .stTextArea textarea, .stSelectbox select {
         color: #4a044e !important;
         background-color: #ffffff !important;
@@ -190,24 +186,50 @@ def get_gspread_client(json_str):
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
 
-def sync_sheet_to_state(sheet_name, data):
-    st.session_state[f"data_{sheet_name}"] = data
-
 def get_data(sheet_name):
-    if f"data_{sheet_name}" not in st.session_state:
+    cache_key = f"data_{sheet_name}"
+    if cache_key not in st.session_state:
         if st.session_state.get("json_credentials_str"):
             try:
                 client = get_gspread_client(st.session_state["json_credentials_str"])
                 ws = client.open("MonAssistantData").worksheet(sheet_name)
-                st.session_state[f"data_{sheet_name}"] = ws.get_all_values()
+                st.session_state[cache_key] = ws.get_all_values()
             except Exception:
-                st.session_state[f"data_{sheet_name}"] = []
+                st.session_state[cache_key] = []
         else:
-            st.session_state[f"data_{sheet_name}"] = []
-    return st.session_state[f"data_{sheet_name}"]
+            st.session_state[cache_key] = []
+    return st.session_state[cache_key]
+
+def sync_sheet_to_state(sheet_name, data):
+    st.session_state[f"data_{sheet_name}"] = data
 
 def append_row_fast(sheet_name, row):
     data = get_data(sheet_name)
+    
+    # Gestion intelligente des doublons pour l'onglet Courses
+    if sheet_name == "Courses":
+        article_nom = row[0].strip().lower()
+        found_idx = -1
+        for idx, existing in enumerate(data):
+            if idx > 0 and len(existing) > 0 and existing[0].strip().lower() == article_nom:
+                found_idx = idx
+                break
+        
+        if found_idx != -1:
+            # Le doublon existe déjà, on met à jour la ligne en mémoire et sur Google Sheets
+            old_qte = data[found_idx][1] if len(data[found_idx]) > 1 else "1"
+            new_qte = f"{old_qte} + {row[1]}"
+            data[found_idx][1] = new_qte
+            sync_sheet_to_state(sheet_name, data)
+            if st.session_state.get("json_credentials_str"):
+                try:
+                    client = get_gspread_client(st.session_state["json_credentials_str"])
+                    client.open("MonAssistantData").worksheet(sheet_name).update_cell(found_idx + 1, 2, new_qte)
+                except Exception:
+                    pass
+            return
+
+    # Ajout normal si pas de doublon
     data.append(row)
     sync_sheet_to_state(sheet_name, data)
     if st.session_state.get("json_credentials_str"):
@@ -319,7 +341,6 @@ if active_page == "🏠 Dashboard":
         total_taches = len(taches_data)
         nb_courses = max(0, len(courses_vals) - 1)
 
-        # Calcul budget
         total_lucas, total_alex = 0.0, 0.0
         for r in (budget_vals[1:] if len(budget_vals) > 1 else []):
             payer = r[1] if len(r) > 1 else ""
@@ -333,7 +354,6 @@ if active_page == "🏠 Dashboard":
         # --- BLOC NOTES IMPORTANTES ---
         st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-bottom: 8px;'>📌 Note importante du moment</p>", unsafe_allow_html=True)
         
-        # Chercher s'il y a une note intitulée "Important" ou prendre la dernière note
         notes_data = notes_vals[1:] if len(notes_vals) > 1 else []
         note_importante = next((n[1] for n in notes_data if len(n) > 1 and "important" in n[0].lower()), None)
         if not note_importante and notes_data:
@@ -365,12 +385,12 @@ if active_page == "🏠 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # --- BLOC TÂCHES URGENTES / À FAIRE VISIBLE DIRECTEMENT SUR LE DASHBOARD ---
+        # --- BLOC TÂCHES VISIBLES SUR LE DASHBOARD ---
         st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-top: 16px; margin-bottom: 8px;'>✨ Tâches en cours à valider</p>", unsafe_allow_html=True)
         taches_actives = [t for t in taches_data if len(t) > 2 and t[2] != "Fait"]
         
         if taches_actives:
-            for row in taches_actives[:4]: # Afficher les 4 premières tâches en cours
+            for row in taches_actives[:4]:
                 nom_t, cat_t = (row + ["Sans nom", "Général"])[:2]
                 real_idx = taches_vals.index(row)
                 
@@ -653,7 +673,7 @@ elif active_page == "🐾 Maison & Loisirs" and json_str:
     with sub_tab_l:
         st.subheader("🧳 Listes & Cadeaux")
         all_vals = get_data("Listes")
-        listes_data = all_vals[1:] if len(all_vals) > 1 else []
+        listes_data = all_vals[1:] if len(listes_data) > 1 else []
         cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
 
         filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_l]
