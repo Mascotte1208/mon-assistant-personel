@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.40"
+VERSION = "2.41"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -562,7 +562,6 @@ def depuis(instant):
 def fetch_market_history(tickers_list, period="1d"):
     try:
         import yfinance as yf
-        # Adapter l'intervalle selon la période courte (minutes) ou longue (jours)
         interval = "1m" if period in ["1d", "5d"] else ("15m" if period == "1mo" else "1d")
         if period in ["6mo", "1y"]:
             interval = "1d"
@@ -1001,7 +1000,6 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
     if onglet_ia == ONGLETS_IA[0]:
         st.caption("Espace dédié à l'enregistrement de tes apprentissages, priorités et gestion des dangers.")
 
-        # Raccourcis pour intégrer des règles de trading court terme dans le Labo
         regles_trading_preset = st.selectbox(
             "⚡ Charger une règle d'investissement court terme classique",
             [
@@ -1048,7 +1046,7 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
             vide("Aucune note enregistrée pour le moment.")
 
     elif onglet_ia == ONGLETS_IA[1]:
-        st.caption("Dashboard de comparaison des marchés financiers (Vue Prix réels ou Base 100 en Minutes/Mois).")
+        st.caption("Dashboard de comparaison des marchés financiers (Graphique haute lisibilité).")
 
         dictionnaire_actifs = {
             "Or (Gold)": "GC=F",
@@ -1069,10 +1067,8 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                 default=["Or (Gold)", "Bitcoin"]
             )
         with col_sel2:
-            # Ajout des vues en minutes (1d, 5d) et mois
             periode_choisie = pills("market_period", ["1d", "5d", "1mo", "6mo"], defaut="1d", cols=2)
 
-        # Option d'affichage : Prix Réels ou Base 100 (pour comparer Or à 4000$ et BTC à 70000$)
         mode_affichage = st.radio(
             "Mode d'affichage du graphique",
             ["Base 100 (Comparaison relative en %)", "Prix réels en dollars ($)"],
@@ -1102,28 +1098,45 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                             st.metric(label=nom, value="N/A")
 
                 st.divider()
-                titre("📊 Graphique comparatif (Minutes & Évolution)")
+                titre("📊 Graphique interactif (Lignes nettes et épaisses)")
                 
                 try:
+                    import plotly.express as px
+
                     if isinstance(df_hist.columns, pd.MultiIndex):
                         df_close = df_hist['Close']
                     else:
                         df_close = df_hist
 
-                    # Si l'utilisateur choisit la Base 100, on normalise chaque actif par sa valeur initiale
                     if "Base 100" in mode_affichage:
                         df_plot = df_close.apply(lambda x: (x / x.dropna().iloc[0]) * 100 if not x.dropna().empty else x)
-                        st.caption("ℹ️ Normalisation Base 100 : Tous les actifs partent de 100 au début de la période pour comparer leur performance en % net.")
+                        y_title = "Performance Base 100"
                     else:
                         df_plot = df_close
+                        y_title = "Prix en USD ($)"
 
-                    st.line_chart(df_plot)
+                    # Création d'un graphique Plotly propre et lisible
+                    fig = px.line(df_plot, labels={"value": y_title, "Datetime": "Temps", "Date": "Date"})
+                    
+                    # Style visuel net : courbes épaisses et fond épuré
+                    fig.update_traces(line=dict(width=3))
+                    fig.update_layout(
+                        margin=dict(l=10, r=10, t=20, b=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        xaxis_title="",
+                        yaxis_title=y_title,
+                        template="plotly_white",
+                        hovermode="x unified"
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
                 except Exception as e:
                     st.info(f"Affichage du graphique indisponible : {e}")
 
                 st.divider()
                 titre("🔍 Enregistrer une analyse croisée")
-                note_comparaison = st.text_area("Notes de synthèse ou stratégie DCA multi-actifs", placeholder="Ex: Suivi du breakout en 5 minutes sur le Bitcoin vs Or...")
+                note_comparaison = st.text_area("Notes de synthèse ou stratégie DCA multi-actifs", placeholder="Ex: Analyse des mouvements en minute sur l'or et le bitcoin...")
                 if st.button("Enregistrer l'analyse comparative", type="primary", key="btn_save_multi_market") and note_comparaison.strip():
                     contenu_txt = f"Actifs : {', '.join(selection_actifs_noms)} | Période : {periode_choisie} | Mode : {mode_affichage}\nAnalyse : {note_comparaison}"
                     add_row("IA_Lab", [str(ajd), "Analyse Comparative Marchés", contenu_txt, "Analyse Technique / Tendance"])
