@@ -858,8 +858,8 @@ if page_cle == "accueil":
             st.markdown(f"<div class='today-none'>⚠️ {en_retard} en retard</div>", unsafe_allow_html=True)
         if actives:
             for idx, nom, cat, ech in actives[:6]:
-                urgent = " urgent" if cat == "Urgent" else ""
-                clique = ligne_action(f"{nom}<span class='tag{urgent}'>{cat}</span>{badge_echeance(ech, ajd)}",
+                clique = ligne_action(f"{nom}<span class='tag cat-{slug(cat)}'>{cat}</span>"
+                                      f"{badge_echeance(ech, ajd)}",
                                       [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
                 if clique == f"acc_tk_{idx}":
                     set_cell("Taches", idx, 3, "Fait", annulable=True, libelle=f"« {nom} » cochée")
@@ -891,12 +891,14 @@ if page_cle == "accueil":
                 du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
                 if not du_rayon or montre >= 10:
                     continue
-                st.markdown(f"<div class='rayon'>{rayon} · {len(du_rayon)}</div>", unsafe_allow_html=True)
-                for idx, r in du_rayon[:10 - montre]:
-                    art, qte, _ = pad(r, 3)
-                    if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
-                        delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
-                        st.rerun()
+                with conteneur(f"grp-{slug(rayon)}"):
+                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>",
+                                unsafe_allow_html=True)
+                    for idx, r in du_rayon[:10 - montre]:
+                        art, qte, _ = pad(r, 3)
+                        if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
+                            delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
+                            st.rerun()
                 montre += len(du_rayon[:10 - montre])
             if len(courses) > montre:
                 st.caption(f"+ {len(courses) - montre} autres articles")
@@ -1059,8 +1061,8 @@ elif page_cle == "quotidien":
 
         visibles = [t for t in actives if filtre == "Toutes" or t[2] == filtre]
         for idx, nom, cat, ech in visibles:
-            urgent = " urgent" if cat == "Urgent" else ""
-            clique = ligne_action(f"{nom}<span class='tag{urgent}'>{cat}</span>{badge_echeance(ech, ajd)}",
+            clique = ligne_action(f"{nom}<span class='tag cat-{slug(cat)}'>{cat}</span>"
+                                  f"{badge_echeance(ech, ajd)}",
                                   [("✔️", f"tk_{idx}"), ("🗑️", f"td_{idx}")])
             if clique == f"tk_{idx}":
                 set_cell("Taches", idx, 3, "Fait", annulable=True, libelle=f"« {nom} » cochée")
@@ -1124,12 +1126,14 @@ elif page_cle == "quotidien":
                 du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
                 if not du_rayon:
                     continue
-                st.markdown(f"<div class='rayon'>{rayon} · {len(du_rayon)}</div>", unsafe_allow_html=True)
-                for idx, r in du_rayon:
-                    art, qte, _ = pad(r, 3)
-                    if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"co_{idx}")]):
-                        delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
-                        st.rerun()
+                with conteneur(f"grp-{slug(rayon)}"):
+                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>",
+                                unsafe_allow_html=True)
+                    for idx, r in du_rayon:
+                        art, qte, _ = pad(r, 3)
+                        if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"co_{idx}")]):
+                            delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
+                            st.rerun()
 
             texte = "🛒 Liste de courses\n\n"
             for rayon in RAYONS:
@@ -1418,3 +1422,4 @@ elif page_cle == "maison":
             add_row("Listes", [cat_l, l_elem.strip(), l_notes])
             reset_after(new_liste_elem="", new_liste_notes="")
             st.rerun()
+              
