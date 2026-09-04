@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.19"
+VERSION = "2.20"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Dashboard Mode Sombre / Style Smart Home & Cartes Pro)
+# 2. STYLE (Dashboard Mode Sombre Pro)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -187,7 +187,6 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:2px solid #60a5fa !important; outline-offset:2px;}
 
-/* Cartes sombres et nettes */
 [data-testid="stVerticalBlockBorderWrapper"], 
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
 [data-baseweb="block"] {
@@ -476,6 +475,46 @@ def parse_date(texte):
         except ValueError:
             continue
     return None
+
+def merge_qte(a, b):
+    motif = r"^\s*(\d+(?:[.,]\d+)?)\s*(.*)$"
+    ma, mb = re.match(motif, str(a or "")), re.match(motif, str(b or ""))
+    if ma and mb and ma.group(2).strip().lower() == mb.group(2).strip().lower():
+        total = float(ma.group(1).replace(",", ".")) + float(mb.group(1).replace(",", "."))
+        nombre = int(total) if total.is_integer() else round(total, 2)
+        return f"{nombre} {ma.group(2).strip()}".strip()
+    return f"{a} + {b}"
+
+def deviner_rayon(nom):
+    minus = nom.lower()
+    for memo in MEMOIRE_COURSES:
+        base = memo["article"].lower().split(" /")[0].strip()
+        if base and (base in minus or minus in memo["article"].lower()):
+            return memo["rayon"]
+    for rayon, mots in INDICES_RAYON:
+        if any(mot in minus for mot in mots):
+            return rayon
+    return "Autre"
+
+def separer_quantite(ligne_texte):
+    texte = re.sub(r"^\s*[-•*·]\s*", "", str(ligne_texte)).strip()
+    m = re.match(r"^(\d+(?:[.,]\d+)?)\s*([a-zA-Zàâçéèêëîïôûùüÿœ.]*)\s+(?:de\s+|d')?(.+)$", texte)
+    if m:
+        unite = m.group(2).lower().strip()
+        if unite in UNITES or unite == "":
+            return m.group(3).strip(), f"{m.group(1)} {unite}".strip()
+    return texte, "1"
+
+def add_course(article, qte, rayon=None):
+    article = str(article).strip()
+    if not article:
+        return
+    nom = article.lower()
+    for idx, r in rows("Courses"):
+        if pad(r, 3)[0].strip().lower() == nom:
+            set_cell("Courses", idx, 2, merge_qte(pad(r, 3)[1] or "1", qte))
+            return
+    add_row("Courses", [article, qte, rayon or deviner_rayon(article)])
 
 def evenements_tries():
     sortie = []
@@ -873,7 +912,7 @@ elif page_cle == "maison":
         for i, memo in enumerate([m for m in MEMOIRE_COURSES if m["rayon"] == rayon_memo]):
             with (mc1 if i % 2 == 0 else mc2):
                 if st.button(("✅ " if memo["article"].lower() in deja else "＋ ") + memo["article"], key=f"memo_{memo['article']}"):
-                    add_row("Courses", [memo["article"], memo["qte"], memo["rayon"]])
+                    add_course(memo["article"], memo["qte"], memo["rayon"])
                     st.rerun()
 
         st.divider()
@@ -898,12 +937,38 @@ elif page_cle == "maison":
         for idx, r in recettes:
             t, ing, inst = pad(r, 3)
             with st.expander(f"🍲 {t}"):
-                st.markdown(f"**Ingrédients**\n\n{ing}")
-                if st.button("🗑️ Supprimer", key=f"re_{idx}"):
-                    delete_row("Recettes", idx, libelle="Recette supprimée")
-                    st.rerun()
+                if ing:
+                    st.markdown(f"**Ingrédients**\n\n{ing}")
+                if inst:
+                    st.markdown(f"**Préparation**\n\n{inst}")
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button("🛒 Au panier", key=f"rec_panier_{idx}") and ing:
+                        ajoutes = 0
+                        for brut in ing.splitlines():
+                            if brut.strip():
+                                article, qte = separer_quantite(brut)
+                                add_course(article, qte)
+                                ajoutes += 1
+                        st.toast(f"{ajoutes} ingrédient(s) ajouté(s) 🛒", icon="✅")
+                        st.rerun()
+                with b2:
+                    if st.button("🗑️ Supprimer", key=f"re_{idx}"):
+                        delete_row("Recettes", idx, libelle="Recette supprimée")
+                        st.rerun()
         if not recettes:
-            vide("Aucune recette.")
+            vide("Aucune recette pour l'instant.")
+
+        st.divider()
+        with st.form("form_recette", clear_on_submit=True):
+            titre("Nouvelle recette")
+            st.caption("Un ingrédient par ligne : « 200 g de farine ». Le panier saura les relire.")
+            r_titre = st.text_input("Nom")
+            r_ing = st.text_area("Ingrédients", height=90)
+            r_inst = st.text_area("Préparation", height=110)
+            if st.form_submit_button("Enregistrer la recette", type="primary") and r_titre.strip():
+                add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
+                st.rerun()
 
 # ==========================================================
 # 8d. LABO IA & FORMATIONS
