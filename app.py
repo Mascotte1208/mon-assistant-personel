@@ -7,7 +7,7 @@ from datetime import datetime
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
-    page_title="Notre Assistant", 
+    page_title="Notre Assistant Shared", 
     page_icon="✨", 
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -19,19 +19,19 @@ st.markdown("""
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="theme-color" content="#6366f1" />
+        <meta name="theme-color" content="#4f46e5" />
         <link rel="apple-touch-icon" href="https://img.icons8.com/emoji/192/sparkles-emoji.png" />
     </head>
 """, unsafe_allow_html=True)
 
-# --- STYLE CSS DESIGN DASHBOARD PREMIUM ---
+# --- STYLE CSS APPLI HIGH-END / GLASSMORPHISM ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
-        background-color: #f8fafc;
+        background: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 100%) !important;
         color: #0f172a;
         -webkit-tap-highlight-color: transparent;
     }
@@ -46,89 +46,101 @@ st.markdown("""
         max-width: 550px !important;
     }
 
-    /* En-tête / Bannière */
-    .welcome-banner {
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-        border-radius: 24px;
-        padding: 22px 20px;
+    /* Hero Banner Premium Glassmorphism */
+    .hero-banner {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #d946ef 100%);
+        border-radius: 28px;
+        padding: 24px 22px;
         color: white;
-        margin-bottom: 20px;
-        box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3);
+        margin-bottom: 22px;
+        box-shadow: 0 18px 35px -10px rgba(124, 58, 237, 0.35);
+        position: relative;
+        overflow: hidden;
     }
-    .welcome-title {
-        font-size: 22px;
+    .hero-banner::after {
+        content: "✨";
+        position: absolute;
+        right: -10px;
+        bottom: -15px;
+        font-size: 85px;
+        opacity: 0.15;
+    }
+    .hero-title {
+        font-size: 24px;
         font-weight: 800;
         margin: 0;
+        letter-spacing: -0.5px;
     }
-    .welcome-sub {
+    .hero-sub {
         font-size: 13px;
-        opacity: 0.9;
-        margin-top: 4px;
-        font-weight: 500;
+        opacity: 0.92;
+        margin-top: 5px;
+        font-weight: 600;
     }
 
-    /* Navigation Onglets */
+    /* Navigation Onglets Flottante */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
-        background-color: #e2e8f0;
+        background-color: rgba(226, 232, 240, 0.8);
+        backdrop-filter: blur(10px);
         padding: 6px;
-        border-radius: 22px;
+        border-radius: 24px;
         overflow-x: auto;
-        margin-bottom: 18px;
+        margin-bottom: 20px;
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 16px;
-        padding: 10px 14px;
+        border-radius: 18px;
+        padding: 10px 16px;
         font-weight: 700;
         font-size: 13px;
         color: #64748b;
         background-color: transparent;
         border: none;
         white-space: nowrap;
-        transition: all 0.2s ease;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
         color: #4f46e5 !important;
-        box-shadow: 0 4px 16px rgba(79, 70, 229, 0.18);
+        box-shadow: 0 6px 20px rgba(79, 70, 229, 0.2);
     }
 
-    /* Cartes Métriques Premium */
-    .card-purple {
+    /* Cartes Glassmorphism Multi-couleurs */
+    .glass-card-purple {
         background: #ffffff;
         border: 1px solid #e0e7ff;
-        border-left: 6px solid #6366f1;
-        border-radius: 20px;
-        padding: 16px 18px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+        border-top: 4px solid #6366f1;
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.08);
         margin-bottom: 12px;
     }
-    .card-emerald {
+    .glass-card-emerald {
         background: #ffffff;
         border: 1px solid #d1fae5;
-        border-left: 6px solid #10b981;
-        border-radius: 20px;
-        padding: 16px 18px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+        border-top: 4px solid #10b981;
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.08);
         margin-bottom: 12px;
     }
-    .card-amber {
+    .glass-card-amber {
         background: #ffffff;
         border: 1px solid #fef3c7;
-        border-left: 6px solid #f59e0b;
-        border-radius: 20px;
-        padding: 16px 18px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+        border-top: 4px solid #f59e0b;
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.08);
         margin-bottom: 12px;
     }
-    .card-sky {
+    .glass-card-sky {
         background: #ffffff;
         border: 1px solid #e0f2fe;
-        border-left: 6px solid #0284c7;
-        border-radius: 20px;
-        padding: 16px 18px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+        border-top: 4px solid #0284c7;
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.08);
         margin-bottom: 12px;
     }
 
@@ -137,10 +149,10 @@ st.markdown("""
         font-weight: 800;
         color: #64748b;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
+        letter-spacing: 0.9px;
     }
     .card-num {
-        font-size: 26px;
+        font-size: 28px;
         font-weight: 800;
         color: #0f172a;
         margin-top: 2px;
@@ -148,40 +160,58 @@ st.markdown("""
     .card-foot {
         font-size: 12px;
         font-weight: 600;
-        color: #475569;
+        color: #4f46e5;
         margin-top: 4px;
     }
 
     .badge-tag {
         display: inline-block;
-        padding: 3px 10px;
-        border-radius: 12px;
+        padding: 4px 12px;
+        border-radius: 14px;
         font-size: 11px;
         font-weight: 700;
         background-color: #e0e7ff;
         color: #4338ca;
     }
 
+    /* Boutons Gradient Pill */
     .stButton button {
-        border-radius: 16px;
-        font-weight: 700;
+        border-radius: 18px;
+        font-weight: 800;
         font-size: 14px;
         background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
         color: white;
         border: none;
-        padding: 14px 20px;
-        box-shadow: 0 4px 16px rgba(99, 102, 241, 0.28);
+        padding: 14px 22px;
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+        transition: all 0.2s ease;
+    }
+    .stButton button:active {
+        transform: scale(0.97);
     }
 
-    /* Correctif de visibilité pour les champs texte */
+    /* Inputs Visibilité & Focus */
     .stTextInput input, .stTextArea textarea, .stSelectbox select {
         color: #0f172a !important;
         background-color: #ffffff !important;
         -webkit-text-fill-color: #0f172a !important;
-        border-radius: 16px !important;
+        border-radius: 18px !important;
         border: 1.5px solid #cbd5e1 !important;
         padding: 12px 16px !important;
         font-size: 16px !important;
+    }
+    .stTextInput input:focus, .stTextArea textarea:focus {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15) !important;
+    }
+
+    .streamlit-expanderHeader {
+        background-color: #ffffff !important;
+        border-radius: 20px !important;
+        border: 1px solid #f1f5f9 !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -248,11 +278,11 @@ def update_cell_fast(sheet_name, row_idx, col_idx, value):
 if "json_credentials_str" not in st.session_state:
     st.session_state["json_credentials_str"] = None
 
-# --- BANNIÈRE D'ACCUEIL ---
+# --- HERO BANNER ---
 st.markdown("""
-    <div class="welcome-banner">
-        <div class="welcome-title">✨ Bienvenue Lucas & Alex</div>
-        <div class="welcome-sub">Votre tableau de bord synchro au quotidien</div>
+    <div class="hero-banner">
+        <div class="hero-title">Bonjour Lucas & Alex 👋</div>
+        <div class="hero-sub">Espace partagé & assistant quotidien</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -322,20 +352,20 @@ with tab_dash:
             elif payer == "Alex": total_alex += amt
         diff = (total_lucas - total_alex) / 2
 
-        st.markdown("<h4 style='font-weight: 800; color: #1e293b; margin-bottom: 14px;'>📊 Synthèse Générale</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='font-weight: 800; color: #0f172a; margin-bottom: 14px;'>📊 Métriques de l'assistant</h4>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
             st.markdown(f'''
-                <div class="card-purple">
+                <div class="glass-card-purple">
                     <div class="card-head">✅ Tâches accomplies</div>
                     <div class="card-num">{taches_faites} <span style="font-size:15px; color:#94a3b8;">/ {total_taches}</span></div>
-                    <div class="card-foot">{"🎉 Tout est réglé !" if total_taches == taches_faites and total_taches > 0 else "Actions en cours"}</div>
+                    <div class="card-foot">{"🎉 Tout est à jour !" if total_taches == taches_faites and total_taches > 0 else "Actions en cours"}</div>
                 </div>
             ''', unsafe_allow_html=True)
             
             st.markdown(f'''
-                <div class="card-amber">
+                <div class="glass-card-amber">
                     <div class="card-head">🛒 En liste de courses</div>
                     <div class="card-num">{nb_courses}</div>
                     <div class="card-foot">Articles à acheter</div>
@@ -344,31 +374,30 @@ with tab_dash:
 
         with c2:
             st.markdown(f'''
-                <div class="card-emerald">
-                    <div class="card-head">💶 Solde des dépenses</div>
+                <div class="glass-card-emerald">
+                    <div class="card-head">💶 Équilibre Budget</div>
                     <div class="card-num">{abs(diff):.2f} €</div>
                     <div class="card-foot">{"Alex ➔ Lucas" if diff > 0 else ("Lucas ➔ Alex" if diff < 0 else "Comptes équilibrés")}</div>
                 </div>
             ''', unsafe_allow_html=True)
 
             st.markdown(f'''
-                <div class="card-sky">
+                <div class="glass-card-sky">
                     <div class="card-head">🎓 Formations & Pro</div>
                     <div class="card-num">{nb_cand}</div>
                     <div class="card-foot">Dossiers suivis</div>
                 </div>
             ''', unsafe_allow_html=True)
 
-        # Aperçu rapide des événements à venir
         st.divider()
-        st.markdown("<h4 style='font-weight: 800; color: #1e293b; margin-bottom: 10px;'>🗓️ Prochains RDV</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='font-weight: 800; color: #0f172a; margin-bottom: 10px;'>🗓️ Prochains Événements</h4>", unsafe_allow_html=True)
         agenda_data = agenda_vals[1:] if len(agenda_vals) > 1 else []
         if agenda_data:
             for ev in agenda_data[:3]:
                 dt_e, hr_e, tit_e = (ev + ["", "", ""])[:3]
-                st.markdown(f"📌 **{dt_e}** {f'à {hr_e}' if hr_e else ''} — {tit_e}")
+                st.markdown(f"📌 **{dt_e}** {f'à {hr_e}' if hr_e else ''} — **{tit_e}**")
         else:
-            st.info("Aucun rendez-vous prévu pour le moment.")
+            st.info("Aucun événement prévu.")
 
         st.divider()
         col_act1, col_act2 = st.columns(2)
@@ -432,7 +461,7 @@ with tab_quotidien:
                                 delete_row_fast("Taches", real_idx)
                                 st.rerun()
             else:
-                st.info("Aucune tâche dans cette catégorie.")
+                st.info("Aucune tâche.")
 
             st.divider()
             with st.form("form_tache", clear_on_submit=True):
