@@ -1,10 +1,11 @@
 import re
 import json
+import calendar
 import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 # ==========================================
 # CONFIG
@@ -27,6 +28,9 @@ CAT_TACHES = ["Maison", "Urgent", "Autre"]
 CAT_BUDGET = ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"]
 CAT_LISTES = ["Idées Cadeaux", "Valise / Voyage", "Maison"]
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+JOURS_COURT = ["L", "M", "M", "J", "V", "S", "D"]
+MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 PERSONNES = ["Lucas", "Alex"]
 
 st.set_page_config(
@@ -185,6 +189,64 @@ label p{font-weight:700 !important; font-size:13px !important; color:var(--prune
   background:linear-gradient(135deg,#ec4899,#db2777); color:#fff !important;
 }
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
+
+/* --- Tuiles de synthèse --- */
+.tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px;}
+.tile{
+  background:#fff; border:1.5px solid var(--bord); border-radius:18px; padding:12px 8px;
+  text-align:center; box-shadow:0 6px 14px rgba(236,72,153,.06);
+}
+.tile .n{font-size:21px; font-weight:800; color:#701a75; line-height:1.15;}
+.tile .l{font-size:11px; font-weight:700; color:var(--rose-fonce); margin-top:2px;}
+
+.solde{
+  border-radius:18px; padding:13px 16px; margin-bottom:10px; font-weight:700; font-size:14px;
+  background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:1.5px solid #f0abfc; color:#701a75;
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+}
+.solde .m{font-size:17px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
+
+/* --- Bloc « aujourd'hui » --- */
+.today-box{
+  background:#fff; border:1.5px solid var(--bord); border-radius:22px; padding:15px 18px;
+  box-shadow:0 10px 22px rgba(236,72,153,.08); margin-bottom:12px;
+}
+.today-box .d{font-size:13px; font-weight:800; color:#a21caf; margin-bottom:8px;}
+.today-row{
+  display:flex; gap:10px; align-items:baseline; padding:5px 0;
+  font-size:14px; font-weight:600; color:var(--prune); border-top:1px solid #fdf2f8;
+}
+.today-row .h{font-size:12px; font-weight:800; color:var(--rose-fonce); min-width:46px;}
+.today-none{font-size:14px; color:#9d174d; font-weight:600; opacity:.7;}
+
+/* --- Calendrier mensuel --- */
+.cal{
+  background:#fff; border:1.5px solid var(--bord); border-radius:22px; padding:14px 12px 12px;
+  box-shadow:0 10px 22px rgba(236,72,153,.08); margin-bottom:12px;
+}
+.cal-week, .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+.cal-week{margin-bottom:6px;}
+.cal-week span{text-align:center; font-size:11px; font-weight:800; color:#c026d3;}
+.cal-cell{
+  aspect-ratio:1/1; border-radius:13px; background:#fdf2f8; color:var(--prune);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; line-height:1;
+}
+.cal-cell.out{background:transparent; color:#ecd9f5; font-weight:600;}
+.cal-cell.ev{background:linear-gradient(135deg,#fce7f3,#fae8ff); color:#9d174d;}
+.cal-cell.today{
+  background:linear-gradient(135deg,#ec4899,#a855f7); color:#fff;
+  box-shadow:0 5px 12px -2px rgba(219,39,119,.55);
+}
+.cal-dots{display:flex; gap:3px; height:5px; margin-top:4px;}
+.cal-dots i{width:5px; height:5px; border-radius:50%; background:#db2777; display:block;}
+.cal-cell.today .cal-dots i{background:#fff;}
+
+.day-head{
+  font-size:12px; font-weight:800; color:#a21caf; background:#fae8ff;
+  display:inline-block; padding:5px 12px; border-radius:12px; margin:14px 0 2px;
+}
+.cal-title{text-align:center; font-size:16px; font-weight:800; color:var(--prune-clair); padding-top:10px;}
 
 /* --- Divers --- */
 .stProgress > div > div > div > div{background-image:linear-gradient(90deg,#f472b6,#a855f7) !important;}
@@ -400,6 +462,50 @@ def ligne(html, done=False):
     st.markdown(f"<div class='line{' done' if done else ''}'>{html}</div>", unsafe_allow_html=True)
 
 
+def parse_date(txt):
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(str(txt).strip(), fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def evenements_tries():
+    """(date, heure, titre, description, index) triés, dates illisibles écartées."""
+    out = []
+    for idx, r in rows("Agenda"):
+        d, h, ti, desc = pad(r, 4)
+        jd = parse_date(d)
+        if jd:
+            out.append((jd, h, ti, desc, idx))
+    return sorted(out, key=lambda e: (e[0], e[1] or "99:99"))
+
+
+def grille_mois(annee, mois, par_jour, aujourd):
+    """Rend le mois en grille HTML, avec un point par événement (3 max)."""
+    semaines = calendar.Calendar(firstweekday=0).monthdatescalendar(annee, mois)
+    cells = ""
+    for semaine in semaines:
+        for jour in semaine:
+            classes = ["cal-cell"]
+            nb = 0
+            if jour.month != mois:
+                classes.append("out")
+            else:
+                nb = len(par_jour.get(jour, []))
+                if nb:
+                    classes.append("ev")
+            if jour == aujourd:
+                classes.append("today")
+            points = "".join("<i></i>" for _ in range(min(nb, 3)))
+            cells += (f"<div class='{' '.join(classes)}'>{jour.day}"
+                      f"<div class='cal-dots'>{points}</div></div>")
+    entetes = "".join(f"<span>{j}</span>" for j in JOURS_COURT)
+    return (f"<div class='cal'><div class='cal-week'>{entetes}</div>"
+            f"<div class='cal-grid'>{cells}</div></div>")
+
+
 # ==========================================
 # EN-TÊTE
 # ==========================================
@@ -454,51 +560,70 @@ if page == "🏠 Accueil":
     courses = rows("Courses")
     budget = rows("Budget")
     notes = rows("Notes")
+    repas = rows("Repas")
+    evenements = evenements_tries()
 
+    ajd = date.today()
+    evts_jour = [e for e in evenements if e[0] == ajd]
+    a_venir = [e for e in evenements if e[0] > ajd]
+    repas_jour = [pad(r, 3) for _, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
+
+    # --- Ce qui se passe aujourd'hui ---
+    contenu = ""
+    for _, h, ti, _, _ in evts_jour:
+        contenu += f"<div class='today-row'><span class='h'>{h or '—'}</span><span>📅 {ti}</span></div>"
+    for _, typ, plat in repas_jour:
+        contenu += f"<div class='today-row'><span class='h'>{typ}</span><span>🍽️ {plat}</span></div>"
+    if not contenu:
+        if a_venir:
+            jd, h, ti, _, _ = a_venir[0]
+            quand = "demain" if jd == ajd + timedelta(days=1) else f"le {jd.day} {MOIS[jd.month - 1]}"
+            contenu = f"<div class='today-none'>Journée libre. Ensuite : {ti}, {quand}.</div>"
+        else:
+            contenu = "<div class='today-none'>Journée libre, rien au planning 🌸</div>"
+
+    st.markdown(f"""
+    <div class="today-box">
+      <div class="d">{JOURS[ajd.weekday()]} {ajd.day} {MOIS[ajd.month - 1]}</div>
+      {contenu}
+    </div>""", unsafe_allow_html=True)
+
+    # --- Trois chiffres clés ---
     faites = len([r for _, r in taches if pad(r, 3)[2] == "Fait"])
+    a_faire = len(taches) - faites
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
     diff = (total_l - total_a) / 2
     if diff > 0.005:
-        bilan = f"Alex doit {diff:.2f} € à Lucas"
+        qui, combien = "Alex doit à Lucas", f"{diff:.2f} €"
     elif diff < -0.005:
-        bilan = f"Lucas doit {abs(diff):.2f} € à Alex"
+        qui, combien = "Lucas doit à Alex", f"{abs(diff):.2f} €"
     else:
-        bilan = "Comptes équilibrés 💖"
-
-    epingle = next((pad(r, 2)[1] for _, r in notes if "important" in pad(r, 2)[0].lower()), None)
-    if not epingle:
-        epingle = pad(notes[-1][1], 2)[1] if notes else "Ajoutez une note nommée « Important » pour l'afficher ici."
-    st.markdown(f"""
-    <div class="note-box">
-      <div class="t">✨ Message épinglé</div>
-      <div class="c">{epingle}</div>
-    </div>""", unsafe_allow_html=True)
+        qui, combien = "Comptes équilibrés", "💖"
 
     st.markdown(f"""
-    <div class="card"><span class="k">🌸 Tâches accomplies</span><span class="v">{faites} / {len(taches)}</span></div>
-    <div class="card"><span class="k">🛒 Panier de courses</span><span class="v">{len(courses)} articles</span></div>
-    <div class="card"><span class="k">💶 Équilibre du budget</span><span class="v small">{bilan}</span></div>
+    <div class="tiles">
+      <div class="tile"><div class="n">{a_faire}</div><div class="l">🌸 À faire</div></div>
+      <div class="tile"><div class="n">{len(courses)}</div><div class="l">🛒 Courses</div></div>
+      <div class="tile"><div class="n">{len(a_venir)}</div><div class="l">📅 À venir</div></div>
+    </div>
+    <div class="solde"><span>{qui}</span><span class="m">{combien}</span></div>
     """, unsafe_allow_html=True)
 
-    titre("⚡ Ajout rapide")
-    cible = pills("quick_cible", ["Tâche", "Course", "Note"], cols=3)
-    q_txt = st.text_input("Quoi ?", key="quick_txt", placeholder=f"Nouvelle {cible.lower()}…",
-                          label_visibility="collapsed")
-    if st.button("Ajouter", key="quick_add", type="primary") and q_txt.strip():
-        if cible == "Tâche":
-            add_row("Taches", [q_txt.strip(), "Autre", "À faire"])
-        elif cible == "Course":
-            add_course(q_txt.strip(), "1", "Autre")
-        else:
-            add_row("Notes", [q_txt.strip(), ""])
-        reset_after(quick_txt="")
-        st.toast(f"{cible} ajoutée 💖", icon="✅")
-        st.rerun()
+    # --- Note épinglée (seulement si elle existe) ---
+    epingle = next((pad(r, 2) for _, r in notes if "important" in pad(r, 2)[0].lower()), None)
+    if epingle:
+        st.markdown(f"""
+        <div class="note-box">
+          <div class="t">📌 {epingle[0]}</div>
+          <div class="c">{epingle[1]}</div>
+        </div>""", unsafe_allow_html=True)
 
-    titre("✨ Tâches en cours")
+    # --- Tâches, les urgentes en premier ---
     actives = [(i, r) for i, r in taches if pad(r, 3)[2] != "Fait"]
+    actives.sort(key=lambda x: pad(x[1], 3)[1] != "Urgent")
     if actives:
+        titre("À faire")
         for idx, r in actives[:5]:
             nom, cat, _ = pad(r, 3)
             c1, c2 = st.columns([4, 1])
@@ -508,8 +633,25 @@ if page == "🏠 Accueil":
                 if st.button("✔️", key=f"acc_ok_{idx}"):
                     set_cell("Taches", idx, 3, "Fait")
                     st.rerun()
+        if len(actives) > 5:
+            st.caption(f"+ {len(actives) - 5} autres dans l'onglet Quotidien")
     else:
         vide("🎉 Tout est fait, profitez de votre soirée.")
+
+    with st.expander("⚡ Ajout rapide"):
+        cible = pills("quick_cible", ["Tâche", "Course", "Note"], cols=3)
+        q_txt = st.text_input("Quoi ?", key="quick_txt", placeholder=f"Nouvelle {cible.lower()}…",
+                              label_visibility="collapsed")
+        if st.button("Ajouter", key="quick_add", type="primary") and q_txt.strip():
+            if cible == "Tâche":
+                add_row("Taches", [q_txt.strip(), "Autre", "À faire"])
+            elif cible == "Course":
+                add_course(q_txt.strip(), "1", "Autre")
+            else:
+                add_row("Notes", [q_txt.strip(), ""])
+            reset_after(quick_txt="")
+            st.toast(f"{cible} ajoutée 💖", icon="✅")
+            st.rerun()
 
     st.divider()
     d1, d2 = st.columns(2)
@@ -639,41 +781,71 @@ elif page == "📋 Quotidien":
 
     # ---------- AGENDA ----------
     with t3:
-        agenda = rows("Agenda")
+        ajd = date.today()
+        if "cal_ym" not in st.session_state:
+            st.session_state["cal_ym"] = (ajd.year, ajd.month)
+        annee, mois = st.session_state["cal_ym"]
 
-        def cle_date(item):
-            try:
-                return (datetime.strptime(pad(item[1], 4)[0], "%Y-%m-%d").date(), pad(item[1], 4)[1])
-            except ValueError:
-                return (datetime.max.date(), "")
+        evenements = evenements_tries()
+        par_jour = {}
+        for e in evenements:
+            par_jour.setdefault(e[0], []).append(e)
 
-        for idx, r in sorted(agenda, key=cle_date):
-            d, h, ti, desc = pad(r, 4)
-            try:
-                d_aff = datetime.strptime(d, "%Y-%m-%d").strftime("%d/%m/%Y")
-            except ValueError:
-                d_aff = d
-            with st.expander(f"🗓️ {d_aff}{f' · {h}' if h else ''} — {ti}"):
-                if desc:
-                    st.write(desc)
-                if st.button("🗑️ Supprimer", key=f"ag_{idx}"):
-                    delete_row("Agenda", idx)
-                    st.rerun()
-        if not agenda:
-            vide("Aucun événement prévu.")
+        h1, h2, h3 = st.columns([1, 3, 1])
+        with h1:
+            if st.button("◀", key="cal_prev"):
+                st.session_state["cal_ym"] = (annee - 1, 12) if mois == 1 else (annee, mois - 1)
+                st.rerun()
+        with h2:
+            st.markdown(f"<div class='cal-title'>{MOIS[mois - 1].capitalize()} {annee}</div>",
+                        unsafe_allow_html=True)
+        with h3:
+            if st.button("▶", key="cal_next"):
+                st.session_state["cal_ym"] = (annee + 1, 1) if mois == 12 else (annee, mois + 1)
+                st.rerun()
+
+        st.markdown(grille_mois(annee, mois, par_jour, ajd), unsafe_allow_html=True)
+
+        if (annee, mois) != (ajd.year, ajd.month):
+            if st.button("↩️ Revenir à ce mois-ci", key="cal_today"):
+                st.session_state["cal_ym"] = (ajd.year, ajd.month)
+                st.rerun()
+
+        du_mois = [e for e in evenements if e[0].year == annee and e[0].month == mois]
+        if du_mois:
+            jour_courant = None
+            for jd, h, ti, desc, idx in du_mois:
+                if jd != jour_courant:
+                    jour_courant = jd
+                    marque = " · aujourd'hui" if jd == ajd else ""
+                    st.markdown(
+                        f"<div class='day-head'>{JOURS[jd.weekday()]} {jd.day} {MOIS[jd.month - 1]}{marque}</div>",
+                        unsafe_allow_html=True)
+                c1, c2 = st.columns([4, 1])
+                with c1:
+                    detail = f"<br><span class='q'>{desc}</span>" if desc else ""
+                    ligne(f"<span class='tag'>{h or '—'}</span> {ti}{detail}")
+                with c2:
+                    if st.button("🗑️", key=f"ag_{idx}"):
+                        delete_row("Agenda", idx)
+                        st.rerun()
+        else:
+            vide("Aucun événement ce mois-ci.")
 
         st.divider()
         with st.form("form_agenda", clear_on_submit=True):
             titre("Nouvel événement")
             fa, fb = st.columns(2)
             with fa:
-                e_date = st.date_input("Date", value=datetime.today())
+                e_date = st.date_input("Date", value=date(annee, mois, 1) if
+                                       (annee, mois) != (ajd.year, ajd.month) else ajd)
             with fb:
                 e_heure = st.time_input("Heure", value=datetime.now().time())
             e_titre = st.text_input("Titre")
             e_desc = st.text_area("Détails", height=80)
             if st.form_submit_button("Enregistrer", type="primary") and e_titre.strip():
                 add_row("Agenda", [str(e_date), e_heure.strftime("%H:%M"), e_titre.strip(), e_desc])
+                st.session_state["cal_ym"] = (e_date.year, e_date.month)
                 st.rerun()
 
     # ---------- REPAS ----------
@@ -850,3 +1022,4 @@ elif page == "🐾 Maison":
             add_row("Listes", [cat_l, l_elem.strip(), l_notes])
             reset_after(new_liste_elem="", new_liste_notes="")
             st.rerun()
+            
