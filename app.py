@@ -950,7 +950,7 @@ with tab_loisirs:
         with sub_tab_l:
             st.subheader("🧳 Listes & Cadeaux")
             all_vals = get_data("Listes")
-            listes_data = all_vals[1:] if len(listes_data) > 1 else []
+            listes_data = all_vals[1:] if len(all_vals) > 1 else []
             cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
 
             filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_l]
