@@ -22,11 +22,11 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.2"
+VERSION = "2.3"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
-    "Taches":   ["Tache", "Categorie", "Statut", "Echeance"],
+    "Taches":   ["Tache", "Statut", "Echeance"],
     "Agenda":   ["Date", "Heure", "Titre", "Description"],
     "Courses":  ["Article", "Quantite", "Categorie"],
     "Notes":    ["Titre", "Contenu", "Epingle"],
@@ -46,13 +46,6 @@ RAYON_COULEURS = {
     "Entretien": "#db2777",
     "Autre": "#6b7280",
 }
-CAT_COULEURS = {
-    "Maison": "#0891b2",
-    "Urgent": "#b45309",
-    "Courses": "#16a34a",
-    "Autre": "#7c3aed",
-}
-CAT_TACHES = ["Maison", "Urgent", "Courses", "Autre"]
 CAT_BUDGET = ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"]
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 JOURS_COURT = ["L", "M", "M", "J", "V", "S", "D"]
@@ -136,9 +129,6 @@ CSS_CATEGORIES = "".join(
     f"padding-left:13px; margin:14px 0 2px;}}"
     f".st-key-grp-{slug(rayon)} .rayon{{color:{couleur};}}"
     for rayon, couleur in RAYON_COULEURS.items()
-) + "".join(
-    f".tag.cat-{slug(cat)}{{background:{couleur}1a; color:{couleur};}}"
-    for cat, couleur in CAT_COULEURS.items()
 )
 
 st.markdown("""
@@ -215,7 +205,6 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
      background:#fce7f3; color:var(--rose-fonce); margin-left:6px; vertical-align:middle;}
 .tag.retard{background:#fee2e2; color:#b91c1c;}
 .tag.jour{background:#dcfce7; color:#15803d;}
-.tag.urgent{background:#fef3c7; color:#b45309;}
 .rayon{font-size:12px; font-weight:800; color:#a21caf; background:#fae8ff;
        display:inline-block; padding:5px 12px; border-radius:12px; margin:12px 0 2px;}
 .empty{text-align:center; padding:20px 16px; border-radius:20px; background:#fff;
@@ -345,7 +334,7 @@ if not st.session_state["creds_json"]:
         pass
 
 # ==========================================================
-# 4. Couche Données
+# 4. COUCHE DONNÉES
 # ==========================================================
 @st.cache_resource(show_spinner=False)
 def get_client(json_str):
@@ -557,11 +546,11 @@ def evenements_tries():
 def taches_actives():
     resultat = []
     for idx, r in rows("Taches"):
-        nom, cat, statut, ech = pad(r, 4)
+        nom, statut, ech = pad(r, 3)
         if statut == "Fait":
             continue
-        resultat.append((idx, nom, cat or "Autre", parse_date(ech)))
-    return sorted(resultat, key=lambda t: (t[3] or date.max, t[2] != "Urgent"))
+        resultat.append((idx, nom, parse_date(ech)))
+    return sorted(resultat, key=lambda t: t[2] or date.max)
 
 def badge_echeance(echeance, aujourd):
     if not echeance:
@@ -585,7 +574,7 @@ def depuis(instant):
     return f"il y a {int(secondes // 3600)} h"
 
 # ==========================================================
-# 5. Composants d'Interface
+# 5. COMPOSANTS D'INTERFACE
 # ==========================================================
 def conteneur(cle=None, bordure=False):
     try:
@@ -707,7 +696,7 @@ def entete_lien(cle, texte, compteur, onglet):
             st.rerun()
 
 # ==========================================================
-# 6. En-tête et Connexion
+# 6. EN-TÊTE ET CONNEXION
 # ==========================================================
 ajd = date.today()
 st.markdown(f"""
@@ -740,7 +729,7 @@ if st.session_state["ops"]:
     vider_file()
 
 # ==========================================================
-# 7. Navigation
+# 7. NAVIGATION
 # ==========================================================
 params = st.query_params
 page_cle = params.get("p", "accueil")
@@ -775,9 +764,9 @@ if page_cle == "accueil":
     evts_jour = par_jour.get(ajd, [])
     a_venir = [e for e in evenements if e[0] > ajd]
     repas_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
-    en_retard = len([t for t in actives if t[3] and t[3] < ajd])
+    en_retard = len([t for t in actives if t[2] and t[2] < ajd])
 
-    # ================= 1. COURSES (Redirige vers Maison > Courses) =================
+    # ================= 1. COURSES =================
     with conteneur(bordure=True):
         entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
         if courses:
@@ -800,18 +789,17 @@ if page_cle == "accueil":
         else:
             st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
 
-    # ================= 2. À FAIRE (Tâches sur le Dashboard) =================
+    # ================= 2. À FAIRE (Tâches simplifiées) =================
     with conteneur(bordure=True):
         entete_bloc("🌸 À faire", len(actives) or None)
         if en_retard:
             st.markdown(f"<div class='today-none'>⚠️ {en_retard} en retard</div>", unsafe_allow_html=True)
         if actives:
-            for idx, nom, cat, ech in actives[:6]:
-                clique = ligne_action(f"{nom}<span class='tag cat-{slug(cat)}'>{cat}</span>"
-                                     f"{badge_echeance(ech, ajd)}",
+            for idx, nom, ech in actives[:6]:
+                clique = ligne_action(f"{nom}{badge_echeance(ech, ajd)}",
                                      [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
                 if clique == f"acc_tk_{idx}":
-                    set_cell("Taches", idx, 3, "Fait", annulable=True, libelle=f"« {nom} » cochée")
+                    set_cell("Taches", idx, 2, "Fait", annulable=True, libelle=f"« {nom} » cochée")
                     st.rerun()
                 elif clique == f"acc_td_{idx}":
                     delete_row("Taches", idx, libelle=f"« {nom} » supprimée")
@@ -821,15 +809,15 @@ if page_cle == "accueil":
         else:
             st.markdown("<div class='today-none'>🎉 Tout est fait.</div>", unsafe_allow_html=True)
 
-        # Ajout rapide de tâche directement depuis l'accueil
-        na_t, nb_t, nc_t = st.columns([3, 1.2, 1])
+        # Ajout rapide de tâche
+        na_t, nb_t, nc_t = st.columns([2.5, 1.2, 1])
         with na_t:
-            dash_t_txt = st.text_input("Nouvelle tâche", key="dash_t_txt", placeholder="Nouvelle tâche…", label_visibility="collapsed")
+            dash_t_txt = st.text_input("Tâche", key="dash_t_txt", placeholder="Nouvelle tâche…", label_visibility="collapsed")
         with nb_t:
-            dash_t_cat = st.selectbox("Cat", CAT_TACHES, key="dash_t_cat", label_visibility="collapsed")
+            dash_t_ech = st.date_input("Échéance", value=None, key="dash_t_ech", label_visibility="collapsed")
         with nc_t:
             if st.button("＋", key="dash_add_t", type="primary") and dash_t_txt.strip():
-                add_row("Taches", [dash_t_txt.strip(), dash_t_cat, "À faire", ""])
+                add_row("Taches", [dash_t_txt.strip(), "À faire", str(dash_t_ech) if dash_t_ech else ""])
                 reset_after(dash_t_txt="")
                 st.toast("Tâche ajoutée 🌸", icon="✅")
                 st.rerun()
