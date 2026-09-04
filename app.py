@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.34"
+VERSION = "2.35"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -118,7 +118,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Inspiré du Dashboard Clean / Style UI de la référence)
+# 2. STYLE
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -274,7 +274,7 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--ros
   justify-content:flex-start !important; text-align:left !important;
 }
 [class*="st-key-goto-"] button p{font-size:16px !important; font-weight:800 !important;}
-[class*="st-key-goto-"] button::hover::after{opacity:.9;}
+[class*="st-key-goto-"] button:hover::after{opacity:.9;}
 
 .st-key-iatabs{margin-bottom:8px;}
 .st-key-iatabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
@@ -1022,7 +1022,6 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
     elif onglet_ia == ONGLETS_IA[1]:
         st.caption("Dashboard de comparaison des marchés financiers en direct (Style UI épuré).")
 
-        # Dictionnaire des actifs disponibles par défaut
         dictionnaire_actifs = {
             "Or (Gold)": "GC=F",
             "Bitcoin": "BTC-USD",
@@ -1034,7 +1033,6 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
             "Microsoft": "MSFT"
         }
 
-        # Sélection multiple d'actifs pour comparaison
         selection_actifs_noms = st.multiselect(
             "Sélectionner les actifs à comparer",
             options=list(dictionnaire_actifs.keys()),
@@ -1046,13 +1044,11 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
         if selection_actifs_noms:
             tickers_a_charger = [dictionnaire_actifs[nom] for nom in selection_actifs_noms]
             
-            # Blocs de métriques rapides (Style cartes UI)
             df_hist, err = fetch_market_history(tickers_a_charger, period=periode_choisie)
 
             if err:
                 st.warning(f"Erreur de chargement des marchés : {err}. Vérifiez que 'yfinance' est installé.")
             elif df_hist is not None and not df_hist.empty:
-                # Affichage des cartes de KPI (Inspiré du design dashboard)
                 cols_kpi = st.columns(len(selection_actifs_noms))
                 for idx, nom in enumerate(selection_actifs_noms):
                     tk = dictionnaire_actifs[nom]
@@ -1070,17 +1066,15 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                 st.divider()
                 titre("📊 Graphique comparatif des cours")
                 
-                # Normalisation ou tracé direct multi-lignes
                 try:
                     if isinstance(df_hist.columns, pd.MultiIndex):
-                        # Si multiindex yfinance
                         df_close = df_hist['Close']
                     else:
                         df_close = df_hist
 
                     st.line_chart(df_close)
                 except Exception as e:
-                    st.info(fAffichage du graphique indisponible : {e})
+                    st.info(f"Affichage du graphique indisponible : {e}")
 
                 st.divider()
                 titre("🔍 Enregistrer une analyse croisée")
