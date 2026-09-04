@@ -609,7 +609,7 @@ with tab_quotidien:
             st.subheader("🛒 Liste de Courses")
             
             # --- BOUTON POUR CHARGER LES HABITUDES DE TICKETS INDIVIDUELLEMENT ---
-            if st.button("⚡ Charger mes habitudes (Basé sur mes tickets Delhaize)"):
+            if st.button("⚡ Charger mes habitudes (Basé sur mes tickets de courses)"):
                 habitudes_tickets = [
                     ["Tomates cerises", "1 bte", "Fruits & Légumes"],
                     ["Avocat", "2", "Fruits & Légumes"],
