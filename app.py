@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.32"
+VERSION = "2.33"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -845,7 +845,7 @@ if page_cle == "accueil":
     qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés 💖"
     st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>", unsafe_allow_html=True)
 
-    # 6. RÉGLAGES & ACCÈS DISCRET LABO IA
+    # 6. RÉGLAGES & ACCÈS DIRECT LABO IA
     with st.expander("⚙️ Réglages"):
         d1, d2 = st.columns(2)
         with d1:
@@ -862,10 +862,11 @@ if page_cle == "accueil":
                 st.rerun()
         
         st.divider()
-        pwd = st.text_input("🔑 Code Labo IA", type="password", key="sec_pwd_input", placeholder="Code secret…")
+        st.markdown("**🔐 Accès Labo IA**")
+        pwd = st.text_input("Code secret", type="password", key="sec_pwd_input", placeholder="Entrez le code…")
         if pwd == "2026":
             st.session_state["mode_ia"] = True
-            st.success("Mode Labo IA activé ✨")
+            st.query_params["p"] = "ialab"
             st.rerun()
         elif pwd:
             st.error("Code incorrect")
