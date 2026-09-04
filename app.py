@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.15"
+VERSION = "2.16"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -37,9 +37,9 @@ SHEETS = {
 }
 
 RAYONS = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
-RAYON_COULEURS = {
-    "Fruits & Légumes": "#16a34a",
-    "Frais": "#0891b2",
+RAYON_COULES = {
+    "Fruits & Légumes": "#059669",
+    "Frais": "#0284c7",
     "Boulangerie": "#d97706",
     "Supermarché": "#7c3aed",
     "Boissons": "#2563eb",
@@ -61,7 +61,7 @@ PAGES = {
     "maison": "🐾 Maison",
 }
 
-st.set_page_config(page_title="Notre Assistant", page_icon="🌸",
+st.set_page_config(page_title="Notre Assistant", page_icon="🌊",
                    layout="centered", initial_sidebar_state="collapsed")
 
 MEMOIRE_COURSES = [
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE
+# 2. STYLE (Ambiance Eau & Fun / Coloré)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -125,10 +125,10 @@ def slug(texte):
 
 
 CSS_CATEGORIES = "".join(
-    f".st-key-grp-{slug(rayon)}{{border-left:3px solid {couleur};"
+    f".st-key-grp-{slug(rayon)}{{border-left:4px solid {couleur};"
     f"padding-left:14px; margin:16px 0 4px;}}"
     f".st-key-grp-{slug(rayon)} .rayon{{color:{couleur};}}"
-    for rayon, couleur in RAYON_COULEURS.items()
+    for rayon, couleur in RAYON_COULES.items()
 )
 
 st.markdown("""
@@ -136,15 +136,18 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root{
-  --rose:#ec4899; --rose-fonce:#db2777; --violet:#a855f7;
-  --prune:#4a044e; --prune-clair:#831843; --bord:#f472b6;
+  --cyan-vif:#06b6d4; --bleu-ocean:#0284c7; --bleu-profond:#0f172a;
+  --turquoise:#2dd4bf; --rose-fun:#f43f5e; --fond-clair:#f0f9ff;
 }
 
 html, body, [class*="css"], .stApp{
   font-family:'Plus Jakarta Sans', sans-serif !important;
-  color:var(--prune); -webkit-tap-highlight-color:transparent;
+  color:var(--bleu-profond); -webkit-tap-highlight-color:transparent;
 }
-.stApp{background:linear-gradient(180deg,#fff1f2 0%,#fdf2f8 45%,#faf5ff 100%) fixed !important;}
+/* Dégradé fond eau / lagon pétillant */
+.stApp{
+  background: linear-gradient(135deg, #e0f2fe 0%, #ccfbf1 50%, #fae8ff 100%) fixed !important;
+}
 #MainMenu, footer, header{visibility:hidden;}
 .block-container{padding-top:1.2rem !important; padding-bottom:5rem !important; max-width:540px !important;}
 
@@ -158,91 +161,93 @@ html, body, [class*="css"], .stApp{
 
 .bloc-head{
   display:flex; justify-content:space-between; align-items:center; gap:8px;
-  padding:2px 0 10px; font-size:16.5px; font-weight:800; color:var(--prune-clair);
+  padding:2px 0 10px; font-size:16.5px; font-weight:800; color:var(--bleu-ocean);
 }
-.bloc-head .n{background:#fce7f3; color:var(--rose-fonce); border-radius:14px;
+.bloc-head .n{background:#e0f2fe; color:var(--bleu-ocean); border-radius:14px;
   padding:3px 12px; font-size:12px; font-weight:800;}
 
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
   border-radius:18px !important; font-weight:700 !important; font-size:14px !important;
-  padding:12px 16px !important; width:100%; border:2px solid #fbcfe8 !important;
+  padding:12px 16px !important; width:100%; border:2px solid #bae6fd !important;
   transition:transform .12s ease;
 }
 .stButton>button:active, .stFormSubmitButton>button:active{transform:scale(.97);}
 button[kind="secondary"], button[data-testid="stBaseButton-secondary"],
 button[kind="secondaryFormSubmit"], button[data-testid="stBaseButton-secondaryFormSubmit"],
 .stDownloadButton>button{
-  background:#fff !important; color:var(--rose-fonce) !important;
-  box-shadow:0 4px 12px rgba(236,72,153,.06) !important;
+  background:#ffffff !important; color:var(--bleu-ocean) !important;
+  box-shadow:0 6px 16px rgba(2, 132, 199, 0.08) !important;
 }
 button[kind="primary"], button[data-testid="stBaseButton-primary"],
 button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSubmit"]{
-  background:linear-gradient(135deg,#ec4899 0%,#db2777 100%) !important;
+  background:linear-gradient(135deg,#0284c7 0%,#06b6d4 100%) !important;
   color:#fff !important; border:none !important;
-  box-shadow:0 8px 18px -6px rgba(219,39,119,.55) !important;
+  box-shadow:0 8px 20px -4px rgba(6, 182, 212, 0.5) !important;
 }
-button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
+button:focus-visible{outline:3px solid #38bdf8 !important; outline-offset:2px;}
 
+/* Bulles et cartes aux contours eau / turquoise flat & clean */
 [data-testid="stVerticalBlockBorderWrapper"], 
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
 [data-baseweb="block"] {
-  background: #ffffff !important;
-  border: 2.5px solid #f472b6 !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 2.5px solid #38bdf8 !important;
   border-radius: 30px !important;
   padding: 18px 22px 16px !important;
-  box-shadow: 0 16px 36px rgba(236, 72, 153, 0.12) !important;
+  box-shadow: 0 16px 36px rgba(14, 165, 233, 0.12) !important;
   margin-bottom: 18px !important;
 }
 
-[data-testid="stMetricValue"] {color: var(--prune) !important; font-weight: 800 !important;}
-[data-testid="stMetricLabel"] {color: var(--prune-clair) !important; font-weight: 700 !important;}
+[data-testid="stMetricValue"] {color: var(--bleu-profond) !important; font-weight: 800 !important;}
+[data-testid="stMetricLabel"] {color: var(--bleu-ocean) !important; font-weight: 700 !important;}
 [data-testid="stMetric"] {
-  background: #ffffff; border: 2.5px solid #f472b6 !important;
-  border-radius: 24px; padding: 16px 20px; box-shadow: 0 12px 28px rgba(236,72,153,.1);
+  background: #ffffff; border: 2.5px solid #38bdf8 !important;
+  border-radius: 24px; padding: 16px 20px; box-shadow: 0 12px 28px rgba(14,165,233,.1);
 }
 
-.jour-titre{font-size:14px; font-weight:800; color:#a21caf; padding:10px 0 6px;}
-.section{font-weight:800; font-size:16.5px; color:var(--prune-clair); margin:20px 0 8px;}
+.jour-titre{font-size:14px; font-weight:800; color:#0d9488; padding:10px 0 6px;}
+.section{font-weight:800; font-size:16.5px; color:var(--bleu-ocean); margin:20px 0 8px;}
 
-.line{font-size:15px; font-weight:600; color:var(--prune); padding:11px 0;}
-.line.done{color:#a3a3a3; text-decoration:line-through;}
-.line .q{font-weight:600; color:#a21caf; font-size:13px;}
+.line{font-size:15px; font-weight:600; color:var(--bleu-profond); padding:11px 0;}
+.line.done{color:#94a3b8; text-decoration:line-through;}
+.line .q{font-weight:600; color:#0d9488; font-size:13px;}
 
 .tag{display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;
-     background:#fce7f3; color:var(--rose-fonce); margin-left:6px; vertical-align:middle;}
-.rayon{font-size:13.5px; font-weight:800; color:#a21caf; background:#fae8ff;
+     background:#e0f2fe; color:var(--bleu-ocean); margin-left:6px; vertical-align:middle;}
+.rayon{font-size:13.5px; font-weight:800; color:#0d9488; background:#ccfbf1;
        display:inline-block; padding:5px 12px; border-radius:14px; margin:14px 0 4px;}
 .empty{text-align:center; padding:24px 16px; border-radius:22px; background:#fff;
-       border:2px dashed var(--bord); color:#9d174d; font-weight:600; font-size:14px;}
-.today-none{font-size:14px; color:#9d174d; font-weight:600; opacity:.75; padding:10px 0;}
+       border:2px dashed #7dd3fc; color:#0284c7; font-weight:600; font-size:14px;}
+.today-none{font-size:14px; color:#0369a1; font-weight:600; opacity:.8; padding:10px 0;}
 
 .solde{border-radius:24px; padding:18px 22px; margin:16px 0; font-weight:700; font-size:15.5px;
-       background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:2.5px solid #f0abfc; color:#701a75;
+       background:linear-gradient(135deg,#e0f2fe,#ccfbf1); border:2.5px solid #2dd4bf; color:#134e4a;
        display:flex; justify-content:space-between; align-items:center; gap:10px;
-       box-shadow:0 12px 28px rgba(168,85,247,.1);}
-.solde .m{font-size:18.5px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
+       box-shadow:0 12px 28px rgba(45,212,191,.2);}
+.solde .m{font-size:18.5px; font-weight:800; color:#0284c7; white-space:nowrap;}
 
 .bandeau{border-radius:18px; padding:12px 16px; font-size:14px; font-weight:700; margin-bottom:12px;}
-.bandeau.info{background:#f5f3ff; border:1.5px solid #ddd6fe; color:#5b21b6;}
-.bandeau.warn{background:#fff7ed; border:1.5px solid #fed7aa; color:#c2410c;}
+.bandeau.info{background:#f0fdf4; border:1.5px solid #bbf7d0; color:#166534;}
+.bandeau.warn{background:#fffbeb; border:1.5px solid #fde68a; color:#b45309;}
 
 .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input, .stTimeInput input{
-  color:var(--prune) !important; background:#fff !important; -webkit-text-fill-color:var(--prune) !important;
-  border-radius:18px !important; border:2px solid #f9a8d4 !important;
+  color:var(--bleu-profond) !important; background:#fff !important; -webkit-text-fill-color:var(--bleu-profond) !important;
+  border-radius:18px !important; border:2px solid #7dd3fc !important;
   padding:13px 18px !important; font-size:15px !important;
 }
-[data-baseweb="select"]>div{border-radius:18px !important; border:2px solid #f9a8d4 !important; background:#fff !important;}
-label p{font-weight:700 !important; font-size:14px !important; color:var(--prune-clair) !important;}
+[data-baseweb="select"]>div{border-radius:18px !important; border:2px solid #7dd3fc !important; background:#fff !important;}
+label p{font-weight:700 !important; font-size:14px !important; color:var(--bleu-ocean) !important;}
 
 .stTabs [data-baseweb="tab-list"]{gap:8px; background:rgba(255,255,255,.85); padding:8px;
-  border-radius:24px; border:2.5px solid #f472b6;}
-.stTabs [data-baseweb="tab"]{border-radius:16px; padding:9px 16px; font-weight:700; font-size:14px; color:var(--rose-fonce);}
-.stTabs [aria-selected="true"]{background:linear-gradient(135deg,#ec4899,#db2777); color:#fff !important;}
+  border-radius:24px; border:2.5px solid #38bdf8;}
+.stTabs [data-baseweb="tab"]{border-radius:16px; padding:9px 16px; font-weight:700; font-size:14px; color:var(--bleu-ocean);}
+.stTabs [aria-selected="true"]{background:linear-gradient(135deg,#0284c7,#06b6d4); color:#fff !important;}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
 
 .cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin:0 -4px 10px;}
-.cal-week span{text-align:center; font-size:12px; font-weight:800; color:#c026d3;}
-.cal-title{text-align:center; font-size:17px; font-weight:800; color:var(--prune-clair); padding-top:10px;}
+.cal-week span{text-align:center; font-size:12px; font-weight:800; color:#0891b2;}
+.cal-title{text-align:center; font-size:17px; font-weight:800; color:var(--bleu-ocean); padding-top:10px;}
 .st-key-cal-grid{margin:0 -4px;}
 .st-key-cal-grid [data-testid="stHorizontalBlock"],
 [data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]){gap:5px !important;}
@@ -252,20 +257,20 @@ label p{font-weight:700 !important; font-size:14px !important; color:var(--prune
 }
 [class*="st-key-cal_"] button{
   min-height:0 !important; padding:10px 0 !important; border-radius:14px !important;
-  font-size:13px !important; font-weight:700 !important; background:#fdf2f8 !important;
-  color:var(--prune) !important; border:1.5px solid transparent !important; box-shadow:none !important;
+  font-size:13px !important; font-weight:700 !important; background:#f0f9ff !important;
+  color:var(--bleu-profond) !important; border:1.5px solid transparent !important; box-shadow:none !important;
 }
 [class*="st-key-cal_"] button p{font-size:13px !important; font-weight:700 !important; line-height:1.1 !important;}
-[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#ecd9f5 !important; opacity:1 !important;}
+[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#cbd5e1 !important; opacity:1 !important;}
 [class*="st-key-cal_"] button[kind="primary"], [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
-  background:linear-gradient(135deg,#ec4899,#a855f7) !important; color:#fff !important;
-  box-shadow:0 6px 16px -3px rgba(219,39,119,.55) !important;
+  background:linear-gradient(135deg,#0284c7,#2dd4bf) !important; color:#fff !important;
+  box-shadow:0 6px 16px -3px rgba(2,132,199,.5) !important;
 }
 
 [class*="st-key-goto-"] button{
   background:transparent !important; border:none !important; box-shadow:none !important;
-  border-bottom:2px solid #fce7f3 !important; border-radius:0 !important;
-  color:var(--prune-clair) !important; font-size:16.5px !important; font-weight:800 !important;
+  border-bottom:2px solid #e0f2fe !important; border-radius:0 !important;
+  color:var(--bleu-ocean) !important; font-size:16.5px !important; font-weight:800 !important;
   padding:6px 0 12px !important; display:flex !important; align-items:center !important;
   justify-content:flex-start !important; text-align:left !important;
 }
@@ -278,15 +283,15 @@ label p{font-weight:700 !important; font-size:14px !important; color:var(--prune
 .st-key-mtabs button{font-size:13px !important; padding:11px 6px !important; border-radius:18px !important;}
 .st-key-mtabs button p{font-size:13px !important; font-weight:800 !important;}
 
-.bloc-head{border-bottom:2px solid #fce7f3; margin-bottom:6px; padding-bottom:12px;}
+.bloc-head{border-bottom:2px solid #e0f2fe; margin-bottom:6px; padding-bottom:12px;}
 
 [data-testid="stHorizontalBlock"]:has(.line){
-  border-bottom:1px solid #fef2f8; align-items:center !important; gap:6px !important;
+  border-bottom:1px solid #f0f9ff; align-items:center !important; gap:6px !important;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button{
   background:transparent !important; border:none !important; box-shadow:none !important;
-  color:#be185d !important; padding:8px 0 !important; font-size:15px !important;
-  opacity:.5; transition:opacity .15s ease;
+  color:#0284c7 !important; padding:8px 0 !important; font-size:15px !important;
+  opacity:.6; transition:opacity .15s ease;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button:hover{opacity:1;}
 .line{padding:13px 0; line-height:1.45;}
@@ -566,10 +571,10 @@ def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
                         continue
                     if nb:
                         styles.append(f".st-key-{cle} button{{background:linear-gradient("
-                                      f"135deg,#fce7f3,#fae8ff) !important;color:#9d174d !important;}}")
+                                      f"135deg,#e0f2fe,#ccfbf1) !important;color:#0369a1 !important;}}")
                     if jour == aujourd:
-                        styles.append(f".st-key-{cle} button{{border:2px solid #db2777 !important;"
-                                      f"color:#db2777 !important;}}")
+                        styles.append(f".st-key-{cle} button{{border:2px solid #0284c7 !important;"
+                                      f"color:#0284c7 !important;}}")
     if styles:
         st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
     return choisi
@@ -630,7 +635,7 @@ if not st.session_state["creds_json"]:
                 st.session_state["creds_json"] = brut
                 get_doc(brut)
             st.session_state.pop("db", None)
-            st.toast("Connexion réussie 💖", icon="✨")
+            st.toast("Connexion réussie 🌊", icon="✨")
             st.rerun()
         except Exception as err:
             st.session_state["creds_json"] = None
@@ -641,14 +646,13 @@ if st.session_state["ops"]:
     vider_file()
 
 # ==========================================================
-# 7. NAVIGATION & MODE IA (Si activé)
+# 7. NAVIGATION & MODE IA
 # ==========================================================
 params = st.query_params
 page_cle = params.get("p", "accueil")
 if page_cle not in PAGES and page_cle != "ialab":
     page_cle = "accueil"
 
-# Menu contextuel dynamique selon le mode IA
 pages_dispo = PAGES.copy()
 if st.session_state.get("mode_ia"):
     pages_dispo["ialab"] = "🧠 Labo IA"
@@ -703,7 +707,7 @@ if page_cle == "accueil":
 
     # 2. À FAIRE
     with conteneur("carte-taches"):
-        entete_bloc("🌸 À faire", len(actives) or None)
+        entete_bloc("🌊 À faire", len(actives) or None)
         if actives:
             for idx, nom in actives[:6]:
                 clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
@@ -738,7 +742,7 @@ if page_cle == "accueil":
     with conteneur("carte-aujourdhui"):
         entete_bloc("📅 Aujourd'hui", len(evts_jour) + len(repas_jour) or None)
         if not evts_jour and not repas_jour:
-            st.markdown("<div class='today-none'>Journée libre 🌸</div>", unsafe_allow_html=True)
+            st.markdown("<div class='today-none'>Journée libre 🌊</div>", unsafe_allow_html=True)
         for jd, h, ti, desc, idx in evts_jour:
             detail = f"<br><span class='q'>{desc}</span>" if desc else ""
             if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}", [("🗑️", f"acc_ev_{idx}")]):
@@ -788,10 +792,10 @@ if page_cle == "accueil":
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
     ecart = (total_l - total_a) / 2
-    qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés 💖"
+    qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés 🌊"
     st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>", unsafe_allow_html=True)
 
-    # ================= 6. RÉGLAGES & ACCÈS DISCRET LABO IA =================
+    # 6. RÉGLAGES & ACCÈS DISCRET LABO IA
     with st.expander("⚙️ Réglages"):
         d1, d2 = st.columns(2)
         with d1:
@@ -808,9 +812,8 @@ if page_cle == "accueil":
                 st.rerun()
         
         st.divider()
-        # Accès discret par mot de passe
         pwd = st.text_input("🔑 Code Labo IA", type="password", key="sec_pwd_input", placeholder="Code secret…")
-        if pwd == "2026":  # Tu peux modifier ce mot de passe ici
+        if pwd == "2026":
             st.session_state["mode_ia"] = True
             st.success("Mode Labo IA activé ✨")
             st.rerun()
@@ -865,7 +868,7 @@ elif page_cle == "maison":
 
     if onglet_m == ONGLETS_M[0]:
         courses = rows("Courses")
-        titre("💖 Articles habituels")
+        titre("🌊 Articles habituels")
         rayon_memo = pills("memo_rayon", RAYONS[:-1], cols=2)
         deja = {pad(r, 3)[0].strip().lower() for _, r in courses}
         mc1, mc2 = st.columns(2)
@@ -905,13 +908,12 @@ elif page_cle == "maison":
             vide("Aucune recette.")
 
 # ==========================================================
-# 8d. LABO IA & FORMATIONS (Mode Caché)
+# 8d. LABO IA & FORMATIONS
 # ==========================================================
 elif page_cle == "ialab" and st.session_state.get("mode_ia"):
     titre("🧠 Labo IA & Formations")
     st.caption("Espace dédié à l'enregistrement de tes apprentissages, priorités et gestion des dangers.")
 
-    # Formulaire de saisie d'apprentissage ou règle de priorité
     ialab_sujet = st.text_input("Sujet / Domaine", placeholder="Ex: Électricité - Câblage / Frigoriste / Stratégie Priorités")
     ialab_type = pills("ialab_type_pills", ["Apprentissage / Note", "Règle de Priorité", "Sécurité & Dangers"], cols=3)
     ialab_contenu = st.text_area("Notes de synthèse ou Consigne pour l'IA", height=130, placeholder="Détaille tes notes ici…")
