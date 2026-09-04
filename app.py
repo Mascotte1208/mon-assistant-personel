@@ -50,75 +50,67 @@ st.markdown("""
     .hero-banner {
         background: linear-gradient(135deg, #3730a3 0%, #5b21b6 50%, #831843 100%);
         border-radius: 28px;
-        padding: 24px 22px;
+        padding: 22px 20px;
         color: white;
-        margin-bottom: 22px;
-        box-shadow: 0 16px 32px -8px rgba(55, 48, 163, 0.28);
+        margin-bottom: 18px;
+        box-shadow: 0 12px 24px -6px rgba(55, 48, 163, 0.25);
         position: relative;
         overflow: hidden;
     }
-    .hero-banner::after {
-        content: "✨";
-        position: absolute;
-        right: -10px;
-        bottom: -15px;
-        font-size: 85px;
-        opacity: 0.12;
-    }
     .hero-title {
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 800;
         margin: 0;
         letter-spacing: -0.5px;
     }
     .hero-sub {
-        font-size: 13px;
-        opacity: 0.92;
-        margin-top: 5px;
+        font-size: 12px;
+        opacity: 0.9;
+        margin-top: 4px;
         font-weight: 600;
     }
 
     .wooden-block-calendar {
         background: linear-gradient(145deg, #2d241e, #1a1512);
         border: 2px solid #524136;
-        border-radius: 24px;
-        padding: 20px;
+        border-radius: 20px;
+        padding: 16px;
         text-align: center;
-        box-shadow: 0 14px 28px rgba(0,0,0,0.25);
-        margin-bottom: 20px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        margin-bottom: 16px;
     }
     .block-month {
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 800;
         color: #f59e0b;
         text-transform: uppercase;
         letter-spacing: 2px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     .block-cubes {
         display: flex;
         justify-content: center;
-        gap: 12px;
-        margin-bottom: 12px;
+        gap: 10px;
+        margin-bottom: 8px;
     }
     .block-cube {
         background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
         color: #1e293b;
-        font-size: 38px;
+        font-size: 32px;
         font-weight: 800;
-        width: 65px;
-        height: 70px;
-        line-height: 70px;
-        border-radius: 16px;
-        box-shadow: inset 0 -4px 0 rgba(0,0,0,0.15), 0 6px 12px rgba(0,0,0,0.3);
+        width: 55px;
+        height: 60px;
+        line-height: 60px;
+        border-radius: 14px;
+        box-shadow: inset 0 -3px 0 rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.25);
     }
     .block-dayname {
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
         color: #e2e8f0;
         background: rgba(255,255,255,0.1);
-        padding: 6px 14px;
-        border-radius: 12px;
+        padding: 4px 12px;
+        border-radius: 10px;
         display: inline-block;
     }
 
@@ -129,52 +121,58 @@ st.markdown("""
         padding: 6px;
         border-radius: 24px;
         overflow-x: auto;
-        margin-bottom: 20px;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        margin-bottom: 16px;
     }
     .stTabs [data-baseweb="tab"] {
-        border-radius: 18px;
-        padding: 10px 16px;
+        border-radius: 16px;
+        padding: 8px 14px;
         font-weight: 700;
-        font-size: 13px;
+        font-size: 12px;
         color: #78716c;
         background-color: transparent;
         border: none;
         white-space: nowrap;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
         color: #3730a3 !important;
-        box-shadow: 0 6px 18px rgba(55, 48, 163, 0.15);
+        box-shadow: 0 4px 12px rgba(55, 48, 163, 0.12);
     }
 
-    .glass-card-purple, .glass-card-emerald, .glass-card-amber, .glass-card-sky {
+    /* Mini Cartes Épurées Dashboard */
+    .metric-card {
         background: #ffffff;
-        border-radius: 22px;
-        padding: 18px;
-        box-shadow: 0 10px 25px -5px rgba(28, 25, 23, 0.04);
-        margin-bottom: 12px;
+        border-radius: 18px;
+        padding: 14px 16px;
+        border: 1px solid #e7e5e4;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
     }
-    .glass-card-purple { border: 1px solid #e0e7ff; border-top: 4px solid #4338ca; }
-    .glass-card-emerald { border: 1px solid #d1fae5; border-top: 4px solid #059669; }
-    .glass-card-amber { border: 1px solid #fef3c7; border-top: 4px solid #d97706; }
-    .glass-card-sky { border: 1px solid #e0f2fe; border-top: 4px solid #0284c7; }
-
-    .card-head { font-size: 11px; font-weight: 800; color: #78716c; text-transform: uppercase; letter-spacing: 0.9px; }
-    .card-num { font-size: 28px; font-weight: 800; color: #1c1917; margin-top: 2px; }
-    .card-foot { font-size: 12px; font-weight: 600; color: #4338ca; margin-top: 4px; }
-    .badge-tag { display: inline-block; padding: 4px 12px; border-radius: 14px; font-size: 11px; font-weight: 700; background-color: #e0e7ff; color: #3730a3; }
+    .metric-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #78716c;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .metric-value {
+        font-size: 20px;
+        font-weight: 800;
+        color: #1c1917;
+    }
 
     .stButton button {
-        border-radius: 18px;
+        border-radius: 16px;
         font-weight: 800;
-        font-size: 14px;
+        font-size: 13px;
         background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
         color: white;
         border: none;
-        padding: 14px 22px;
-        box-shadow: 0 6px 18px rgba(67, 56, 202, 0.25);
+        padding: 12px 18px;
+        box-shadow: 0 4px 12px rgba(67, 56, 202, 0.2);
     }
     .stButton button:active { transform: scale(0.97); }
 
@@ -182,10 +180,10 @@ st.markdown("""
         color: #1c1917 !important;
         background-color: #ffffff !important;
         -webkit-text-fill-color: #1c1917 !important;
-        border-radius: 18px !important;
+        border-radius: 16px !important;
         border: 1.5px solid #d6d3d1 !important;
-        padding: 12px 16px !important;
-        font-size: 16px !important;
+        padding: 10px 14px !important;
+        font-size: 15px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -309,13 +307,13 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- NAVIGATION SIMPLIFIÉE (4 ONGLETS) ---
+# --- NAVIGATION ---
 tab_dash, tab_quotidien, tab_budget_adv, tab_loisirs = st.tabs([
     "🏠 Dashboard", "📋 Quotidien", "📊 Budget", "🐾 Maison & Loisirs"
 ])
 
 # ==========================================
-# 1. DASHBOARD
+# 1. DASHBOARD ULTRA CLAIR & ÉPURÉ
 # ==========================================
 with tab_dash:
     if not st.session_state["json_credentials_str"]:
@@ -347,7 +345,6 @@ with tab_dash:
     else:
         json_str = st.session_state["json_credentials_str"]
         taches_vals = get_data("Taches")
-        agenda_vals = get_data("Agenda")
         courses_vals = get_data("Courses")
         budget_vals = get_data("Budget")
         
@@ -364,40 +361,30 @@ with tab_dash:
             if payer == "Lucas": total_lucas += amt
             elif payer == "Alex": total_alex += amt
         diff = (total_lucas - total_alex) / 2
+        bilan_str = f"Alex doit {diff:.2f} € à Lucas" if diff > 0 else (f"Lucas doit {abs(diff):.2f} € à Alex" if diff < 0 else "Comptes équilibrés ⚖️")
 
-        st.markdown("<h4 style='font-weight: 800; color: #1c1917; margin-bottom: 14px;'>📊 Métriques de l'assistant</h4>", unsafe_allow_html=True)
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown(f'''
-                <div class="glass-card-purple">
-                    <div class="card-head">✅ Tâches accomplies</div>
-                    <div class="card-num">{taches_faites} <span style="font-size:15px; color:#a8a29e;">/ {total_taches}</span></div>
-                    <div class="card-foot">{"🎉 Tout est à jour !" if total_taches == taches_faites and total_taches > 0 else "Actions en cours"}</div>
-                </div>
-            ''', unsafe_allow_html=True)
-            
-            st.markdown(f'''
-                <div class="glass-card-amber">
-                    <div class="card-head">🛒 En liste de courses</div>
-                    <div class="card-num">{nb_courses}</div>
-                    <div class="card-foot">Articles à acheter</div>
-                </div>
-            ''', unsafe_allow_html=True)
+        st.markdown("<p style='font-weight: 800; font-size: 15px; color: #1c1917; margin-bottom: 12px;'>📊 Vue d'ensemble</p>", unsafe_allow_html=True)
 
-        with c2:
-            st.markdown(f'''
-                <div class="glass-card-emerald">
-                    <div class="card-head">💶 Équilibre Budget</div>
-                    <div class="card-num">{abs(diff):.2f} €</div>
-                    <div class="card-foot">{"Alex ➔ Lucas" if diff > 0 else ("Lucas ➔ Alex" if diff < 0 else "Comptes équilibrés")}</div>
-                </div>
-            ''', unsafe_allow_html=True)
+        # Lignes épurées sous forme de mini-cartes clean
+        st.markdown(f"""
+            <div class="metric-card">
+                <span class="metric-title">✅ Tâches du jour</span>
+                <span class="metric-value">{taches_faites} / {total_taches}</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-title">🛒 Panier Courses</span>
+                <span class="metric-value">{nb_courses} art.</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-title">💶 Équilibre Budget</span>
+                <span class="metric-value" style="font-size: 15px; font-weight: 700; color: #4338ca;">{bilan_str}</span>
+            </div>
+        """, unsafe_allow_html=True)
 
         st.divider()
         col_act1, col_act2 = st.columns(2)
         with col_act1:
-            if st.button("🔄 Re-synchroniser"):
+            if st.button("🔄 Actualiser"):
                 for key in list(st.session_state.keys()):
                     if key.startswith("data_"): del st.session_state[key]
                 st.rerun()
@@ -411,7 +398,7 @@ with tab_dash:
 json_str = st.session_state["json_credentials_str"]
 
 # ==========================================
-# 2. QUOTIDIEN (AVEC COURSES ORGANISÉES PAR RAYONS)
+# 2. QUOTIDIEN
 # ==========================================
 with tab_quotidien:
     if json_str:
@@ -424,7 +411,7 @@ with tab_quotidien:
             
             if taches_data: st.progress(len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"]) / len(taches_data))
 
-            cat_filter = st.selectbox("🔍 Filtrer par catégorie", ["Toutes", "Maison", "Urgent", "Autre"])
+            cat_filter = st.selectbox("🔍 Filtrer", ["Toutes", "Maison", "Urgent", "Autre"])
             filtered = [t for t in taches_data if cat_filter == "Toutes" or (len(t) > 1 and t[1] == cat_filter)]
 
             if filtered:
@@ -483,34 +470,28 @@ with tab_quotidien:
         with sub_tab3:
             st.subheader("🛒 Liste de Courses Organisée")
             
-            # --- MÉMOIRE INTERACTIVE : SELECTION MULTIPLE PAR RAYONS ---
-            with st.expander("🧠 Piocher dans mes articles habituels (Tickets)"):
+            with st.expander("🧠 Piocher dans mes articles habituels"):
                 rayons_dispos = sorted(list(set(item["rayon"] for item in MEMOIRE_COURSES)))
-                selected_rayon = st.selectbox("Filtrer la mémoire par rayon :", rayons_dispos)
-                
+                selected_rayon = st.selectbox("Filtrer par rayon :", rayons_dispos)
                 filtered_memo = [m for m in MEMOIRE_COURSES if m["rayon"] == selected_rayon]
                 memo_noms = [m["article"] for m in filtered_memo]
                 
                 chosen_memo = st.multiselect(f"Articles ({selected_rayon}) :", memo_noms)
-                if st.button("➕ Ajouter la sélection au panier"):
+                if st.button("➕ Ajouter la sélection"):
                     if chosen_memo:
                         for article_name in chosen_memo:
                             match = next((m for m in MEMOIRE_COURSES if m["article"] == article_name), None)
                             if match:
                                 append_row_fast("Courses", [match["article"], match["qte"], match["rayon"]])
-                        st.success("Articles ajoutés !")
+                        st.success("Ajouté !")
                         st.rerun()
 
             st.divider()
-            st.markdown("#### 🛍️ Panier Actif par Rayon")
-
             all_vals = get_data("Courses")
             courses_data = all_vals[1:] if len(all_vals) > 1 else []
 
             if courses_data:
-                # Regroupement intelligent par rayon
                 rayons_ordre = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
-                
                 for rayon in rayons_ordre:
                     articles_du_rayon = [r for r in courses_data if (r[2] if len(r) > 2 else "Autre") == rayon]
                     if articles_du_rayon:
@@ -525,12 +506,10 @@ with tab_quotidien:
                                     delete_row_fast("Courses", real_idx)
                                     st.rerun()
                 st.divider()
-            else:
-                st.info("Votre liste de courses est vide.")
+            else: st.info("Panier vide.")
 
             with st.form("form_courses", clear_on_submit=True):
-                st.markdown("#### ➕ Ajouter un article libre")
-                c_art = st.text_input("Article")
+                c_art = st.text_input("Article libre")
                 c_qte = st.text_input("Quantité", value="1")
                 c_cat = st.selectbox("Rayon", ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"])
                 if st.form_submit_button("Ajouter") and c_art:
@@ -568,7 +547,7 @@ with tab_quotidien:
                     st.rerun()
 
 # ==========================================
-# 3. BUDGET AVANCÉ
+# 3. BUDGET
 # ==========================================
 with tab_budget_adv:
     if json_str:
@@ -624,7 +603,7 @@ with tab_budget_adv:
                 st.rerun()
 
 # ==========================================
-# 4. MAISON & LOISIRS (RECETTES, NOTES, LISTES)
+# 4. MAISON & LOISIRS
 # ==========================================
 with tab_loisirs:
     if json_str:
