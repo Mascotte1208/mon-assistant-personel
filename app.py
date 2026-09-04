@@ -608,30 +608,6 @@ with tab_quotidien:
         with sub_tab3:
             st.subheader("🛒 Liste de Courses")
             
-            # --- BOUTON POUR CHARGER LES HABITUDES DE TICKETS INDIVIDUELLEMENT ---
-            if st.button("⚡ Charger mes habitudes (Basé sur mes tickets de courses)"):
-                habitudes_tickets = [
-                    ["Tomates cerises", "1 bte", "Fruits & Légumes"],
-                    ["Avocat", "2", "Fruits & Légumes"],
-                    ["Concombre", "1", "Fruits & Légumes"],
-                    ["Salade / Roquette", "1", "Fruits & Légumes"],
-                    ["Jus de fruits (Mandarine/Orange)", "1 btl", "Boissons"],
-                    ["Œufs frais", "1 bte", "Frais"],
-                    ["Lait / Lait sans lactose", "1 L", "Frais"],
-                    ["Beurre / Fromage (Burrata/Gouda)", "1", "Frais"],
-                    ["Escalopes ou Nuggets vegan", "1", "Frais"],
-                    ["Saumon fumé / Thon", "1", "Frais"],
-                    ["Pain / Baguette / Sandwich", "1", "Boulangerie"],
-                    ["Pâtes / Tortellini", "1", "Supermarché"],
-                    ["Café / Sirop", "1", "Supermarché"]
-                ]
-                for item in habitudes_tickets:
-                    append_row_fast("Courses", item)
-                st.success("Vos produits récurrents ont été ajoutés un par un dans la liste !")
-                st.rerun()
-
-            st.divider()
-
             all_vals = get_data("Courses")
             courses_data = all_vals[1:] if len(all_vals) > 1 else []
 
