@@ -1073,15 +1073,15 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                         df_close = df_hist
 
                     st.line_chart(df_close)
-                except Exception:
-                    st.info("Affichage du graphique indisponible.")
+                except Exception as e:
+                    st.info(f"Affichage du graphique indisponible : {e}")
 
                 st.divider()
                 titre("🔍 Enregistrer une analyse croisée")
                 note_comparaison = st.text_area("Notes de synthèse ou stratégie DCA multi-actifs", placeholder="Ex: Comparaison Or vs Bitcoin sur la période, arbitrage en cours...")
                 if st.button("Enregistrer l'analyse comparative", type="primary", key="btn_save_multi_market") and note_comparaison.strip():
-                  contenu_txt = f"Actifs comparés : {', '.join(selection_actifs_noms)} | Période : {periode_choisie}\nAnalyse : {note_comparaison}"
-                    add_row("IA_Lab", [str(ajd), f"Analyse Comparative Markets", contenu_txt, "Analyse Technique / Tendance"])
+                    contenu_txt = f"Actifs comparés : {', '.join(selection_actifs_noms)} | Période : {periode_choisie}\nAnalyse : {note_comparaison}"
+                    add_row("IA_Lab", [str(ajd), f"Analyse Comparative Marchés", contenu_txt, "Analyse Technique / Tendance"])
                     st.toast("Analyse comparative enregistrée avec succès ! 📈", icon="✅")
                     st.rerun()
             else:
