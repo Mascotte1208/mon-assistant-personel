@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.7"
+VERSION = "2.8"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Design épuré, aéré & cartes flottantes)
+# 2. STYLE (Grosses bulles / cartes flottantes bien lisibles)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -154,27 +154,27 @@ html, body, [class*="css"], .stApp{
 .topbar{
   display:flex; justify-content:space-between; align-items:center; gap:10px;
   background:linear-gradient(135deg,#ec4899 0%,#a855f7 100%); color:#fff;
-  border-radius:18px; padding:11px 18px; margin-bottom:14px;
-  font-weight:800; font-size:14px; letter-spacing:-.2px;
-  box-shadow:0 10px 22px -8px rgba(219,39,119,.5);
+  border-radius:20px; padding:13px 20px; margin-bottom:16px;
+  font-weight:800; font-size:14.5px; letter-spacing:-.2px;
+  box-shadow:0 12px 26px -8px rgba(219,39,119,.5);
 }
-.topbar .d{font-weight:700; font-size:12.5px; opacity:.94; white-space:nowrap;}
+.topbar .d{font-weight:700; font-size:13px; opacity:.94; white-space:nowrap;}
 
-.st-key-navrow{margin-bottom:8px;}
-.st-key-navrow [data-testid="stHorizontalBlock"]{gap:6px !important;}
-.st-key-navrow button{font-size:12.5px !important; padding:10px 4px !important; border-radius:16px !important;}
-.st-key-navrow button p{font-size:12.5px !important; font-weight:800 !important;}
+.st-key-navrow{margin-bottom:10px;}
+.st-key-navrow [data-testid="stHorizontalBlock"]{gap:8px !important;}
+.st-key-navrow button{font-size:13px !important; padding:11px 6px !important; border-radius:18px !important;}
+.st-key-navrow button p{font-size:13px !important; font-weight:800 !important;}
 
 .bloc-head{
   display:flex; justify-content:space-between; align-items:center; gap:8px;
-  padding:2px 0 8px; font-size:15.5px; font-weight:800; color:var(--prune-clair);
+  padding:2px 0 10px; font-size:16px; font-weight:800; color:var(--prune-clair);
 }
 .bloc-head .n{background:#fce7f3; color:var(--rose-fonce); border-radius:14px;
   padding:3px 12px; font-size:12px; font-weight:800;}
 
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
-  border-radius:16px !important; font-weight:700 !important; font-size:14px !important;
-  padding:12px 14px !important; width:100%; border:1.5px solid var(--bord) !important;
+  border-radius:18px !important; font-weight:700 !important; font-size:14px !important;
+  padding:12px 16px !important; width:100%; border:1.5px solid var(--bord) !important;
   transition:transform .12s ease;
 }
 .stButton>button:active, .stFormSubmitButton>button:active{transform:scale(.97);}
@@ -182,7 +182,7 @@ button[kind="secondary"], button[data-testid="stBaseButton-secondary"],
 button[kind="secondaryFormSubmit"], button[data-testid="stBaseButton-secondaryFormSubmit"],
 .stDownloadButton>button{
   background:#fff !important; color:var(--rose-fonce) !important;
-  box-shadow:0 3px 10px rgba(236,72,153,.06) !important;
+  box-shadow:0 4px 12px rgba(236,72,153,.06) !important;
 }
 button[kind="primary"], button[data-testid="stBaseButton-primary"],
 button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSubmit"]{
@@ -192,7 +192,17 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
-/* Correction de la couleur des chiffres dans les métriques Streamlit */
+/* Application des grosses bulles cosy (cartes flottantes) pour tout le dashboard */
+[data-testid="stVerticalBlockBorderWrapper"]{
+  background:#ffffff !important;
+  border:2px solid #fbcfe8 !important;
+  border-radius:28px !important;
+  padding:16px 20px 14px !important;
+  box-shadow:0 14px 32px rgba(236,72,153,.08) !important;
+  margin-bottom:16px !important;
+}
+
+/* Style des métriques budget */
 [data-testid="stMetricValue"] {
   color: var(--prune) !important;
   font-weight: 800 !important;
@@ -203,105 +213,99 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 }
 [data-testid="stMetric"] {
   background: #ffffff;
-  border: 1.5px solid #fbcfe8 !important;
-  border-radius: 20px;
-  padding: 12px 16px;
-  box-shadow: 0 8px 20px rgba(236,72,153,.06);
+  border: 2px solid #fbcfe8 !important;
+  border-radius: 22px;
+  padding: 14px 18px;
+  box-shadow: 0 10px 24px rgba(236,72,153,.07);
 }
 
-/* Cartes flottantes aux contours doux */
-[data-testid="stVerticalBlockBorderWrapper"]{
-  background:#ffffff; border:1.5px solid #fbcfe8 !important; border-radius:24px !important;
-  padding:12px 18px 10px !important; box-shadow:0 12px 28px rgba(236,72,153,.07); margin-bottom:14px;
-}
-
-.jour-titre{font-size:13.5px; font-weight:800; color:#a21caf; padding:8px 0 4px;}
-.section{font-weight:800; font-size:15.5px; color:var(--prune-clair); margin:18px 0 8px;}
+.jour-titre{font-size:14px; font-weight:800; color:#a21caf; padding:10px 0 6px;}
+.section{font-weight:800; font-size:16px; color:var(--prune-clair); margin:20px 0 8px;}
 
 /* Lignes aérées et confortables pour le pouce */
-.line{font-size:15px; font-weight:600; color:var(--prune); padding:10px 0;}
+.line{font-size:15px; font-weight:600; color:var(--prune); padding:11px 0;}
 .line.done{color:#a3a3a3; text-decoration:line-through;}
 .line .q{font-weight:600; color:#a21caf; font-size:13px;}
 
 .tag{display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;
      background:#fce7f3; color:var(--rose-fonce); margin-left:6px; vertical-align:middle;}
-.rayon{font-size:12.5px; font-weight:800; color:#a21caf; background:#fae8ff;
-       display:inline-block; padding:5px 12px; border-radius:12px; margin:14px 0 4px;}
-.empty{text-align:center; padding:22px 16px; border-radius:20px; background:#fff;
-       border:1.5px dashed var(--bord); color:#9d174d; font-weight:600; font-size:14px;}
-.today-none{font-size:14px; color:#9d174d; font-weight:600; opacity:.75; padding:8px 0;}
+.rayon{font-size:13px; font-weight:800; color:#a21caf; background:#fae8ff;
+       display:inline-block; padding:5px 12px; border-radius:14px; margin:14px 0 4px;}
+.empty{text-align:center; padding:24px 16px; border-radius:22px; background:#fff;
+       border:2px dashed var(--bord); color:#9d174d; font-weight:600; font-size:14px;}
+.today-none{font-size:14px; color:#9d174d; font-weight:600; opacity:.75; padding:10px 0;}
 
 .note-box{background:linear-gradient(135deg,#fdf4ff 0%,#fae8ff 100%); border:2px dashed #e879f9;
-          border-radius:22px; padding:15px 20px; margin-bottom:14px;}
-.note-box .t{font-size:13.5px; font-weight:700; color:#9333ea; margin-bottom:5px;}
+          border-radius:24px; padding:16px 22px; margin-bottom:16px; box-shadow:0 10px 24px rgba(168,85,247,.06);}
+.note-box .t{font-size:14px; font-weight:700; color:#9333ea; margin-bottom:6px;}
 .note-box .c{font-size:15px; color:#581c87; font-weight:600;}
 
-.solde{border-radius:20px; padding:15px 18px; margin:12px 0; font-weight:700; font-size:14.5px;
-       background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:1.5px solid #f0abfc; color:#701a75;
+.solde{border-radius:22px; padding:16px 20px; margin:14px 0; font-weight:700; font-size:15px;
+       background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:2px solid #f0abfc; color:#701a75;
        display:flex; justify-content:space-between; align-items:center; gap:10px;
-       box-shadow:0 8px 20px rgba(168,85,247,.08);}
-.solde .m{font-size:17.5px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
+       box-shadow:0 10px 24px rgba(168,85,247,.08);}
+.solde .m{font-size:18px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
 
-.bandeau{border-radius:16px; padding:11px 15px; font-size:13.5px; font-weight:700; margin-bottom:10px;}
+.bandeau{border-radius:18px; padding:12px 16px; font-size:14px; font-weight:700; margin-bottom:12px;}
 .bandeau.info{background:#f5f3ff; border:1.5px solid #ddd6fe; color:#5b21b6;}
 .bandeau.warn{background:#fff7ed; border:1.5px solid #fed7aa; color:#c2410c;}
 
 .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input, .stTimeInput input{
   color:var(--prune) !important; background:#fff !important; -webkit-text-fill-color:var(--prune) !important;
-  border-radius:16px !important; border:1.5px solid #f9a8d4 !important;
-  padding:12px 16px !important; font-size:15px !important;
+  border-radius:18px !important; border:1.5px solid #f9a8d4 !important;
+  padding:13px 18px !important; font-size:15px !important;
 }
-[data-baseweb="select"]>div{border-radius:16px !important; border:1.5px solid #f9a8d4 !important; background:#fff !important;}
-label p{font-weight:700 !important; font-size:13.5px !important; color:var(--prune-clair) !important;}
+[data-baseweb="select"]>div{border-radius:18px !important; border:1.5px solid #f9a8d4 !important; background:#fff !important;}
+label p{font-weight:700 !important; font-size:14px !important; color:var(--prune-clair) !important;}
 
-.stTabs [data-baseweb="tab-list"]{gap:6px; background:rgba(255,255,255,.8); padding:6px;
-  border-radius:20px; border:1.5px solid var(--bord);}
-.stTabs [data-baseweb="tab"]{border-radius:14px; padding:8px 14px; font-weight:700; font-size:13.5px; color:var(--rose-fonce);}
+.stTabs [data-baseweb="tab-list"]{gap:8px; background:rgba(255,255,255,.85); padding:8px;
+  border-radius:22px; border:2px solid var(--bord);}
+.stTabs [data-baseweb="tab"]{border-radius:16px; padding:9px 16px; font-weight:700; font-size:14px; color:var(--rose-fonce);}
 .stTabs [aria-selected="true"]{background:linear-gradient(135deg,#ec4899,#db2777); color:#fff !important;}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
 
-.cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:0 -4px 8px;}
-.cal-week span{text-align:center; font-size:11.5px; font-weight:800; color:#c026d3;}
-.cal-title{text-align:center; font-size:16.5px; font-weight:800; color:var(--prune-clair); padding-top:10px;}
+.cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin:0 -4px 10px;}
+.cal-week span{text-align:center; font-size:12px; font-weight:800; color:#c026d3;}
+.cal-title{text-align:center; font-size:17px; font-weight:800; color:var(--prune-clair); padding-top:10px;}
 .st-key-cal-grid{margin:0 -4px;}
 .st-key-cal-grid [data-testid="stHorizontalBlock"],
-[data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]){gap:4px !important;}
+[data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]){gap:5px !important;}
 .st-key-cal-grid [data-testid="stHorizontalBlock"] > div,
 [data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]) > div{
   flex:1 1 0 !important; width:auto !important; min-width:0 !important; padding:0 !important;
 }
 [class*="st-key-cal_"] button{
-  min-height:0 !important; padding:9px 0 !important; border-radius:12px !important;
-  font-size:12.5px !important; font-weight:700 !important; background:#fdf2f8 !important;
+  min-height:0 !important; padding:10px 0 !important; border-radius:14px !important;
+  font-size:13px !important; font-weight:700 !important; background:#fdf2f8 !important;
   color:var(--prune) !important; border:1.5px solid transparent !important; box-shadow:none !important;
 }
-[class*="st-key-cal_"] button p{font-size:12.5px !important; font-weight:700 !important; line-height:1.1 !important;}
+[class*="st-key-cal_"] button p{font-size:13px !important; font-weight:700 !important; line-height:1.1 !important;}
 [class*="st-key-cal_"] button:disabled{background:transparent !important; color:#ecd9f5 !important; opacity:1 !important;}
 [class*="st-key-cal_"] button[kind="primary"], [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
   background:linear-gradient(135deg,#ec4899,#a855f7) !important; color:#fff !important;
-  box-shadow:0 5px 14px -3px rgba(219,39,119,.55) !important;
+  box-shadow:0 6px 16px -3px rgba(219,39,119,.55) !important;
 }
 
 [class*="st-key-goto-"] button{
   background:transparent !important; border:none !important; box-shadow:none !important;
-  border-bottom:1.5px solid #fce7f3 !important; border-radius:0 !important;
-  color:var(--prune-clair) !important; font-size:15.5px !important; font-weight:800 !important;
-  padding:4px 0 10px !important; display:flex !important; align-items:center !important;
+  border-bottom:2px solid #fce7f3 !important; border-radius:0 !important;
+  color:var(--prune-clair) !important; font-size:16px !important; font-weight:800 !important;
+  padding:6px 0 12px !important; display:flex !important; align-items:center !important;
   justify-content:flex-start !important; text-align:left !important;
 }
-[class*="st-key-goto-"] button p{font-size:15.5px !important; font-weight:800 !important;}
-[class*="st-key-goto-"] button::after{content:"›"; margin-left:auto; font-size:21px; opacity:.45;}
+[class*="st-key-goto-"] button p{font-size:16px !important; font-weight:800 !important;}
+[class*="st-key-goto-"] button::after{content:"›"; margin-left:auto; font-size:22px; opacity:.45;}
 [class*="st-key-goto-"] button:hover::after{opacity:.9;}
 
-.st-key-mtabs{margin-bottom:8px;}
-.st-key-mtabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
-.st-key-mtabs button{font-size:12.5px !important; padding:10px 4px !important; border-radius:16px !important;}
-.st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
+.st-key-mtabs{margin-bottom:10px;}
+.st-key-mtabs [data-testid="stHorizontalBlock"]{gap:8px !important;}
+.st-key-mtabs button{font-size:13px !important; padding:11px 6px !important; border-radius:18px !important;}
+.st-key-mtabs button p{font-size:13px !important; font-weight:800 !important;}
 
-.bloc-head{border-bottom:1.5px solid #fce7f3; margin-bottom:4px; padding-bottom:10px;}
+.bloc-head{border-bottom:2px solid #fce7f3; margin-bottom:6px; padding-bottom:12px;}
 
 [data-testid="stHorizontalBlock"]:has(.line){
-  border-bottom:1px solid #fef2f8; align-items:center !important; gap:4px !important;
+  border-bottom:1px solid #fef2f8; align-items:center !important; gap:6px !important;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button{
   background:transparent !important; border:none !important; box-shadow:none !important;
@@ -309,15 +313,15 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--pru
   opacity:.5; transition:opacity .15s ease;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button:hover{opacity:1;}
-.line{padding:12px 0; line-height:1.4;}
+.line{padding:13px 0; line-height:1.45;}
 .line .q{font-variant-numeric:tabular-nums; opacity:.85;}
 .solde .m{font-variant-numeric:tabular-nums;}
 
-.rayon{background:transparent; padding:0 0 4px; margin:0; font-size:13px; letter-spacing:-.1px;}
+.rayon{background:transparent; padding:0 0 6px; margin:0; font-size:13.5px; letter-spacing:-.1px;}
 .rayon .c{opacity:.55; font-weight:700;}
 
-.today-none{padding:12px 0;}
-.empty{padding:26px 16px;}
+.today-none{padding:14px 0;}
+.empty{padding:28px 16px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -761,7 +765,7 @@ for ev in evenements:
     par_jour.setdefault(ev[0], []).append(ev)
 
 # ==========================================================
-# 8a. ACCUEIL (Dashboard aéré et chaleureux)
+# 8a. ACCUEIL (Dashboard en grosses bulles cosy)
 # ==========================================================
 if page_cle == "accueil":
     courses = rows("Courses")
