@@ -206,7 +206,6 @@ def sync_sheet_to_state(sheet_name, data):
 def append_row_fast(sheet_name, row):
     data = get_data(sheet_name)
     
-    # Gestion intelligente des doublons pour l'onglet Courses
     if sheet_name == "Courses":
         article_nom = row[0].strip().lower()
         found_idx = -1
@@ -216,7 +215,6 @@ def append_row_fast(sheet_name, row):
                 break
         
         if found_idx != -1:
-            # Le doublon existe déjà, on met à jour la ligne en mémoire et sur Google Sheets
             old_qte = data[found_idx][1] if len(data[found_idx]) > 1 else "1"
             new_qte = f"{old_qte} + {row[1]}"
             data[found_idx][1] = new_qte
@@ -229,7 +227,6 @@ def append_row_fast(sheet_name, row):
                     pass
             return
 
-    # Ajout normal si pas de doublon
     data.append(row)
     sync_sheet_to_state(sheet_name, data)
     if st.session_state.get("json_credentials_str"):
@@ -351,7 +348,6 @@ if active_page == "🏠 Dashboard":
         diff = (total_lucas - total_alex) / 2
         bilan_str = f"Alex doit {diff:.2f} € à Lucas" if diff > 0 else (f"Lucas doit {abs(diff):.2f} € à Alex" if diff < 0 else "Comptes parfaitement équilibrés 💖")
 
-        # --- BLOC NOTES IMPORTANTES ---
         st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-bottom: 8px;'>📌 Note importante du moment</p>", unsafe_allow_html=True)
         
         notes_data = notes_vals[1:] if len(notes_vals) > 1 else []
@@ -368,7 +364,6 @@ if active_page == "🏠 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # --- BLOC CHIFFRES CLÉS ---
         st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-bottom: 8px;'>💖 En un coup d'œil</p>", unsafe_allow_html=True)
         st.markdown(f"""
             <div class="metric-card">
@@ -385,7 +380,6 @@ if active_page == "🏠 Dashboard":
             </div>
         """, unsafe_allow_html=True)
 
-        # --- BLOC TÂCHES VISIBLES SUR LE DASHBOARD ---
         st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-top: 16px; margin-bottom: 8px;'>✨ Tâches en cours à valider</p>", unsafe_allow_html=True)
         taches_actives = [t for t in taches_data if len(t) > 2 and t[2] != "Fait"]
         
@@ -673,7 +667,7 @@ elif active_page == "🐾 Maison & Loisirs" and json_str:
     with sub_tab_l:
         st.subheader("🧳 Listes & Cadeaux")
         all_vals = get_data("Listes")
-        listes_data = all_vals[1:] if len(listes_data) > 1 else []
+        listes_data = all_vals[1:] if len(all_vals) > 1 else []
         cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
 
         filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_l]
