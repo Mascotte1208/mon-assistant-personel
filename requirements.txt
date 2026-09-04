@@ -4,3 +4,4 @@ streamlit-mic-recorder
 gspread
 oauth2client
 pandas
+yfinance
