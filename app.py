@@ -560,13 +560,11 @@ with tab_quotidien:
             
             num_days = calendar.monthrange(today.year, today.month)[1]
             
-            # Affichage en blocs élégants pour chaque jour du mois
             for day_num in range(1, num_days + 1):
                 d_str = f"{today.year}-{today.month:02d}-{day_num:02d}"
                 is_today = day_num == today.day
                 has_events = d_str in events_by_date
                 
-                # Style de la ligne du jour
                 day_bg = "#e0e7ff" if is_today else ("#ffffff" if has_events else "#fafaf9")
                 border_col = "#4338ca" if is_today else ("#cbd5e1" if has_events else "#e7e5e4")
                 
@@ -611,6 +609,38 @@ with tab_quotidien:
 
         with sub_tab3:
             st.subheader("🛒 Liste de Courses")
+            
+            # --- BOUTON DE SAISIE RAPIDE EN MASSE ---
+            if st.button("⚡ Ajouter les indispensables (20 articles courants)"):
+                indispensables = [
+                    ["Œufs", "1 bte", "Frais"],
+                    ["Lait", "1 L", "Frais"],
+                    ["Beurre", "1 plq", "Frais"],
+                    ["Pain / Baguette", "2", "Boulangerie"],
+                    ["Pâtes", "1 sq", "Supermarché"],
+                    ["Riz", "1 sq", "Supermarché"],
+                    ["Huile d'olive", "1 btl", "Supermarché"],
+                    ["Sel & Poivre", "1", "Supermarché"],
+                    ["Café", "1 pqt", "Supermarché"],
+                    ["Papier toilette", "1", "Entretien"],
+                    ["Liquide vaisselle", "1", "Entretien"],
+                    ["Éponges", "1", "Entretien"],
+                    ["Poulet / Viande", "1", "Frais"],
+                    ["Steaks hachés", "1", "Frais"],
+                    ["Fromage", "1", "Frais"],
+                    ["Tomates", "1 kg", "Fruits & Légumes"],
+                    ["Oignons", "1", "Fruits & Légumes"],
+                    ["Ail", "1 tte", "Fruits & Légumes"],
+                    ["Salade", "1", "Fruits & Légumes"],
+                    ["Eau / Boissons", "1 pack", "Boissons"]
+                ]
+                for item in indispensables:
+                    append_row_fast("Courses", item)
+                st.success("20 indispensables ajoutés avec succès !")
+                st.rerun()
+
+            st.divider()
+
             all_vals = get_data("Courses")
             courses_data = all_vals[1:] if len(all_vals) > 1 else []
 
@@ -630,7 +660,7 @@ with tab_quotidien:
             with st.form("form_courses", clear_on_submit=True):
                 c_art = st.text_input("Article")
                 c_qte = st.text_input("Quantité", value="1")
-                c_cat = st.selectbox("Rayon", ["Supermarché", "Frais", "Fruits & Légumes", "Boissons", "Entretien", "Autre"])
+                c_cat = st.selectbox("Rayon", ["Supermarché", "Frais", "Boulangerie", "Fruits & Légumes", "Boissons", "Entretien", "Autre"])
                 if st.form_submit_button("Ajouter") and c_art:
                     append_row_fast("Courses", [c_art, c_qte, c_cat])
                     st.rerun()
