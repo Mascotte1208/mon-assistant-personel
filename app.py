@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.20"
+VERSION = "2.21"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -38,13 +38,13 @@ SHEETS = {
 
 RAYONS = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
 RAYON_COULEURS = {
-    "Fruits & Légumes": "#22c55e",
-    "Frais": "#0ea5e9",
-    "Boulangerie": "#f59e0b",
-    "Supermarché": "#a855f7",
-    "Boissons": "#3b82f6",
-    "Entretien": "#ec4899",
-    "Autre": "#64748b",
+    "Fruits & Légumes": "#16a34a",
+    "Frais": "#0891b2",
+    "Boulangerie": "#d97706",
+    "Supermarché": "#7c3aed",
+    "Boissons": "#2563eb",
+    "Entretien": "#db2777",
+    "Autre": "#6b7280",
 }
 CAT_BUDGET = ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"]
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
@@ -61,7 +61,7 @@ PAGES = {
     "maison": "🐾 Maison",
 }
 
-st.set_page_config(page_title="Notre Assistant", page_icon="⚡",
+st.set_page_config(page_title="Notre Assistant", page_icon="🌸",
                    layout="centered", initial_sidebar_state="collapsed")
 
 MEMOIRE_COURSES = [
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Dashboard Mode Sombre Pro)
+# 2. STYLE (Rose & Prune avec des cadres ultra-visibles et propres)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -136,17 +136,17 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root{
-  --bg-app:#0f172a; --card-bg:#1e293b; --card-border:#334155;
-  --text-main:#f8fafc; --text-muted:#94a3b8; --accent:#3b82f6;
-  --accent-glow:rgba(59, 130, 246, 0.25);
+  --rose:#ec4899; --rose-fonce:#db2777; --violet:#a855f7;
+  --prune:#4a044e; --prune-clair:#831843; --bord-cadre:#f472b6;
 }
 
 html, body, [class*="css"], .stApp{
   font-family:'Plus Jakarta Sans', sans-serif !important;
-  color:var(--text-main); -webkit-tap-highlight-color:transparent;
+  color:var(--prune); -webkit-tap-highlight-color:transparent;
 }
+/* Fond rose poudré très doux */
 .stApp{
-  background: var(--bg-app) fixed !important;
+  background:linear-gradient(180deg,#fff1f2 0%,#fdf2f8 50%,#faf5ff 100%) fixed !important;
 }
 #MainMenu, footer, header{visibility:hidden;}
 .block-container{padding-top:1.2rem !important; padding-bottom:5rem !important; max-width:540px !important;}
@@ -161,92 +161,93 @@ html, body, [class*="css"], .stApp{
 
 .bloc-head{
   display:flex; justify-content:space-between; align-items:center; gap:8px;
-  padding:2px 0 8px; font-size:16.5px; font-weight:800; color:var(--text-main);
-  border-bottom:1px solid var(--card-border); margin-bottom:10px;
+  padding:2px 0 8px; font-size:16.5px; font-weight:800; color:var(--prune-clair);
+  border-bottom:1.5px solid #fce7f3; margin-bottom:10px;
 }
-.bloc-head .n{background:#334155; color:#38bdf8; border-radius:10px;
+.bloc-head .n{background:#fce7f3; color:var(--rose-fonce); border-radius:10px;
   padding:2px 10px; font-size:11.5px; font-weight:800;}
 
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
   border-radius:14px !important; font-weight:700 !important; font-size:14px !important;
-  padding:11px 15px !important; width:100%; border:1px solid var(--card-border) !important;
+  padding:11px 15px !important; width:100%; border:1.5px solid #f472b6 !important;
   transition:transform .1s ease;
 }
 .stButton>button:active, .stFormSubmitButton>button:active{transform:scale(.98);}
 button[kind="secondary"], button[data-testid="stBaseButton-secondary"],
 button[kind="secondaryFormSubmit"], button[data-testid="stBaseButton-secondaryFormSubmit"],
 .stDownloadButton>button{
-  background:#262f45 !important; color:#e2e8f0 !important;
-  box-shadow:0 4px 12px rgba(0,0,0,0.2) !important;
+  background:#ffffff !important; color:var(--rose-fonce) !important;
+  box-shadow:0 3px 10px rgba(236,72,153,.08) !important;
 }
 button[kind="primary"], button[data-testid="stBaseButton-primary"],
 button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSubmit"]{
-  background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%) !important;
+  background:linear-gradient(135deg,#ec4899 0%,#db2777 100%) !important;
   color:#fff !important; border:none !important;
-  box-shadow:0 6px 20px -4px var(--accent-glow) !important;
+  box-shadow:0 6px 16px -4px rgba(219,39,119,.4) !important;
 }
-button:focus-visible{outline:2px solid #60a5fa !important; outline-offset:2px;}
+button:focus-visible{outline:2px solid #f9a8d4 !important; outline-offset:2px;}
 
+/* CADRES BIEN VISIBLES SUR FOND BLANC (style cartes nettes) */
 [data-testid="stVerticalBlockBorderWrapper"], 
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
 [data-baseweb="block"] {
-  background: var(--card-bg) !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: 20px !important;
+  background: #ffffff !important;
+  border: 2px solid var(--bord-cadre) !important;
+  border-radius: 22px !important;
   padding: 16px 20px 14px !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 10px 30px rgba(236, 72, 153, 0.12) !important;
   margin-bottom: 16px !important;
 }
 
-[data-testid="stMetricValue"] {color: #f8fafc !important; font-weight: 800 !important;}
-[data-testid="stMetricLabel"] {color: var(--text-muted) !important; font-weight: 700 !important;}
+[data-testid="stMetricValue"] {color: var(--prune) !important; font-weight: 800 !important;}
+[data-testid="stMetricLabel"] {color: var(--prune-clair) !important; font-weight: 700 !important;}
 [data-testid="stMetric"] {
-  background: #262f45; border: 1px solid var(--card-border) !important;
-  border-radius: 16px; padding: 14px 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  background: #ffffff; border: 2px solid var(--bord-cadre) !important;
+  border-radius: 18px; padding: 14px 18px; box-shadow: 0 6px 16px rgba(236,72,153,.1);
 }
 
-.jour-titre{font-size:13.5px; font-weight:800; color:#38bdf8; padding:8px 0 4px;}
-.section{font-weight:800; font-size:16px; color:#f8fafc; margin:18px 0 6px;}
+.jour-titre{font-size:13.5px; font-weight:800; color:#a21caf; padding:8px 0 4px;}
+.section{font-weight:800; font-size:16px; color:var(--prune-clair); margin:18px 0 6px;}
 
-.line{font-size:14.5px; font-weight:600; color:#f1f5f9; padding:10px 0;}
-.line.done{color:#64748b; text-decoration:line-through;}
-.line .q{font-weight:600; color:#38bdf8; font-size:12.5px;}
+.line{font-size:14.5px; font-weight:600; color:var(--prune); padding:10px 0;}
+.line.done{color:#a3a3a3; text-decoration:line-through;}
+.line .q{font-weight:600; color:#a21caf; font-size:12.5px;}
 
 .tag{display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700;
-     background:#334155; color:#38bdf8; margin-left:6px; vertical-align:middle;}
-.rayon{font-size:13px; font-weight:800; color:#38bdf8; background:#1e293b;
+     background:#fce7f3; color:var(--rose-fonce); margin-left:6px; vertical-align:middle;}
+.rayon{font-size:13px; font-weight:800; color:#a21caf; background:#fae8ff;
        display:inline-block; padding:4px 10px; border-radius:12px; margin:12px 0 4px;}
-.empty{text-align:center; padding:22px 14px; border-radius:18px; background:#262f45;
-       border:1px dashed var(--card-border); color:var(--text-muted); font-weight:600; font-size:13.5px;}
-.today-none{font-size:13.5px; color:var(--text-muted); font-weight:600; opacity:.85; padding:8px 0;}
+.empty{text-align:center; padding:22px 14px; border-radius:18px; background:#fff;
+       border:2px dashed #f472b6; color:#9d174d; font-weight:600; font-size:13.5px;}
+.today-none{font-size:13.5px; color:#9d174d; font-weight:600; opacity:.85; padding:8px 0;}
 
 .solde{border-radius:18px; padding:16px 20px; margin:14px 0; font-weight:700; font-size:15px;
-       background:linear-gradient(135deg,#1e293b,#262f45); border:1px solid #3b82f6; color:#f8fafc;
+       background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:2px solid #f472b6; color:#701a75;
        display:flex; justify-content:space-between; align-items:center; gap:10px;
-       box-shadow:0 6px 18px rgba(59,130,246,0.15);}
-.solde .m{font-size:17.5px; font-weight:800; color:#60a5fa; white-space:nowrap;}
+       box-shadow:0 8px 20px rgba(168,85,247,.1);}
+.solde .m{font-size:17.5px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
 
 .bandeau{border-radius:14px; padding:10px 14px; font-size:13.5px; font-weight:700; margin-bottom:10px;}
-.bandeau.info{background:#1e293b; border:1px solid #3b82f6; color:#60a5fa;}
-.bandeau.warn{background:#2a2318; border:1px solid #f59e0b; color:#fbbf24;}
+.bandeau.info{background:#f5f3ff; border:1.5px solid #ddd6fe; color:#5b21b6;}
+.bandeau.warn{background:#fff7ed; border:1.5px solid #fed7aa; color:#c2410c;}
 
 .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input, .stTimeInput input{
-  color:#f8fafc !important; background:#262f45 !important; -webkit-text-fill-color:#f8fafc !important;
-  border-radius:14px !important; border:1px solid var(--card-border) !important;
+  color:var(--prune) !important; background:#fff !important; -webkit-text-fill-color:var(--prune) !important;
+  border-radius:14px !important; border:2px solid #f9a8d4 !important;
   padding:11px 15px !important; font-size:14.5px !important;
 }
-[data-baseweb="select"]>div{border-radius:14px !important; border:1px solid var(--card-border) !important; background:#262f45 !important;}
-label p{font-weight:700 !important; font-size:13.5px !important; color:#cbd5e1 !important;}
+[data-baseweb="select"]>div{border-radius:14px !important; border:2px solid #f9a8d4 !important; background:#fff !important;}
+label p{font-weight:700 !important; font-size:13.5px !important; color:var(--prune-clair) !important;}
 
-.stTabs [data-baseweb="tab-list"]{gap:6px; background:#262f45; padding:6px;
-  border-radius:18px; border:1px solid var(--card-border);}
-.stTabs [data-baseweb="tab"]{border-radius:12px; padding:8px 14px; font-weight:700; font-size:13.5px; color:var(--text-muted);}
-.stTabs [aria-selected="true"]{background:linear-gradient(135deg,#3b82f6,#2563eb); color:#fff !important;}
+.stTabs [data-baseweb="tab-list"]{gap:6px; background:#fff; padding:6px;
+  border-radius:18px; border:2px solid #f472b6;}
+.stTabs [data-baseweb="tab"]{border-radius:12px; padding:8px 14px; font-weight:700; font-size:13.5px; color:var(--rose-fonce);}
+.stTabs [aria-selected="true"]{background:linear-gradient(135deg,#ec4899,#db2777); color:#fff !important;}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
 
 .cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:0 -2px 8px;}
-.cal-week span{text-align:center; font-size:11.5px; font-weight:800; color:var(--text-muted);}
-.cal-title{text-align:center; font-size:16px; font-weight:800; color:#f8fafc; padding-top:8px;}
+.cal-week span{text-align:center; font-size:11.5px; font-weight:800; color:#c026d3;}
+.cal-title{text-align:center; font-size:16px; font-weight:800; color:var(--prune-clair); padding-top:8px;}
 .st-key-cal-grid{margin:0 -2px;}
 .st-key-cal-grid [data-testid="stHorizontalBlock"],
 [data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]){gap:4px !important;}
@@ -256,20 +257,20 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:#cbd5e1 !
 }
 [class*="st-key-cal_"] button{
   min-height:0 !important; padding:9px 0 !important; border-radius:12px !important;
-  font-size:12.5px !important; font-weight:700 !important; background:#262f45 !important;
-  color:#f1f5f9 !important; border:1px solid transparent !important; box-shadow:none !important;
+  font-size:12.5px !important; font-weight:700 !important; background:#fdf2f8 !important;
+  color:var(--prune) !important; border:1.5px solid transparent !important; box-shadow:none !important;
 }
 [class*="st-key-cal_"] button p{font-size:12.5px !important; font-weight:700 !important; line-height:1.1 !important;}
-[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#475569 !important; opacity:1 !important;}
+[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#ecd9f5 !important; opacity:1 !important;}
 [class*="st-key-cal_"] button[kind="primary"], [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
-  background:linear-gradient(135deg,#3b82f6,#60a5fa) !important; color:#fff !important;
-  box-shadow:0 4px 12px -2px rgba(59,130,246,0.4) !important;
+  background:linear-gradient(135deg,#ec4899,#a855f7) !important; color:#fff !important;
+  box-shadow:0 4px 12px -2px rgba(219,39,119,.4) !important;
 }
 
 [class*="st-key-goto-"] button{
   background:transparent !important; border:none !important; box-shadow:none !important;
-  border-bottom:1px solid var(--card-border) !important; border-radius:0 !important;
-  color:#f8fafc !important; font-size:16px !important; font-weight:800 !important;
+  border-bottom:1.5px solid #fce7f3 !important; border-radius:0 !important;
+  color:var(--prune-clair) !important; font-size:16px !important; font-weight:800 !important;
   padding:4px 0 10px !important; display:flex !important; align-items:center !important;
   justify-content:flex-start !important; text-align:left !important;
 }
@@ -283,11 +284,11 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:#cbd5e1 !
 .st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
 
 [data-testid="stHorizontalBlock"]:has(.line){
-  border-bottom:1px solid #262f45; align-items:center !important; gap:6px !important;
+  border-bottom:1px solid #fef2f8; align-items:center !important; gap:6px !important;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button{
   background:transparent !important; border:none !important; box-shadow:none !important;
-  color:#60a5fa !important; padding:6px 0 !important; font-size:14.5px !important;
+  color:#be185d !important; padding:6px 0 !important; font-size:14.5px !important;
   opacity:.5; transition:opacity .15s ease;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button:hover{opacity:1;}
@@ -608,10 +609,10 @@ def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
                         continue
                     if nb:
                         styles.append(f".st-key-{cle} button{{background:linear-gradient("
-                                      f"135deg,#1e293b,#334155) !important;color:#38bdf8 !important;}}")
+                                      f"135deg,#fce7f3,#fae8ff) !important;color:#9d174d !important;}}")
                     if jour == aujourd:
-                        styles.append(f".st-key-{cle} button{{border:1px solid #3b82f6 !important;"
-                                      f"color:#38bdf8 !important;}}")
+                        styles.append(f".st-key-{cle} button{{border:1.5px solid #db2777 !important;"
+                                      f"color:#db2777 !important;}}")
     if styles:
         st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
     return choisi
@@ -672,7 +673,7 @@ if not st.session_state["creds_json"]:
                 st.session_state["creds_json"] = brut
                 get_doc(brut)
             st.session_state.pop("db", None)
-            st.toast("Connexion réussie ⚡", icon="✨")
+            st.toast("Connexion réussie 💖", icon="✨")
             st.rerun()
         except Exception as err:
             st.session_state["creds_json"] = None
@@ -744,7 +745,7 @@ if page_cle == "accueil":
 
     # 2. À FAIRE
     with conteneur("carte-taches"):
-        entete_bloc("⚡ À faire", len(actives) or None)
+        entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
             for idx, nom in actives[:6]:
                 clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
@@ -779,7 +780,7 @@ if page_cle == "accueil":
     with conteneur("carte-aujourdhui"):
         entete_bloc("📅 Aujourd'hui", len(evts_jour) + len(repas_jour) or None)
         if not evts_jour and not repas_jour:
-            st.markdown("<div class='today-none'>Journée libre ⚡</div>", unsafe_allow_html=True)
+            st.markdown("<div class='today-none'>Journée libre 🌸</div>", unsafe_allow_html=True)
         for jd, h, ti, desc, idx in evts_jour:
             detail = f"<br><span class='q'>{desc}</span>" if desc else ""
             if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}", [("🗑️", f"acc_ev_{idx}")]):
@@ -829,7 +830,7 @@ if page_cle == "accueil":
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
     ecart = (total_l - total_a) / 2
-    qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés ⚡"
+    qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés 💖"
     st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>", unsafe_allow_html=True)
 
     # 6. RÉGLAGES & ACCÈS DISCRET LABO IA
@@ -905,7 +906,7 @@ elif page_cle == "maison":
 
     if onglet_m == ONGLETS_M[0]:
         courses = rows("Courses")
-        titre("⚡ Articles habituels")
+        titre("💖 Articles habituels")
         rayon_memo = pills("memo_rayon", RAYONS[:-1], cols=2)
         deja = {pad(r, 3)[0].strip().lower() for _, r in courses}
         mc1, mc2 = st.columns(2)
