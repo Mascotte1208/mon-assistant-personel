@@ -262,6 +262,40 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- MÉMOIRE DES ARTICLES HABITUELS (BASÉE SUR LES TICKETS) ---
+MEMOIRE_COURSES = [
+    {"article": "Tomates cerises", "qte": "1 bte", "rayon": "Fruits & Légumes"},
+    {"article": "Avocats", "qte": "2", "rayon": "Fruits & Légumes"},
+    {"article": "Concombre", "qte": "1", "rayon": "Fruits & Légumes"},
+    {"article": "Salade / Roquette", "qte": "1 sachet", "rayon": "Fruits & Légumes"},
+    {"article": "Oignons", "qte": "1 sachet", "rayon": "Fruits & Légumes"},
+    {"article": "Ail", "qte": "1 tte", "rayon": "Fruits & Légumes"},
+    {"article": "Courgettes", "qte": "2", "rayon": "Fruits & Légumes"},
+    {"article": "Citrons", "qte": "2", "rayon": "Fruits & Légumes"},
+    {"article": "Œufs frais", "qte": "1 bte", "rayon": "Frais"},
+    {"article": "Lait sans lactose / Demi-écrémé", "qte": "1 L", "rayon": "Frais"},
+    {"article": "Beurre doux", "qte": "1 plq", "rayon": "Frais"},
+    {"article": "Gouda / Fromage tranché", "qte": "1 pqt", "rayon": "Frais"},
+    {"article": "Feta ou Mozzarella / Burrata", "qte": "1", "rayon": "Frais"},
+    {"article": "Escalopes ou Nuggets vegan", "qte": "1 pqt", "rayon": "Frais"},
+    {"article": "Saumon fumé", "qte": "1 pqt", "rayon": "Frais"},
+    {"article": "Thon en boîte", "qte": "1 bte", "rayon": "Frais"},
+    {"article": "Yaourts nature / grecs", "qte": "4 pot", "rayon": "Frais"},
+    {"article": "Pain / Baguette tradition", "qte": "1", "rayon": "Boulangerie"},
+    {"article": "Sandwichs / Pains panini", "qte": "2", "rayon": "Boulangerie"},
+    {"article": "Pâtes / Tortellini", "qte": "1 sachet", "rayon": "Supermarché"},
+    {"article": "Riz basmati", "qte": "1 pqt", "rayon": "Supermarché"},
+    {"article": "Café moulu / Capsules", "qte": "1 pqt", "rayon": "Supermarché"},
+    {"article": "Sirop de menthe", "qte": "1 btl", "rayon": "Boissons"},
+    {"article": "Jus d'orange / Mandarine", "qte": "1 btl", "rayon": "Boissons"},
+    {"article": "Huile d'olive", "qte": "1 btl", "rayon": "Supermarché"},
+    {"article": "Sel & Poivre / Épices", "qte": "1", "rayon": "Supermarché"},
+    {"article": "Papier toilette", "qte": "1 pqt", "rayon": "Entretien"},
+    {"article": "Liquide vaisselle", "qte": "1 btl", "rayon": "Entretien"},
+    {"article": "Éponges", "qte": "1 pqt", "rayon": "Entretien"},
+    {"article": "Sacs poubelle", "qte": "1 rlx", "rayon": "Entretien"}
+]
+
 # --- FONCTIONS CACHE MÉMOIRE OPTIMISTIC ---
 def get_gspread_client(json_str):
     creds_dict = json.loads(json_str)
@@ -279,7 +313,6 @@ def get_data(sheet_name):
                 client = get_gspread_client(st.session_state["json_credentials_str"])
                 ws = client.open("MonAssistantData").worksheet(sheet_name)
                 all_vals = ws.get_all_values()
-                # Si la feuille est vide ou ne contient que l'en-tête
                 st.session_state[f"data_{sheet_name}"] = all_vals
             except Exception:
                 st.session_state[f"data_{sheet_name}"] = []
@@ -411,7 +444,6 @@ with tab_dash:
         nb_courses = max(0, len(courses_vals) - 1)
         nb_cand = max(0, len(cand_vals) - 1)
 
-        # Calcul budget
         total_lucas, total_alex = 0.0, 0.0
         for r in (budget_vals[1:] if len(budget_vals) > 1 else []):
             payer = r[1] if len(r) > 1 else ""
@@ -557,7 +589,6 @@ with tab_quotidien:
                     events_by_date[d_key].append(titre_ev)
 
             st.markdown(f"#### 🗓️ Calendrier - {mois_fr[today.month - 1]} {today.year}")
-            
             num_days = calendar.monthrange(today.year, today.month)[1]
             
             for day_num in range(1, num_days + 1):
@@ -584,7 +615,6 @@ with tab_quotidien:
                 """, unsafe_allow_html=True)
 
             st.divider()
-
             if agenda_events_data:
                 for idx, row in enumerate(agenda_events_data):
                     date_ev, heure_ev, titre_ev, desc_ev = (row + ["", "", "", ""])[:4]
@@ -608,10 +638,29 @@ with tab_quotidien:
                     st.rerun()
 
         with sub_tab3:
-            st.subheader("🛒 Liste de Courses")
+            st.subheader("🛒 Liste de Courses & Mémoire")
             
+            # --- SECTION SÉLECTION DEPUIS LA MÉMOIRE DES TICKETS ---
+            with st.expander("🧠 Piocher dans ma mémoire d'habitudes (Tickets)"):
+                article_noms = [item["article"] for item in MEMOIRE_COURSES]
+                selected_memo_articles = st.multiselect("Sélectionnez un ou plusieurs articles mémorisés à ajouter :", article_noms)
+                
+                if st.button("➕ Ajouter les articles sélectionnés à ma liste"):
+                    if selected_memo_articles:
+                        for sel_name in selected_memo_articles:
+                            # Retrouver les infos correspondantes dans la mémoire
+                            match = next((m for m in MEMOIRE_COURSES if m["article"] == sel_name), None)
+                            if match:
+                                append_row_fast("Courses", [match["article"], match["qte"], match["rayon"]])
+                        st.success("Articles ajoutés un par un à votre liste !")
+                        st.rerun()
+                    else:
+                        st.warning("Veuillez sélectionner au moins un article.")
+
+            st.divider()
+            st.markdown("#### 📋 Votre Liste Active")
+
             all_vals = get_data("Courses")
-            # Afficher directement toutes les lignes présentes (ou ignorer l'en-tête s'il s'appelle exactement "Article")
             courses_data = []
             if len(all_vals) > 0:
                 if all_vals[0][0].lower() in ["article", "tache", "produit"]:
@@ -629,14 +678,15 @@ with tab_quotidien:
                         if st.button("✔️ Acquis", key=f"c_del_{real_idx}"):
                             delete_row_fast("Courses", real_idx)
                             st.rerun()
-            else: st.info("Liste de courses vide.")
+            else: st.info("Votre liste de courses active est vide.")
 
             st.divider()
             with st.form("form_courses", clear_on_submit=True):
+                st.markdown("#### ➕ Ajouter un article personnalisé")
                 c_art = st.text_input("Article")
                 c_qte = st.text_input("Quantité", value="1")
                 c_cat = st.selectbox("Rayon", ["Supermarché", "Frais", "Boulangerie", "Fruits & Légumes", "Boissons", "Entretien", "Autre"])
-                if st.form_submit_button("Ajouter") and c_art:
+                if st.form_submit_button("Ajouter à la liste") and c_art:
                     append_row_fast("Courses", [c_art, c_qte, c_cat])
                     st.rerun()
 
@@ -934,7 +984,7 @@ with tab_loisirs:
         with sub_tab_l:
             st.subheader("🧳 Listes & Cadeaux")
             all_vals = get_data("Listes")
-            listes_data = all_vals[1:] if len(all_vals) > 1 else []
+            listes_data = all_vals[1:] if len(listes_data) > 1 else []
             cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
 
             filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_l]
@@ -957,3 +1007,4 @@ with tab_loisirs:
                 if st.form_submit_button("Ajouter") and l_elem:
                     append_row_fast("Listes", [l_cat, l_elem, l_notes])
                     st.rerun()
+                
