@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.8"
+VERSION = "2.9"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Grosses bulles / cartes flottantes bien lisibles)
+# 2. STYLE (Grosses bulles / cartes flottantes marquées)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -137,7 +137,7 @@ st.markdown("""
 
 :root{
   --rose:#ec4899; --rose-fonce:#db2777; --violet:#a855f7;
-  --prune:#4a044e; --prune-clair:#831843; --bord:#fbcfe8;
+  --prune:#4a044e; --prune-clair:#831843; --bord:#f472b6;
 }
 
 html, body, [class*="css"], .stApp{
@@ -154,27 +154,27 @@ html, body, [class*="css"], .stApp{
 .topbar{
   display:flex; justify-content:space-between; align-items:center; gap:10px;
   background:linear-gradient(135deg,#ec4899 0%,#a855f7 100%); color:#fff;
-  border-radius:20px; padding:13px 20px; margin-bottom:16px;
-  font-weight:800; font-size:14.5px; letter-spacing:-.2px;
-  box-shadow:0 12px 26px -8px rgba(219,39,119,.5);
+  border-radius:22px; padding:14px 20px; margin-bottom:18px;
+  font-weight:800; font-size:15px; letter-spacing:-.2px;
+  box-shadow:0 12px 28px -8px rgba(219,39,119,.5);
 }
 .topbar .d{font-weight:700; font-size:13px; opacity:.94; white-space:nowrap;}
 
-.st-key-navrow{margin-bottom:10px;}
+.st-key-navrow{margin-bottom:12px;}
 .st-key-navrow [data-testid="stHorizontalBlock"]{gap:8px !important;}
 .st-key-navrow button{font-size:13px !important; padding:11px 6px !important; border-radius:18px !important;}
 .st-key-navrow button p{font-size:13px !important; font-weight:800 !important;}
 
 .bloc-head{
   display:flex; justify-content:space-between; align-items:center; gap:8px;
-  padding:2px 0 10px; font-size:16px; font-weight:800; color:var(--prune-clair);
+  padding:2px 0 10px; font-size:16.5px; font-weight:800; color:var(--prune-clair);
 }
 .bloc-head .n{background:#fce7f3; color:var(--rose-fonce); border-radius:14px;
   padding:3px 12px; font-size:12px; font-weight:800;}
 
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
   border-radius:18px !important; font-weight:700 !important; font-size:14px !important;
-  padding:12px 16px !important; width:100%; border:1.5px solid var(--bord) !important;
+  padding:12px 16px !important; width:100%; border:2px solid #fbcfe8 !important;
   transition:transform .12s ease;
 }
 .stButton>button:active, .stFormSubmitButton>button:active{transform:scale(.97);}
@@ -192,14 +192,14 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
-/* Application des grosses bulles cosy (cartes flottantes) pour tout le dashboard */
+/* Vraies grosses bulles bien nettes et prononcées pour TOUTES les cartes du dashboard */
 [data-testid="stVerticalBlockBorderWrapper"]{
   background:#ffffff !important;
-  border:2px solid #fbcfe8 !important;
-  border-radius:28px !important;
-  padding:16px 20px 14px !important;
-  box-shadow:0 14px 32px rgba(236,72,153,.08) !important;
-  margin-bottom:16px !important;
+  border:2.5px solid #f472b6 !important;
+  border-radius:30px !important;
+  padding:18px 22px 16px !important;
+  box-shadow:0 16px 36px rgba(236,72,153,.12) !important;
+  margin-bottom:18px !important;
 }
 
 /* Style des métriques budget */
@@ -213,14 +213,14 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 }
 [data-testid="stMetric"] {
   background: #ffffff;
-  border: 2px solid #fbcfe8 !important;
-  border-radius: 22px;
-  padding: 14px 18px;
-  box-shadow: 0 10px 24px rgba(236,72,153,.07);
+  border: 2.5px solid #f472b6 !important;
+  border-radius: 24px;
+  padding: 16px 20px;
+  box-shadow: 0 12px 28px rgba(236,72,153,.1);
 }
 
 .jour-titre{font-size:14px; font-weight:800; color:#a21caf; padding:10px 0 6px;}
-.section{font-weight:800; font-size:16px; color:var(--prune-clair); margin:20px 0 8px;}
+.section{font-weight:800; font-size:16.5px; color:var(--prune-clair); margin:20px 0 8px;}
 
 /* Lignes aérées et confortables pour le pouce */
 .line{font-size:15px; font-weight:600; color:var(--prune); padding:11px 0;}
@@ -229,22 +229,22 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
 .tag{display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;
      background:#fce7f3; color:var(--rose-fonce); margin-left:6px; vertical-align:middle;}
-.rayon{font-size:13px; font-weight:800; color:#a21caf; background:#fae8ff;
+.rayon{font-size:13.5px; font-weight:800; color:#a21caf; background:#fae8ff;
        display:inline-block; padding:5px 12px; border-radius:14px; margin:14px 0 4px;}
 .empty{text-align:center; padding:24px 16px; border-radius:22px; background:#fff;
        border:2px dashed var(--bord); color:#9d174d; font-weight:600; font-size:14px;}
 .today-none{font-size:14px; color:#9d174d; font-weight:600; opacity:.75; padding:10px 0;}
 
-.note-box{background:linear-gradient(135deg,#fdf4ff 0%,#fae8ff 100%); border:2px dashed #e879f9;
-          border-radius:24px; padding:16px 22px; margin-bottom:16px; box-shadow:0 10px 24px rgba(168,85,247,.06);}
-.note-box .t{font-size:14px; font-weight:700; color:#9333ea; margin-bottom:6px;}
+.note-box{background:linear-gradient(135deg,#fdf4ff 0%,#fae8ff 100%); border:2.5px dashed #e879f9;
+          border-radius:26px; padding:18px 24px; margin-bottom:18px; box-shadow:0 12px 26px rgba(168,85,247,.08);}
+.note-box .t{font-size:14.5px; font-weight:700; color:#9333ea; margin-bottom:6px;}
 .note-box .c{font-size:15px; color:#581c87; font-weight:600;}
 
-.solde{border-radius:22px; padding:16px 20px; margin:14px 0; font-weight:700; font-size:15px;
-       background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:2px solid #f0abfc; color:#701a75;
+.solde{border-radius:24px; padding:18px 22px; margin:16px 0; font-weight:700; font-size:15.5px;
+       background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:2.5px solid #f0abfc; color:#701a75;
        display:flex; justify-content:space-between; align-items:center; gap:10px;
-       box-shadow:0 10px 24px rgba(168,85,247,.08);}
-.solde .m{font-size:18px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
+       box-shadow:0 12px 28px rgba(168,85,247,.1);}
+.solde .m{font-size:18.5px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
 
 .bandeau{border-radius:18px; padding:12px 16px; font-size:14px; font-weight:700; margin-bottom:12px;}
 .bandeau.info{background:#f5f3ff; border:1.5px solid #ddd6fe; color:#5b21b6;}
@@ -252,14 +252,14 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
 .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input, .stTimeInput input{
   color:var(--prune) !important; background:#fff !important; -webkit-text-fill-color:var(--prune) !important;
-  border-radius:18px !important; border:1.5px solid #f9a8d4 !important;
+  border-radius:18px !important; border:2px solid #f9a8d4 !important;
   padding:13px 18px !important; font-size:15px !important;
 }
-[data-baseweb="select"]>div{border-radius:18px !important; border:1.5px solid #f9a8d4 !important; background:#fff !important;}
+[data-baseweb="select"]>div{border-radius:18px !important; border:2px solid #f9a8d4 !important; background:#fff !important;}
 label p{font-weight:700 !important; font-size:14px !important; color:var(--prune-clair) !important;}
 
 .stTabs [data-baseweb="tab-list"]{gap:8px; background:rgba(255,255,255,.85); padding:8px;
-  border-radius:22px; border:2px solid var(--bord);}
+  border-radius:24px; border:2.5px solid #f472b6;}
 .stTabs [data-baseweb="tab"]{border-radius:16px; padding:9px 16px; font-weight:700; font-size:14px; color:var(--rose-fonce);}
 .stTabs [aria-selected="true"]{background:linear-gradient(135deg,#ec4899,#db2777); color:#fff !important;}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
@@ -289,11 +289,11 @@ label p{font-weight:700 !important; font-size:14px !important; color:var(--prune
 [class*="st-key-goto-"] button{
   background:transparent !important; border:none !important; box-shadow:none !important;
   border-bottom:2px solid #fce7f3 !important; border-radius:0 !important;
-  color:var(--prune-clair) !important; font-size:16px !important; font-weight:800 !important;
+  color:var(--prune-clair) !important; font-size:16.5px !important; font-weight:800 !important;
   padding:6px 0 12px !important; display:flex !important; align-items:center !important;
   justify-content:flex-start !important; text-align:left !important;
 }
-[class*="st-key-goto-"] button p{font-size:16px !important; font-weight:800 !important;}
+[class*="st-key-goto-"] button p{font-size:16.5px !important; font-weight:800 !important;}
 [class*="st-key-goto-"] button::after{content:"›"; margin-left:auto; font-size:22px; opacity:.45;}
 [class*="st-key-goto-"] button:hover::after{opacity:.9;}
 
@@ -589,7 +589,7 @@ def depuis(instant):
 # ==========================================================
 # 5. COMPOSANTS D'INTERFACE
 # ==========================================================
-def conteneur(cle=None, bordure=False):
+def conteneur(cle=None, bordure=True):
     try:
         return st.container(border=bordure, key=cle) if cle else st.container(border=bordure)
     except TypeError:
@@ -779,7 +779,7 @@ if page_cle == "accueil":
     repas_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
 
     # ================= 1. COURSES =================
-    with conteneur(bordure=True):
+    with conteneur("carte-courses"):
         entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
         if courses:
             montre = 0
@@ -802,7 +802,7 @@ if page_cle == "accueil":
             st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
 
     # ================= 2. À FAIRE =================
-    with conteneur(bordure=True):
+    with conteneur("carte-taches"):
         entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
             for idx, nom in actives[:6]:
@@ -838,7 +838,7 @@ if page_cle == "accueil":
                     st.rerun()
 
     # ================= 3. AUJOURD'HUI =================
-    with conteneur(bordure=True):
+    with conteneur("carte-aujourdhui"):
         entete_bloc("📅 Aujourd'hui", len(evts_jour) + len(repas_jour) or None)
         if not evts_jour and not repas_jour:
             if a_venir:
@@ -873,7 +873,7 @@ if page_cle == "accueil":
         st.session_state["dash_jour"] = ajd
     jour_sel = st.session_state["dash_jour"]
 
-    with conteneur("dash-cal", bordure=True):
+    with conteneur("dash-cal"):
         entete_bloc("🗓️ Notre mois", len(a_venir) or None)
         d_annee, d_mois = navigateur_mois("dash_ym", ajd, "dash")
         clic = grille_mois(d_annee, d_mois, par_jour, ajd, jour_sel)
