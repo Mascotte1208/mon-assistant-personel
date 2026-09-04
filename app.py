@@ -24,7 +24,7 @@ st.markdown("""
     </head>
 """, unsafe_allow_html=True)
 
-# --- STYLE CSS APPLI NATIVE ET VISIBILITÉ DU TEXTE ---
+# --- STYLE CSS DESIGN DASHBOARD PREMIUM ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -41,18 +41,40 @@ st.markdown("""
     header {visibility: hidden;}
 
     .block-container {
-        padding-top: 1.2rem !important;
+        padding-top: 1rem !important;
         padding-bottom: 4rem !important;
         max-width: 550px !important;
     }
 
+    /* En-tête / Bannière */
+    .welcome-banner {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        border-radius: 24px;
+        padding: 22px 20px;
+        color: white;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3);
+    }
+    .welcome-title {
+        font-size: 22px;
+        font-weight: 800;
+        margin: 0;
+    }
+    .welcome-sub {
+        font-size: 13px;
+        opacity: 0.9;
+        margin-top: 4px;
+        font-weight: 500;
+    }
+
+    /* Navigation Onglets */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
         background-color: #e2e8f0;
         padding: 6px;
         border-radius: 22px;
         overflow-x: auto;
-        margin-bottom: 16px;
+        margin-bottom: 18px;
         box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
     }
     .stTabs [data-baseweb="tab"] {
@@ -72,32 +94,62 @@ st.markdown("""
         box-shadow: 0 4px 16px rgba(79, 70, 229, 0.18);
     }
 
-    .widget-card {
+    /* Cartes Métriques Premium */
+    .card-purple {
         background: #ffffff;
-        border: 1px solid #f1f5f9;
-        border-radius: 22px;
-        padding: 18px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e0e7ff;
+        border-left: 6px solid #6366f1;
+        border-radius: 20px;
+        padding: 16px 18px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
         margin-bottom: 12px;
     }
-    .widget-title {
+    .card-emerald {
+        background: #ffffff;
+        border: 1px solid #d1fae5;
+        border-left: 6px solid #10b981;
+        border-radius: 20px;
+        padding: 16px 18px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+        margin-bottom: 12px;
+    }
+    .card-amber {
+        background: #ffffff;
+        border: 1px solid #fef3c7;
+        border-left: 6px solid #f59e0b;
+        border-radius: 20px;
+        padding: 16px 18px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+        margin-bottom: 12px;
+    }
+    .card-sky {
+        background: #ffffff;
+        border: 1px solid #e0f2fe;
+        border-left: 6px solid #0284c7;
+        border-radius: 20px;
+        padding: 16px 18px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.03);
+        margin-bottom: 12px;
+    }
+
+    .card-head {
         font-size: 11px;
         font-weight: 800;
-        color: #94a3b8;
+        color: #64748b;
         text-transform: uppercase;
-        letter-spacing: 0.9px;
+        letter-spacing: 0.8px;
     }
-    .widget-value {
+    .card-num {
         font-size: 26px;
         font-weight: 800;
         color: #0f172a;
         margin-top: 2px;
     }
-    .widget-sub {
+    .card-foot {
         font-size: 12px;
         font-weight: 600;
-        color: #6366f1;
-        margin-top: 2px;
+        color: #475569;
+        margin-top: 4px;
     }
 
     .badge-tag {
@@ -121,6 +173,7 @@ st.markdown("""
         box-shadow: 0 4px 16px rgba(99, 102, 241, 0.28);
     }
 
+    /* Correctif de visibilité pour les champs texte */
     .stTextInput input, .stTextArea textarea, .stSelectbox select {
         color: #0f172a !important;
         background-color: #ffffff !important;
@@ -130,23 +183,10 @@ st.markdown("""
         padding: 12px 16px !important;
         font-size: 16px !important;
     }
-    .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: #6366f1 !important;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
-    }
-
-    .streamlit-expanderHeader {
-        background-color: #ffffff !important;
-        border-radius: 18px !important;
-        border: 1px solid #f1f5f9 !important;
-        font-weight: 700 !important;
-        color: #1e293b !important;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- FONCTIONS DE CONNEXION ET DE GESTION DU CACHE MÉMOIRE ---
+# --- FONCTIONS CACHE MÉMOIRE OPTIMISTIC ---
 def get_gspread_client(json_str):
     creds_dict = json.loads(json_str)
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -188,7 +228,6 @@ def delete_row_fast(sheet_name, index):
         if st.session_state.get("json_credentials_str"):
             try:
                 client = get_gspread_client(st.session_state["json_credentials_str"])
-                # +1 car gspread commence à 1 (les entêtes sont à la ligne 1)
                 client.open("MonAssistantData").worksheet(sheet_name).delete_rows(index + 1)
             except Exception:
                 pass
@@ -209,9 +248,13 @@ def update_cell_fast(sheet_name, row_idx, col_idx, value):
 if "json_credentials_str" not in st.session_state:
     st.session_state["json_credentials_str"] = None
 
-# --- EN-TÊTE PRINCIPAL ---
-st.markdown("<h1 style='text-align: center; font-weight: 800; color: #0f172a; margin-bottom: 0px;'>✨ Notre Espace</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 13px; font-weight: 600; color: #64748b; margin-top: 4px; margin-bottom: 20px;'>Tableau de bord partagé — <b>Lucas & Alex</b></p>", unsafe_allow_html=True)
+# --- BANNIÈRE D'ACCUEIL ---
+st.markdown("""
+    <div class="welcome-banner">
+        <div class="welcome-title">✨ Bienvenue Lucas & Alex</div>
+        <div class="welcome-sub">Votre tableau de bord synchro au quotidien</div>
+    </div>
+""", unsafe_allow_html=True)
 
 # --- NAVIGATION RESTRUCTURÉE ---
 tab_dash, tab_quotidien, tab_budget_adv, tab_pro, tab_loisirs = st.tabs([
@@ -219,7 +262,7 @@ tab_dash, tab_quotidien, tab_budget_adv, tab_pro, tab_loisirs = st.tabs([
 ])
 
 # ==========================================
-# SUPER-ONGLET 1 : DASHBOARD VISUEL
+# SUPER-ONGLET 1 : DASHBOARD DESIGN
 # ==========================================
 with tab_dash:
     if not st.session_state["json_credentials_str"]:
@@ -269,56 +312,68 @@ with tab_dash:
         nb_courses = max(0, len(courses_vals) - 1)
         nb_cand = max(0, len(cand_vals) - 1)
 
-        st.markdown("<h4 style='font-weight: 800; color: #1e293b; margin-bottom: 12px;'>⚡ Aperçu Rapide</h4>", unsafe_allow_html=True)
+        # Calcul budget
+        total_lucas, total_alex = 0.0, 0.0
+        for r in (budget_vals[1:] if len(budget_vals) > 1 else []):
+            payer = r[1] if len(r) > 1 else ""
+            try: amt = float(r[3].replace(',', '.')) if len(r) > 3 else 0.0
+            except ValueError: amt = 0.0
+            if payer == "Lucas": total_lucas += amt
+            elif payer == "Alex": total_alex += amt
+        diff = (total_lucas - total_alex) / 2
+
+        st.markdown("<h4 style='font-weight: 800; color: #1e293b; margin-bottom: 14px;'>📊 Synthèse Générale</h4>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
             st.markdown(f'''
-                <div class="widget-card">
-                    <div class="widget-title">✅ Tâches</div>
-                    <div class="widget-value">{taches_faites} <span style="font-size:16px; color:#94a3b8;">/ {total_taches}</span></div>
-                    <div class="widget-sub">{"🎉 À jour !" if total_taches == taches_faites and total_taches > 0 else "En cours"}</div>
+                <div class="card-purple">
+                    <div class="card-head">✅ Tâches accomplies</div>
+                    <div class="card-num">{taches_faites} <span style="font-size:15px; color:#94a3b8;">/ {total_taches}</span></div>
+                    <div class="card-foot">{"🎉 Tout est réglé !" if total_taches == taches_faites and total_taches > 0 else "Actions en cours"}</div>
                 </div>
             ''', unsafe_allow_html=True)
             
             st.markdown(f'''
-                <div class="widget-card">
-                    <div class="widget-title">🛒 Courses</div>
-                    <div class="widget-value">{nb_courses}</div>
-                    <div class="widget-sub">Articles à acheter</div>
+                <div class="card-amber">
+                    <div class="card-head">🛒 En liste de courses</div>
+                    <div class="card-num">{nb_courses}</div>
+                    <div class="card-foot">Articles à acheter</div>
                 </div>
             ''', unsafe_allow_html=True)
 
         with c2:
             st.markdown(f'''
-                <div class="widget-card">
-                    <div class="widget-title">🎓 Candidatures</div>
-                    <div class="widget-value">{nb_cand}</div>
-                    <div class="widget-sub">Dossiers suivis</div>
+                <div class="card-emerald">
+                    <div class="card-head">💶 Solde des dépenses</div>
+                    <div class="card-num">{abs(diff):.2f} €</div>
+                    <div class="card-foot">{"Alex ➔ Lucas" if diff > 0 else ("Lucas ➔ Alex" if diff < 0 else "Comptes équilibrés")}</div>
                 </div>
             ''', unsafe_allow_html=True)
-            
-            total_lucas, total_alex = 0.0, 0.0
-            for r in (budget_vals[1:] if len(budget_vals) > 1 else []):
-                payer = r[1] if len(r) > 1 else ""
-                try: amt = float(r[3].replace(',', '.')) if len(r) > 3 else 0.0
-                except ValueError: amt = 0.0
-                if payer == "Lucas": total_lucas += amt
-                elif payer == "Alex": total_alex += amt
-            diff = (total_lucas - total_alex) / 2
-            
+
             st.markdown(f'''
-                <div class="widget-card">
-                    <div class="widget-title">💶 Équilibre</div>
-                    <div class="widget-value">{abs(diff):.2f} €</div>
-                    <div class="widget-sub">{"Alex ➔ Lucas" if diff > 0 else ("Lucas ➔ Alex" if diff < 0 else "Équilibré")}</div>
+                <div class="card-sky">
+                    <div class="card-head">🎓 Formations & Pro</div>
+                    <div class="card-num">{nb_cand}</div>
+                    <div class="card-foot">Dossiers suivis</div>
                 </div>
             ''', unsafe_allow_html=True)
+
+        # Aperçu rapide des événements à venir
+        st.divider()
+        st.markdown("<h4 style='font-weight: 800; color: #1e293b; margin-bottom: 10px;'>🗓️ Prochains RDV</h4>", unsafe_allow_html=True)
+        agenda_data = agenda_vals[1:] if len(agenda_vals) > 1 else []
+        if agenda_data:
+            for ev in agenda_data[:3]:
+                dt_e, hr_e, tit_e = (ev + ["", "", ""])[:3]
+                st.markdown(f"📌 **{dt_e}** {f'à {hr_e}' if hr_e else ''} — {tit_e}")
+        else:
+            st.info("Aucun rendez-vous prévu pour le moment.")
 
         st.divider()
         col_act1, col_act2 = st.columns(2)
         with col_act1:
-            if st.button("🔄 Forcer la re-synchronisation"):
+            if st.button("🔄 Re-synchroniser"):
                 for key in list(st.session_state.keys()):
                     if key.startswith("data_"):
                         del st.session_state[key]
@@ -340,7 +395,6 @@ with tab_quotidien:
     if json_str:
         sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda", "🛒 Courses", "🍽️ Repas"])
         
-        # --- TÂCHES ---
         with sub_tab1:
             st.subheader("✅ Tâches à faire")
             all_vals = get_data("Taches")
@@ -352,7 +406,7 @@ with tab_quotidien:
             if total_taches > 0:
                 st.progress(taches_faites / total_taches)
 
-            cat_filter = st.selectbox("🔍 Filtrer", ["Toutes", "Maison", "Admin", "Saiko", "Urgent", "Autre"])
+            cat_filter = st.selectbox("🔍 Filtrer par catégorie", ["Toutes", "Maison", "Admin", "Saiko", "Urgent", "Autre"])
             filtered = [t for t in taches_data if cat_filter == "Toutes" or (len(t) > 1 and t[1] == cat_filter)]
 
             if filtered:
@@ -378,7 +432,7 @@ with tab_quotidien:
                                 delete_row_fast("Taches", real_idx)
                                 st.rerun()
             else:
-                st.info("Aucune tâche.")
+                st.info("Aucune tâche dans cette catégorie.")
 
             st.divider()
             with st.form("form_tache", clear_on_submit=True):
@@ -389,7 +443,6 @@ with tab_quotidien:
                     append_row_fast("Taches", [n_tache, n_cat, "À faire"])
                     st.rerun()
 
-        # --- AGENDA ---
         with sub_tab2:
             st.subheader("📅 Agenda")
             all_vals = get_data("Agenda")
@@ -417,7 +470,6 @@ with tab_quotidien:
                     append_row_fast("Agenda", [str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
                     st.rerun()
 
-        # --- COURSES ---
         with sub_tab3:
             st.subheader("🛒 Liste de Courses")
             all_vals = get_data("Courses")
@@ -444,7 +496,6 @@ with tab_quotidien:
                     append_row_fast("Courses", [c_art, c_qte, c_cat])
                     st.rerun()
 
-        # --- REPAS ---
         with sub_tab4:
             st.subheader("🍽️ Planning des Repas")
             all_vals = get_data("Repas")
@@ -624,7 +675,6 @@ with tab_loisirs:
     if json_str:
         sub_tab_s, sub_tab_r, sub_tab_n, sub_tab_a, sub_tab_l = st.tabs(["🐶 Saiko", "🍲 Recettes", "📝 Notes", "🏡 Admin", "🧳 Listes"])
 
-        # --- SAIKO ---
         with sub_tab_s:
             st.subheader("🐶 Espace Saiko")
             all_vals = get_data("Saiko")
@@ -650,7 +700,6 @@ with tab_loisirs:
                     append_row_fast("Saiko", [str(s_date), s_type, s_sujet, s_notes])
                     st.rerun()
 
-        # --- RECETTES ---
         with sub_tab_r:
             st.subheader("🍲 Recettes de Cuisine")
             all_vals = get_data("Recettes")
@@ -688,7 +737,6 @@ with tab_loisirs:
                     append_row_fast("Recettes", [r_titre, r_ing, r_inst])
                     st.rerun()
 
-        # --- NOTES ---
         with sub_tab_n:
             st.subheader("📝 Notes Partagées")
             all_vals = get_data("Notes")
@@ -715,7 +763,6 @@ with tab_loisirs:
                     append_row_fast("Notes", [n_titre, n_contenu])
                     st.rerun()
 
-        # --- ADMIN ---
         with sub_tab_a:
             st.subheader("🏡 Logement & Admin")
             all_vals = get_data("Admin")
@@ -740,7 +787,6 @@ with tab_loisirs:
                     append_row_fast("Admin", [a_sujet, a_echeance, a_details])
                     st.rerun()
 
-        # --- LISTES ---
         with sub_tab_l:
             st.subheader("🧳 Listes & Cadeaux")
             all_vals = get_data("Listes")
