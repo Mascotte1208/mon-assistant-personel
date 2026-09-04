@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.39"
+VERSION = "2.40"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -558,11 +558,16 @@ def depuis(instant):
         return f"il y a {int(secondes // 60)} min"
     return f"il y a {int(secondes // 3600)} h"
 
-@st.cache_data(ttl=120, show_spinner=False)
-def fetch_market_history(tickers_list, period="1mo"):
+@st.cache_data(ttl=60, show_spinner=False)
+def fetch_market_history(tickers_list, period="1d"):
     try:
         import yfinance as yf
-        data = yf.download(tickers_list, period=period, progress=False)
+        # Adapter l'intervalle selon la période courte (minutes) ou longue (jours)
+        interval = "1m" if period in ["1d", "5d"] else ("15m" if period == "1mo" else "1d")
+        if period in ["6mo", "1y"]:
+            interval = "1d"
+            
+        data = yf.download(tickers_list, period=period, interval=interval, progress=False)
         if 'Close' in data:
             df_close = data['Close']
             if isinstance(df_close, pd.Series):
@@ -996,13 +1001,36 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
     if onglet_ia == ONGLETS_IA[0]:
         st.caption("Espace dédié à l'enregistrement de tes apprentissages, priorités et gestion des dangers.")
 
-        ialab_sujet = st.text_input("Sujet / Domaine", placeholder="Ex: Électricité - Câblage / Frigoriste / Stratégie Priorités")
+        # Raccourcis pour intégrer des règles de trading court terme dans le Labo
+        regles_trading_preset = st.selectbox(
+            "⚡ Charger une règle d'investissement court terme classique",
+            [
+                "Personnalisé",
+                "Règle 1 : Breakout / Cassure de résistance (Achat sur cassure de plus haut avec volume)",
+                "Règle 2 : Pullback sur Moyenne Mobile (Achat sur rebond EMA 20 en tendance)",
+                "Règle 3 : RSI de Survente / Surachat (Achat si RSI < 30, Vente/Allègement si RSI > 70)",
+                "Règle 4 : DCA Intraday / Minute (Lissage automatique des points d'entrée en minute)"
+            ]
+        )
+        
+        def_sujet = "Trading Court Terme" if regles_trading_preset != "Personnalisé" else ""
+        def_contenu = ""
+        if "Règle 1" in regles_trading_preset:
+            def_contenu = "Stratégie Breakout : Attendre la cassure franche d'un range horizontal en données 1m/5m avec volume x2. Stop-loss serré sous le support."
+        elif "Règle 2" in regles_trading_preset:
+            def_contenu = "Pullback EMA 20 : En tendance haussière forte (minutes), acheter lorsque le prix revient tester la moyenne mobile exponentielle à 20 périodes."
+        elif "Règle 3" in regles_trading_preset:
+            def_contenu = "RSI Court Terme (14) : Entrée en position acheteuse si le RSI en unités courtes descend sous 30 (rebond technique probable)."
+        elif "Règle 4" in regles_trading_preset:
+            def_contenu = "DCA Minute : Diviser son capital en 5 parts égales et placer des ordres automatisés toutes les 5 minutes lors des fortes volatilités."
+
+        ialab_sujet = st.text_input("Sujet / Domaine", value=def_sujet, placeholder="Ex: Stratégie Breakout / DCA Court Terme")
         ialab_type = pills("ialab_type_pills", ["Apprentissage / Note", "Règle de Priorité", "Sécurité & Dangers"], cols=3)
-        ialab_contenu = st.text_area("Notes de synthèse ou Consigne pour l'IA", height=130, placeholder="Détaille tes notes ici…")
+        ialab_contenu = st.text_area("Notes de synthèse ou Consigne pour l'IA", value=def_contenu, height=130, placeholder="Détaille tes notes ici…")
 
         if st.button("Enregistrer dans la base IA", type="primary", key="btn_save_ialab") and ialab_sujet.strip():
             add_row("IA_Lab", [str(ajd), ialab_sujet.strip(), ialab_contenu.strip(), ialab_type])
-            st.toast("Contexte enregistré pour l'IA 🚀", icon="✅")
+            st.toast("Règle enregistrée pour l'IA 🚀", icon="✅")
             st.rerun()
 
         st.divider()
@@ -1020,7 +1048,7 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
             vide("Aucune note enregistrée pour le moment.")
 
     elif onglet_ia == ONGLETS_IA[1]:
-        st.caption("Dashboard de comparaison des marchés financiers en direct (Style UI épuré).")
+        st.caption("Dashboard de comparaison des marchés financiers (Vue Prix réels ou Base 100 en Minutes/Mois).")
 
         dictionnaire_actifs = {
             "Or (Gold)": "GC=F",
@@ -1033,13 +1061,23 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
             "Microsoft": "MSFT"
         }
 
-        selection_actifs_noms = st.multiselect(
-            "Sélectionner les actifs à comparer",
-            options=list(dictionnaire_actifs.keys()),
-            default=["Or (Gold)", "Bitcoin", "Apple"]
-        )
+        col_sel1, col_sel2 = st.columns([2, 1])
+        with col_sel1:
+            selection_actifs_noms = st.multiselect(
+                "Sélectionner les actifs à comparer",
+                options=list(dictionnaire_actifs.keys()),
+                default=["Or (Gold)", "Bitcoin"]
+            )
+        with col_sel2:
+            # Ajout des vues en minutes (1d, 5d) et mois
+            periode_choisie = pills("market_period", ["1d", "5d", "1mo", "6mo"], defaut="1d", cols=2)
 
-        periode_choisie = pills("market_period", ["1mo", "3mo", "6mo", "1y"], defaut="1mo", cols=4)
+        # Option d'affichage : Prix Réels ou Base 100 (pour comparer Or à 4000$ et BTC à 70000$)
+        mode_affichage = st.radio(
+            "Mode d'affichage du graphique",
+            ["Base 100 (Comparaison relative en %)", "Prix réels en dollars ($)"],
+            horizontal=True
+        )
 
         if selection_actifs_noms:
             tickers_a_charger = [dictionnaire_actifs[nom] for nom in selection_actifs_noms]
@@ -1047,7 +1085,7 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
             df_hist, err = fetch_market_history(tickers_a_charger, period=periode_choisie)
 
             if err:
-                st.warning(f"Erreur de chargement des marchés : {err}. Vérifiez que 'yfinance' est installé.")
+                st.warning(f"Erreur de chargement des marchés : {err}.")
             elif df_hist is not None and not df_hist.empty:
                 cols_kpi = st.columns(len(selection_actifs_noms))
                 for idx, nom in enumerate(selection_actifs_noms):
@@ -1064,7 +1102,7 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                             st.metric(label=nom, value="N/A")
 
                 st.divider()
-                titre("📊 Graphique comparatif des cours")
+                titre("📊 Graphique comparatif (Minutes & Évolution)")
                 
                 try:
                     if isinstance(df_hist.columns, pd.MultiIndex):
@@ -1072,15 +1110,22 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                     else:
                         df_close = df_hist
 
-                    st.line_chart(df_close)
+                    # Si l'utilisateur choisit la Base 100, on normalise chaque actif par sa valeur initiale
+                    if "Base 100" in mode_affichage:
+                        df_plot = df_close.apply(lambda x: (x / x.dropna().iloc[0]) * 100 if not x.dropna().empty else x)
+                        st.caption("ℹ️ Normalisation Base 100 : Tous les actifs partent de 100 au début de la période pour comparer leur performance en % net.")
+                    else:
+                        df_plot = df_close
+
+                    st.line_chart(df_plot)
                 except Exception as e:
                     st.info(f"Affichage du graphique indisponible : {e}")
 
                 st.divider()
                 titre("🔍 Enregistrer une analyse croisée")
-                note_comparaison = st.text_area("Notes de synthèse ou stratégie DCA multi-actifs", placeholder="Ex: Comparaison Or vs Bitcoin sur la période, arbitrage en cours...")
+                note_comparaison = st.text_area("Notes de synthèse ou stratégie DCA multi-actifs", placeholder="Ex: Suivi du breakout en 5 minutes sur le Bitcoin vs Or...")
                 if st.button("Enregistrer l'analyse comparative", type="primary", key="btn_save_multi_market") and note_comparaison.strip():
-                    contenu_txt = f"Actifs comparés : {', '.join(selection_actifs_noms)} | Période : {periode_choisie}\nAnalyse : {note_comparaison}"
+                    contenu_txt = f"Actifs : {', '.join(selection_actifs_noms)} | Période : {periode_choisie} | Mode : {mode_affichage}\nAnalyse : {note_comparaison}"
                     add_row("IA_Lab", [str(ajd), "Analyse Comparative Marchés", contenu_txt, "Analyse Technique / Tendance"])
                     st.toast("Analyse comparative enregistrée avec succès ! 📈", icon="✅")
                     st.rerun()
