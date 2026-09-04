@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.9"
+VERSION = "2.10"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Grosses bulles / cartes flottantes marquées)
+# 2. STYLE (Forçage brut des bulles et cartes sur mobile)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -192,14 +192,14 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
-/* Vraies grosses bulles bien nettes et prononcées pour TOUTES les cartes du dashboard */
-[data-testid="stVerticalBlockBorderWrapper"]{
-  background:#ffffff !important;
-  border:2.5px solid #f472b6 !important;
-  border-radius:30px !important;
-  padding:18px 22px 16px !important;
-  box-shadow:0 16px 36px rgba(236,72,153,.12) !important;
-  margin-bottom:18px !important;
+/* CORRECTION MOBILE : Force Streamlit à afficher les bordures et fonds blancs sur téléphone */
+[data-testid="stVerticalBlockBorderWrapper"], div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+  background: #ffffff !important;
+  border: 2.5px solid #f472b6 !important;
+  border-radius: 30px !important;
+  padding: 18px 22px 16px !important;
+  box-shadow: 0 16px 36px rgba(236, 72, 153, 0.12) !important;
+  margin-bottom: 18px !important;
 }
 
 /* Style des métriques budget */
@@ -682,7 +682,7 @@ def bandeaux():
         c1, c2 = st.columns([3, 1])
         with c1:
             st.markdown(f"<div class='bandeau warn'>⏳ {en_attente} modification(s) en attente "
-                        f"d'envoi vers Google</div>", unsafe_allow_html=True)
+                        f"d'envoi προς Google</div>", unsafe_allow_html=True)
         with c2:
             if st.button("Réessayer", key="retry_sync"):
                 vider_file()
