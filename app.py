@@ -4,7 +4,6 @@ import gspread
 from google.oauth2.service_account import Credentials
 import json
 from datetime import datetime, date
-import calendar
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
@@ -540,9 +539,9 @@ with tab_quotidien:
                     st.rerun()
 
         with sub_tab2:
-            st.subheader("📅 Agenda & Vue Mois")
+            st.subheader("📅 Agenda & Vue Mois Mobile")
             
-            # --- INDEXATION DES ÉVÉNEMENTS DE L'AGENDA PAR DATE (YYYY-MM-DD) ---
+            # --- INDEXATION DES ÉVÉNEMENTS ---
             all_agenda_vals = get_data("Agenda")
             agenda_events_data = all_agenda_vals[1:] if len(all_agenda_vals) > 1 else []
             
@@ -555,37 +554,25 @@ with tab_quotidien:
                         events_by_date[d_key] = []
                     events_by_date[d_key].append(titre_ev)
 
-            # --- VUE CALENDRIER DU MOIS AVEC ÉVÉNEMENTS ---
-            st.markdown(f"#### 🗓️ Calendrier - {mois_fr[today.month - 1]} {today.year}")
-            cal = calendar.monthcalendar(today.year, today.month)
-            cols = st.columns(7)
-            jours_court = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
-            for i, h in enumerate(jours_court):
-                cols[i].caption(f"**{h}**")
+            # --- VUE CHRONOLOGIQUE MOBILE DU MOIS (PARFAIT POUR SMARTPHONE) ---
+            st.markdown(f"#### 🗓️ Événements de {mois_fr[today.month - 1]} {today.year}")
             
-            for week in cal:
-                cols_w = st.columns(7)
-                for i, day_num in enumerate(week):
-                    if day_num != 0:
-                        # Construire la date au format YYYY-MM-DD pour la correspondance
-                        current_date_str = f"{today.year}-{today.month:02d}-{day_num:02d}"
-                        has_events = current_date_str in events_by_date
-                        
-                        if day_num == today.day:
-                            cell_text = f"🔵 **{day_num}**"
-                        elif has_events:
-                            cell_text = f"🟠 **{day_num}**"
-                        else:
-                            cell_text = f"{day_num}"
-                            
-                        # Affichage dans la case
-                        if has_events:
-                            ev_list_str = "<br>".join([f"<small style='color:#4338ca; font-weight:700;'>• {t}</small>" for t in events_by_date[current_date_str]])
-                            cols_w[i].markdown(f"{cell_text}<br>{ev_list_str}", unsafe_allow_html=True)
-                        else:
-                            cols_w[i].write(cell_text)
-                    else:
-                        cols_w[i].write(" ")
+            # Afficher uniquement les jours du mois en cours qui contiennent un événement ou aujourd'hui
+            import calendar
+            num_days = calendar.monthrange(today.year, today.month)[1]
+            
+            has_month_events = False
+            for day_num in range(1, num_days + 1):
+                d_str = f"{today.year}-{today.month:02d}-{day_num:02d}"
+                if d_str in events_by_date:
+                    has_month_events = True
+                    evs_str = ", ".join(events_by_date[d_str])
+                    is_today = " (Aujourd'hui)" if day_num == today.day else ""
+                    st.markdown(f"📌 **Jour {day_num}{is_today}** : <span style='color:#4338ca; font-weight:700;'>{evs_str}</span>", unsafe_allow_html=True)
+            
+            if not has_month_events:
+                st.info("Aucun événement planifié ce mois-ci.")
+
             st.divider()
 
             if agenda_events_data:
@@ -597,7 +584,7 @@ with tab_quotidien:
                         if st.button("🗑️ Supprimer", key=f"ev_del_{real_idx}"):
                             delete_row_fast("Agenda", real_idx)
                             st.rerun()
-            else: st.info("Aucun événement.")
+            else: st.info("Aucun événement dans la base.")
 
             st.divider()
             with st.form("form_agenda", clear_on_submit=True):
