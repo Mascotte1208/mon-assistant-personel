@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.27"
+VERSION = "2.28"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -734,7 +734,7 @@ if page_cle == "accueil":
         entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
             for idx, nom in actives[:6]:
-                clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
+                clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx})"])
                 if clique == f"acc_tk_{idx}":
                     set_cell("Taches", idx, 2, "Fait")
                     st.rerun()
@@ -777,21 +777,8 @@ if page_cle == "accueil":
                 delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
 
-    # 3. COURSES (Version compacte / réduite sur le dashboard)
-    with conteneur("carte-courses"):
-        entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
-        if courses:
-            # Affichage compact : uniquement les 4 premiers articles pour ne pas encombrer le dashboard
-            A_AFFICHER = 4
-            for idx, r in courses[:A_AFFICHER]:
-                art, qte, rayon = pad(r, 3)
-                if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
-                    delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
-                    st.rerun()
-            if len(courses) > A_AFFICHER:
-                st.caption(f"Et {len(courses) - A_AFFICHER} autre(s) article(s)... (cliquez sur le titre ci-dessus pour tout voir)")
-        else:
-            st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
+    # 3. COURSES (Uniquement la redirection, sans liste d'articles)
+    entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
 
     # 4. LE MOIS
     if "dash_jour" not in st.session_state:
@@ -968,7 +955,7 @@ elif page_cle == "maison":
             st.caption("Un ingrédient par ligne : « 200 g de farine ». Le panier saura les relire.")
             r_titre = st.text_input("Nom")
             r_ing = st.text_area("Ingrédients", height=90)
-            r_inst = st.text_area("Prép.")
+            r_inst = st.text_area("Préparation", height=110)
             if st.form_submit_button("Enregistrer la recette", type="primary") and r_titre.strip():
                 add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
                 st.rerun()
