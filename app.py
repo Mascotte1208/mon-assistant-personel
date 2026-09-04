@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.1"
+VERSION = "2.2"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -60,12 +60,10 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
         "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 PERSONNES = ["Lucas", "Alex"]
 
-ONGLETS_Q = ["✅ Tâches", "🛒 Courses"]
-ONGLETS_M = ["🍲 Recettes", "📝 Notes"]
+ONGLETS_M = ["🛒 Courses", "🍲 Recettes", "📝 Notes"]
 
 PAGES = {
     "accueil": "🏠 Accueil",
-    "quotidien": "📋 Quotidien",
     "budget": "📊 Budget",
     "maison": "🐾 Maison",
 }
@@ -285,10 +283,10 @@ label p{font-weight:700 !important; font-size:13px !important; color:var(--prune
 [class*="st-key-goto-"] button::after{content:"›"; margin-left:auto; font-size:20px; opacity:.45;}
 [class*="st-key-goto-"] button:hover::after{opacity:.9;}
 
-.st-key-qtabs{margin-bottom:6px;}
-.st-key-qtabs [data-testid="stHorizontalBlock"]{gap:5px !important;}
-.st-key-qtabs button{font-size:12px !important; padding:9px 2px !important; border-radius:14px !important;}
-.st-key-qtabs button p{font-size:12px !important; font-weight:800 !important;}
+.st-key-mtabs{margin-bottom:6px;}
+.st-key-mtabs [data-testid="stHorizontalBlock"]{gap:5px !important;}
+.st-key-mtabs button{font-size:12px !important; padding:9px 2px !important; border-radius:14px !important;}
+.st-key-mtabs button p{font-size:12px !important; font-weight:800 !important;}
 
 [data-testid="stVerticalBlockBorderWrapper"]{padding:12px 18px 10px !important; margin-bottom:14px;}
 .bloc-head{border-bottom:1px solid #fce7f3; margin-bottom:2px; padding-bottom:8px;}
@@ -347,7 +345,7 @@ if not st.session_state["creds_json"]:
         pass
 
 # ==========================================================
-# 4. COUCHE DONNÉES
+# 4. Couche Données
 # ==========================================================
 @st.cache_resource(show_spinner=False)
 def get_client(json_str):
@@ -587,7 +585,7 @@ def depuis(instant):
     return f"il y a {int(secondes // 3600)} h"
 
 # ==========================================================
-# 5. COMPOSANTS D'INTERFACE
+# 5. Composants d'Interface
 # ==========================================================
 def conteneur(cle=None, bordure=False):
     try:
@@ -704,12 +702,12 @@ def entete_bloc(texte, compteur=None):
 def entete_lien(cle, texte, compteur, onglet):
     with conteneur(f"goto-{cle}"):
         if st.button(f"{texte}   ·   {compteur}", key=f"goto_{cle}"):
-            st.session_state["q_tab"] = onglet
-            st.query_params["p"] = "quotidien"
+            st.session_state["m_tab"] = onglet
+            st.query_params["p"] = "maison"
             st.rerun()
 
 # ==========================================================
-# 6. EN-TÊTE ET CONNEXION
+# 6. En-tête et Connexion
 # ==========================================================
 ajd = date.today()
 st.markdown(f"""
@@ -742,7 +740,7 @@ if st.session_state["ops"]:
     vider_file()
 
 # ==========================================================
-# 7. NAVIGATION
+# 7. Navigation
 # ==========================================================
 params = st.query_params
 page_cle = params.get("p", "accueil")
@@ -750,7 +748,7 @@ if page_cle not in PAGES:
     page_cle = "accueil"
 
 with conteneur("navrow"):
-    cols = st.columns(4)
+    cols = st.columns(3)
     for col, (cle, libelle) in zip(cols, PAGES.items()):
         with col:
             if st.button(libelle, key=f"nav_{cle}", type="primary" if page_cle == cle else "secondary"):
@@ -765,7 +763,7 @@ for ev in evenements:
     par_jour.setdefault(ev[0], []).append(ev)
 
 # ==========================================================
-# 8a. ACCUEIL
+# 8a. ACCUEIL (Dashboard)
 # ==========================================================
 if page_cle == "accueil":
     courses = rows("Courses")
@@ -779,30 +777,9 @@ if page_cle == "accueil":
     repas_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
     en_retard = len([t for t in actives if t[3] and t[3] < ajd])
 
-    # ================= 1. À FAIRE =================
+    # ================= 1. COURSES (Redirige vers Maison > Courses) =================
     with conteneur(bordure=True):
-        entete_lien("taches", "🌸 À faire", len(actives), ONGLETS_Q[0])
-        if en_retard:
-            st.markdown(f"<div class='today-none'>⚠️ {en_retard} en retard</div>", unsafe_allow_html=True)
-        if actives:
-            for idx, nom, cat, ech in actives[:6]:
-                clique = ligne_action(f"{nom}<span class='tag cat-{slug(cat)}'>{cat}</span>"
-                                     f"{badge_echeance(ech, ajd)}",
-                                     [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
-                if clique == f"acc_tk_{idx}":
-                    set_cell("Taches", idx, 3, "Fait", annulable=True, libelle=f"« {nom} » cochée")
-                    st.rerun()
-                elif clique == f"acc_td_{idx}":
-                    delete_row("Taches", idx, libelle=f"« {nom} » supprimée")
-                    st.rerun()
-            if len(actives) > 6:
-                st.caption(f"+ {len(actives) - 6} autres · touchez le titre pour tout voir")
-        else:
-            st.markdown("<div class='today-none'>🎉 Tout est fait.</div>", unsafe_allow_html=True)
-
-    # ================= 2. COURSES =================
-    with conteneur(bordure=True):
-        entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_Q[1])
+        entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
         if courses:
             montre = 0
             for rayon in RAYONS:
@@ -822,6 +799,40 @@ if page_cle == "accueil":
                 st.caption(f"+ {len(courses) - montre} autres articles · touchez le titre pour tout voir")
         else:
             st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
+
+    # ================= 2. À FAIRE (Tâches sur le Dashboard) =================
+    with conteneur(bordure=True):
+        entete_bloc("🌸 À faire", len(actives) or None)
+        if en_retard:
+            st.markdown(f"<div class='today-none'>⚠️ {en_retard} en retard</div>", unsafe_allow_html=True)
+        if actives:
+            for idx, nom, cat, ech in actives[:6]:
+                clique = ligne_action(f"{nom}<span class='tag cat-{slug(cat)}'>{cat}</span>"
+                                     f"{badge_echeance(ech, ajd)}",
+                                     [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
+                if clique == f"acc_tk_{idx}":
+                    set_cell("Taches", idx, 3, "Fait", annulable=True, libelle=f"« {nom} » cochée")
+                    st.rerun()
+                elif clique == f"acc_td_{idx}":
+                    delete_row("Taches", idx, libelle=f"« {nom} » supprimée")
+                    st.rerun()
+            if len(actives) > 6:
+                st.caption(f"+ {len(actives) - 6} autres tâches")
+        else:
+            st.markdown("<div class='today-none'>🎉 Tout est fait.</div>", unsafe_allow_html=True)
+
+        # Ajout rapide de tâche directement depuis l'accueil
+        na_t, nb_t, nc_t = st.columns([3, 1.2, 1])
+        with na_t:
+            dash_t_txt = st.text_input("Nouvelle tâche", key="dash_t_txt", placeholder="Nouvelle tâche…", label_visibility="collapsed")
+        with nb_t:
+            dash_t_cat = st.selectbox("Cat", CAT_TACHES, key="dash_t_cat", label_visibility="collapsed")
+        with nc_t:
+            if st.button("＋", key="dash_add_t", type="primary") and dash_t_txt.strip():
+                add_row("Taches", [dash_t_txt.strip(), dash_t_cat, "À faire", ""])
+                reset_after(dash_t_txt="")
+                st.toast("Tâche ajoutée 🌸", icon="✅")
+                st.rerun()
 
     # ================= 3. AUJOURD'HUI =================
     with conteneur(bordure=True):
@@ -947,138 +958,8 @@ if page_cle == "accueil":
                 st.rerun()
         st.caption(f"Synchronisé {depuis(st.session_state['derniere_synchro'])} · version {VERSION}")
 
-
 # ==========================================================
-# 8b. QUOTIDIEN
-# ==========================================================
-elif page_cle == "quotidien":
-    with conteneur("qtabs"):
-        onglet = pills("q_tab", ONGLETS_Q, cols=2)
-
-    # ---------- TÂCHES ----------
-    if onglet == ONGLETS_Q[0]:
-        toutes = rows("Taches")
-        actives = taches_actives()
-        faites = len(toutes) - len(actives)
-        if toutes:
-            st.progress(faites / len(toutes), text=f"{faites} sur {len(toutes)} terminées")
-
-        filtre = pills("f_taches", ["Toutes"] + CAT_TACHES, cols=3)
-        montrer_faites = st.toggle("Afficher les tâches terminées", key="voir_faites")
-
-        visibles = [t for t in actives if filtre == "Toutes" or t[2] == filtre]
-        for idx, nom, cat, ech in visibles:
-            clique = ligne_action(f"{nom}<span class='tag cat-{slug(cat)}'>{cat}</span>"
-                                  f"{badge_echeance(ech, ajd)}",
-                                  [("✔️", f"tk_{idx}"), ("🗑️", f"td_{idx}")])
-            if clique == f"tk_{idx}":
-                set_cell("Taches", idx, 3, "Fait", annulable=True, libelle=f"« {nom} » cochée")
-                st.rerun()
-            elif clique == f"td_{idx}":
-                delete_row("Taches", idx, libelle=f"« {nom} » supprimée")
-                st.rerun()
-        if not visibles:
-            vide("Rien à faire dans cette catégorie 🎉")
-
-        if montrer_faites:
-            terminees = [(i, pad(r, 4)) for i, r in toutes if pad(r, 4)[2] == "Fait"]
-            if terminees:
-                titre("Terminées")
-                for idx, r in terminees:
-                    clique = ligne_action(f"{r[0]}<span class='tag'>{r[1] or 'Général'}</span>",
-                                         [("↩️", f"tu_{idx}"), ("🗑️", f"tdd_{idx}")], done=True)
-                    if clique == f"tu_{idx}":
-                        set_cell("Taches", idx, 3, "À faire")
-                        st.rerun()
-                    elif clique == f"tdd_{idx}":
-                        delete_row("Taches", idx, libelle=f"« {r[0]} » supprimée")
-                        st.rerun()
-                if st.button("🧹 Effacer les tâches terminées", key="clean_taches"):
-                    for idx, _ in sorted(terminees, key=lambda x: -x[0]):
-                        delete_row("Taches", idx, annulable=False)
-                    st.rerun()
-
-        st.divider()
-        titre("Nouvelle tâche")
-        n_cat = pills("new_tache_cat", CAT_TACHES, cols=4)
-        n_txt = st.text_input("Intitulé", key="new_tache_txt", placeholder="Sortir les poubelles…")
-        avec_date = st.toggle("Avec une échéance", key="new_tache_date_on")
-        n_ech = st.date_input("Échéance", value=ajd, key="new_tache_date") if avec_date else None
-        if st.button("Ajouter la tâche", type="primary", key="add_tache") and n_txt.strip():
-            add_row("Taches", [n_txt.strip(), n_cat, "À faire", str(n_ech) if n_ech else ""])
-            reset_after(new_tache_txt="")
-            st.rerun()
-
-    # ---------- COURSES ----------
-    elif onglet == ONGLETS_Q[1]:
-        courses = rows("Courses")
-
-        titre("💖 Nos articles habituels")
-        rayon_memo = pills("memo_rayon", RAYONS[:-1], cols=2)
-        deja = {pad(r, 3)[0].strip().lower() for _, r in courses}
-        propositions = [m for m in MEMOIRE_COURSES if m["rayon"] == rayon_memo]
-        mc1, mc2 = st.columns(2)
-        for i, memo in enumerate(propositions):
-            with (mc1 if i % 2 == 0 else mc2):
-                dedans = memo["article"].strip().lower() in deja
-                if st.button(("✅ " if dedans else "＋ ") + memo["article"], key=f"memo_{memo['article']}"):
-                    add_course(memo["article"], memo["qte"], memo["rayon"])
-                    st.toast(f"{memo['article']} au panier", icon="🛒")
-                    st.rerun()
-
-        st.divider()
-        titre(f"🛒 Panier ({len(courses)})")
-        if courses:
-            for rayon in RAYONS:
-                du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
-                if not du_rayon:
-                    continue
-                with conteneur(f"grp-{slug(rayon)}"):
-                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>",
-                                unsafe_allow_html=True)
-                    for idx, r in du_rayon:
-                        art, qte, _ = pad(r, 3)
-                        if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"co_{idx}")]):
-                            delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
-                            st.rerun()
-
-            texte = "🛒 Liste de courses\n\n"
-            for rayon in RAYONS:
-                du_rayon = [pad(r, 3) for _, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
-                if du_rayon:
-                    texte += f"— {rayon} —\n" + "".join(f"  • {a} ({q})\n" for a, q, _ in du_rayon) + "\n"
-            e1, e2 = st.columns(2)
-            with e1:
-                st.download_button("📤 Exporter", texte, file_name="liste-de-courses.txt",
-                                   mime="text/plain", key="dl_courses")
-            with e2:
-                if st.session_state.get("confirm_vider"):
-                    if st.button("Confirmer", type="primary", key="vider_ok"):
-                        clear_sheet("Courses")
-                        st.session_state["confirm_vider"] = False
-                        st.rerun()
-                elif st.button("🧹 Vider", key="vider_go"):
-                    st.session_state["confirm_vider"] = True
-                    st.rerun()
-        else:
-            vide("Le panier est vide. Piochez dans les habituels ci-dessus.")
-
-        st.divider()
-        titre("Ajouter autre chose")
-        st.caption("Le rayon est deviné automatiquement, ajustez-le si besoin.")
-        c_rayon = pills("new_course_rayon", RAYONS, cols=2)
-        ca, cb = st.columns([3, 1])
-        with ca:
-            c_art = st.text_input("Article", key="new_course_art", placeholder="Fraises…")
-        with cb:
-            c_qte = st.text_input("Qté", key="new_course_qte", value="1")
-        if st.button("Ajouter au panier", type="primary", key="add_course") and c_art.strip():
-            add_course(c_art, c_qte or "1", c_rayon)
-            reset_after(new_course_art="", new_course_qte="1")
-            st.rerun()
-
-# ==========================================================
-# 8c. BUDGET
+# 8b. BUDGET
 # ==========================================================
 elif page_cle == "budget":
     budget = rows("Budget")
@@ -1153,13 +1034,82 @@ elif page_cle == "budget":
         st.rerun()
 
 # ==========================================================
-# 8d. MAISON & LOISIRS
+# 8c. MAISON (Regroupe Courses, Recettes, Notes)
 # ==========================================================
 elif page_cle == "maison":
-    with conteneur("qtabs"):
-        onglet_m = pills("m_tab", ONGLETS_M, cols=2)
+    with conteneur("mtabs"):
+        onglet_m = pills("m_tab", ONGLETS_M, cols=3)
 
+    # ---------- COURSES ----------
     if onglet_m == ONGLETS_M[0]:
+        courses = rows("Courses")
+
+        titre("💖 Nos articles habituels")
+        rayon_memo = pills("memo_rayon", RAYONS[:-1], cols=2)
+        deja = {pad(r, 3)[0].strip().lower() for _, r in courses}
+        propositions = [m for m in MEMOIRE_COURSES if m["rayon"] == rayon_memo]
+        mc1, mc2 = st.columns(2)
+        for i, memo in enumerate(propositions):
+            with (mc1 if i % 2 == 0 else mc2):
+                dedans = memo["article"].strip().lower() in deja
+                if st.button(("✅ " if dedans else "＋ ") + memo["article"], key=f"memo_{memo['article']}"):
+                    add_course(memo["article"], memo["qte"], memo["rayon"])
+                    st.toast(f"{memo['article']} au panier", icon="🛒")
+                    st.rerun()
+
+        st.divider()
+        titre(f"🛒 Panier ({len(courses)})")
+        if courses:
+            for rayon in RAYONS:
+                du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
+                if not du_rayon:
+                    continue
+                with conteneur(f"grp-{slug(rayon)}"):
+                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>",
+                                unsafe_allow_html=True)
+                    for idx, r in du_rayon:
+                        art, qte, _ = pad(r, 3)
+                        if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"co_{idx}")]):
+                            delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
+                            st.rerun()
+
+            texte = "🛒 Liste de courses\n\n"
+            for rayon in RAYONS:
+                du_rayon = [pad(r, 3) for _, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
+                if du_rayon:
+                    texte += f"— {rayon} —\n" + "".join(f"  • {a} ({q})\n" for a, q, _ in du_rayon) + "\n"
+            e1, e2 = st.columns(2)
+            with e1:
+                st.download_button("📤 Exporter", texte, file_name="liste-de-courses.txt",
+                                   mime="text/plain", key="dl_courses")
+            with e2:
+                if st.session_state.get("confirm_vider"):
+                    if st.button("Confirmer", type="primary", key="vider_ok"):
+                        clear_sheet("Courses")
+                        st.session_state["confirm_vider"] = False
+                        st.rerun()
+                elif st.button("🧹 Vider", key="vider_go"):
+                    st.session_state["confirm_vider"] = True
+                    st.rerun()
+        else:
+            vide("Le panier est vide. Piochez dans les habituels ci-dessus.")
+
+        st.divider()
+        titre("Ajouter autre chose")
+        st.caption("Le rayon est deviné automatiquement, ajustez-le si besoin.")
+        c_rayon = pills("new_course_rayon", RAYONS, cols=2)
+        ca, cb = st.columns([3, 1])
+        with ca:
+            c_art = st.text_input("Article", key="new_course_art", placeholder="Fraises…")
+        with cb:
+            c_qte = st.text_input("Qté", key="new_course_qte", value="1")
+        if st.button("Ajouter au panier", type="primary", key="add_course") and c_art.strip():
+            add_course(c_art, c_qte or "1", c_rayon)
+            reset_after(new_course_art="", new_course_qte="1")
+            st.rerun()
+
+    # ---------- RECETTES ----------
+    elif onglet_m == ONGLETS_M[1]:
         recettes = rows("Recettes")
         recherche = st.text_input("Rechercher", key="rec_search", placeholder="🔎 Chercher une recette…",
                                   label_visibility="collapsed")
@@ -1200,7 +1150,8 @@ elif page_cle == "maison":
                 add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
                 st.rerun()
 
-    elif onglet_m == ONGLETS_M[1]:
+    # ---------- NOTES ----------
+    elif onglet_m == ONGLETS_M[2]:
         notes = rows("Notes")
         for idx, r in reversed(notes):
             t, c, ep = pad(r, 3)
