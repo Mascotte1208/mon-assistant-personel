@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.31"
+VERSION = "2.32"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -329,7 +329,8 @@ DEFAULTS = {
     "annulation": None,
     "show_add_tache": False,
     "mode_ia": False,
-    "ia_tab": "📝 Notes & Contexte",
+    "ia_tab": ONGLETS_IA[0],
+    "m_tab": ONGLETS_M[0],
     "_reset": {},
 }
 for cle, val in DEFAULTS.items():
