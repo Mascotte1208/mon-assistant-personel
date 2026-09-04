@@ -4,12 +4,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 import json
 from datetime import datetime, date
-import calendar
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
     page_title="Notre Assistant Shared", 
-    page_icon="✨", 
+    page_icon="🌸", 
     layout="centered",
     initial_sidebar_state="collapsed"
 )
@@ -20,20 +19,20 @@ st.markdown("""
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="theme-color" content="#4338ca" />
-        <link rel="apple-touch-icon" href="https://img.icons8.com/emoji/192/sparkles-emoji.png" />
+        <meta name="theme-color" content="#db2777" />
+        <link rel="apple-touch-icon" href="https://img.icons8.com/emoji/192/sparkling-heart.png" />
     </head>
 """, unsafe_allow_html=True)
 
-# --- STYLE CSS DESIGN SUR-MESURE ---
+# --- STYLE CSS GIRLY & DOUX SUR-MESURE ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
-        background: linear-gradient(180deg, #f8f8f6 0%, #f1f1ed 100%) !important;
-        color: #1c1917;
+        background: linear-gradient(180deg, #fff1f2 0%, #fdf2f8 50%, #faf5ff 100%) !important;
+        color: #4a044e;
         -webkit-tap-highlight-color: transparent;
     }
     
@@ -42,123 +41,102 @@ st.markdown("""
     header {visibility: hidden;}
 
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 1.5rem !important;
         padding-bottom: 4rem !important;
-        max-width: 550px !important;
+        max-width: 520px !important;
     }
 
+    /* Bannière Douce & Girly */
     .hero-banner {
-        background: linear-gradient(135deg, #3730a3 0%, #5b21b6 50%, #831843 100%);
-        border-radius: 28px;
-        padding: 22px 20px;
+        background: linear-gradient(135deg, #ec4899 0%, #d946ef 50%, #8b5cf6 100%);
+        border-radius: 30px;
+        padding: 24px 22px;
         color: white;
-        margin-bottom: 18px;
-        box-shadow: 0 12px 24px -6px rgba(55, 48, 163, 0.25);
+        margin-bottom: 20px;
+        box-shadow: 0 14px 28px -6px rgba(236, 72, 153, 0.3);
         position: relative;
         overflow: hidden;
     }
+    .hero-banner::after {
+        content: "💖";
+        position: absolute;
+        right: -5px;
+        bottom: -15px;
+        font-size: 80px;
+        opacity: 0.18;
+    }
     .hero-title {
-        font-size: 22px;
+        font-size: 24px;
         font-weight: 800;
         margin: 0;
         letter-spacing: -0.5px;
     }
     .hero-sub {
-        font-size: 12px;
-        opacity: 0.9;
+        font-size: 13px;
+        opacity: 0.95;
         margin-top: 4px;
         font-weight: 600;
     }
 
-    .wooden-block-calendar {
-        background: linear-gradient(145deg, #2d241e, #1a1512);
-        border: 2px solid #524136;
-        border-radius: 20px;
-        padding: 16px;
-        text-align: center;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        margin-bottom: 16px;
-    }
-    .block-month {
-        font-size: 13px;
-        font-weight: 800;
-        color: #f59e0b;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        margin-bottom: 8px;
-    }
-    .block-cubes {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        margin-bottom: 8px;
-    }
-    .block-cube {
-        background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
-        color: #1e293b;
-        font-size: 32px;
-        font-weight: 800;
-        width: 55px;
-        height: 60px;
-        line-height: 60px;
-        border-radius: 14px;
-        box-shadow: inset 0 -3px 0 rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.25);
-    }
-    .block-dayname {
-        font-size: 12px;
-        font-weight: 700;
-        color: #e2e8f0;
-        background: rgba(255,255,255,0.1);
-        padding: 4px 12px;
-        border-radius: 10px;
-        display: inline-block;
-    }
-
+    /* Cartes Métriques Dashboard Douces */
     .metric-card {
         background: #ffffff;
-        border-radius: 18px;
-        padding: 14px 16px;
-        border: 1px solid #e7e5e4;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-        margin-bottom: 10px;
+        border-radius: 20px;
+        padding: 16px 20px;
+        border: 1.5px solid #fbcfe8;
+        box-shadow: 0 8px 20px rgba(236, 72, 153, 0.06);
+        margin-bottom: 12px;
         display: flex;
         align-items: center;
         justify-content: space-between;
     }
     .metric-title {
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 700;
-        color: #78716c;
+        color: #be185d;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
     .metric-value {
         font-size: 20px;
         font-weight: 800;
-        color: #1c1917;
+        color: #701a75;
     }
 
+    /* Boutons de Navigation Stylés */
     .stButton button {
-        border-radius: 16px;
+        border-radius: 20px;
         font-weight: 800;
-        font-size: 13px;
-        background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
+        font-size: 14px;
+        background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
         color: white;
         border: none;
-        padding: 12px 18px;
-        box-shadow: 0 4px 12px rgba(67, 56, 202, 0.2);
+        padding: 14px 20px;
+        box-shadow: 0 6px 16px rgba(219, 39, 119, 0.25);
         width: 100%;
+        transition: all 0.2s ease;
     }
     .stButton button:active { transform: scale(0.97); }
 
+    /* Inputs & Formulaires Doux */
     .stTextInput input, .stTextArea textarea, .stSelectbox select {
-        color: #1c1917 !important;
+        color: #4a044e !important;
         background-color: #ffffff !important;
-        -webkit-text-fill-color: #1c1917 !important;
-        border-radius: 16px !important;
-        border: 1.5px solid #d6d3d1 !important;
-        padding: 10px 14px !important;
+        -webkit-text-fill-color: #4a044e !important;
+        border-radius: 18px !important;
+        border: 1.5px solid #f472b6 !important;
+        padding: 12px 16px !important;
         font-size: 15px !important;
+    }
+    
+    .badge-tag {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 14px;
+        font-size: 11px;
+        font-weight: 700;
+        background-color: #fce7f3;
+        color: #be185d;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -257,37 +235,19 @@ def update_cell_fast(sheet_name, row_idx, col_idx, value):
 if "json_credentials_str" not in st.session_state:
     st.session_state["json_credentials_str"] = None
 
-# Initialisation de la page active en mémoire
 if "active_page" not in st.session_state:
     st.session_state["active_page"] = "🏠 Dashboard"
 
 # --- HERO BANNER ---
 st.markdown("""
     <div class="hero-banner">
-        <div class="hero-title">Bonjour Lucas & Alex 👋</div>
-        <div class="hero-sub">Espace partagé & assistant quotidien</div>
+        <div class="hero-title">Bonjour Lucas & Alex ✨</div>
+        <div class="hero-sub">Notre petit espace cosy du quotidien 🌸</div>
     </div>
 """, unsafe_allow_html=True)
 
-# --- CALENDRIER ---
-today = date.today()
-mois_fr = ["JANVIER", "FÉVRIER", "MARS", "AVRIL", "MAI", "JUIN", "JUILLET", "AOÛT", "SEPTEMBRE", "OCTOBRE", "NOVEMBRE", "DÉCEMBRE"]
-jours_fr = ["LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI", "DIMANCHE"]
-
-day_str = f"{today.day:02d}"
-st.markdown(f"""
-    <div class="wooden-block-calendar">
-        <div class="block-month">📅 {mois_fr[today.month - 1]}</div>
-        <div class="block-cubes">
-            <div class="block-cube">{day_str[0]}</div>
-            <div class="block-cube">{day_str[1]}</div>
-        </div>
-        <div class="block-dayname">{jours_fr[today.weekday()]}</div>
-    </div>
-""", unsafe_allow_html=True)
-
-# --- MENU DE NAVIGATION SOUS FORME DE BOUTONS VISIBLES ---
-st.markdown("<p style='font-size: 11px; font-weight: 800; color: #78716c; text-transform: uppercase; letter-spacing: 0.9px; margin-bottom: 8px;'>Navigation</p>", unsafe_allow_html=True)
+# --- MENU DE NAVIGATION SOUS FORME DE BOUTONS ---
+st.markdown("<p style='font-size: 11px; font-weight: 800; color: #be185d; text-transform: uppercase; letter-spacing: 0.9px; margin-bottom: 8px;'>Navigation</p>", unsafe_allow_html=True)
 b1, b2 = st.columns(2)
 with b1:
     if st.button("🏠 Dashboard"):
@@ -310,11 +270,11 @@ active_page = st.session_state["active_page"]
 json_str = st.session_state["json_credentials_str"]
 
 # ==========================================
-# 1. DASHBOARD
+# 1. DASHBOARD (SANS DATE)
 # ==========================================
 if active_page == "🏠 Dashboard":
     if not json_str:
-        st.warning("⚠️ Connexion Google Sheets requise.")
+        st.warning("✨ Connexion Google Sheets requise.")
         uploaded_json = st.file_uploader("Glissez votre fichier JSON de configuration ici", type=["json"])
         if uploaded_json is not None:
             raw_json = uploaded_json.read().decode("utf-8")
@@ -357,27 +317,27 @@ if active_page == "🏠 Dashboard":
             if payer == "Lucas": total_lucas += amt
             elif payer == "Alex": total_alex += amt
         diff = (total_lucas - total_alex) / 2
-        bilan_str = f"Alex doit {diff:.2f} € à Lucas" if diff > 0 else (f"Lucas doit {abs(diff):.2f} € à Alex" if diff < 0 else "Comptes équilibrés ⚖️")
+        bilan_str = f"Alex doit {diff:.2f} € à Lucas" if diff > 0 else (f"Lucas doit {abs(diff):.2f} € à Alex" if diff < 0 else "Comptes parfaitement équilibrés 💖")
 
-        st.markdown("<p style='font-weight: 800; font-size: 15px; color: #1c1917; margin-bottom: 12px;'>📊 Vue d'ensemble</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-bottom: 12px;'>💖 En un coup d'œil</p>", unsafe_allow_html=True)
 
         st.markdown(f"""
             <div class="metric-card">
-                <span class="metric-title">✅ Tâches du jour</span>
+                <span class="metric-title">🌸 Tâches accomplies</span>
                 <span class="metric-value">{taches_faites} / {total_taches}</span>
             </div>
             <div class="metric-card">
-                <span class="metric-title">🛒 Panier Courses</span>
-                <span class="metric-value">{nb_courses} art.</span>
+                <span class="metric-title">🛒 Panier de courses</span>
+                <span class="metric-value">{nb_courses} articles</span>
             </div>
             <div class="metric-card">
-                <span class="metric-title">💶 Équilibre Budget</span>
-                <span class="metric-value" style="font-size: 14px; font-weight: 700; color: #4338ca;">{bilan_str}</span>
+                <span class="metric-title">💶 Équilibre du budget</span>
+                <span class="metric-value" style="font-size: 14px; font-weight: 700; color: #db2777;">{bilan_str}</span>
             </div>
         """, unsafe_allow_html=True)
 
         st.divider()
-        if st.button("🔴 Déconnexion du compte Google"):
+        if st.button("💖 Déconnexion du compte"):
             st.session_state["json_credentials_str"] = None
             for key in list(st.session_state.keys()):
                 if key.startswith("data_"): del st.session_state[key]
@@ -390,7 +350,7 @@ elif active_page == "📋 Quotidien" and json_str:
     sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda", "🛒 Courses", "🍽️ Repas"])
     
     with sub_tab1:
-        st.subheader("✅ Tâches à faire")
+        st.subheader("🌸 Tâches à faire")
         all_vals = get_data("Taches")
         taches_data = all_vals[1:] if len(all_vals) > 1 else []
         
@@ -416,7 +376,7 @@ elif active_page == "📋 Quotidien" and json_str:
                         if st.button("🗑️", key=f"t_del_{real_idx}"):
                             delete_row_fast("Taches", real_idx)
                             st.rerun()
-        else: st.info("Aucune tâche.")
+        else: st.info("Aucune tâche pour le moment.")
 
         st.divider()
         with st.form("form_tache", clear_on_submit=True):
@@ -440,7 +400,7 @@ elif active_page == "📋 Quotidien" and json_str:
                     if st.button("🗑️ Supprimer", key=f"ev_del_{real_idx}"):
                         delete_row_fast("Agenda", real_idx)
                         st.rerun()
-        else: st.info("Aucun événement.")
+        else: st.info("Aucun événement prévu.")
 
         st.divider()
         with st.form("form_agenda", clear_on_submit=True):
@@ -455,7 +415,7 @@ elif active_page == "📋 Quotidien" and json_str:
     with sub_tab3:
         st.subheader("🛒 Liste de Courses Organisée")
         
-        with st.expander("🧠 Piocher dans mes articles habituels"):
+        with st.expander("💖 Piocher dans nos articles habituels"):
             rayons_dispos = sorted(list(set(item["rayon"] for item in MEMOIRE_COURSES)))
             selected_rayon = st.selectbox("Filtrer par rayon :", rayons_dispos)
             filtered_memo = [m for m in MEMOIRE_COURSES if m["rayon"] == selected_rayon]
@@ -468,7 +428,7 @@ elif active_page == "📋 Quotidien" and json_str:
                         match = next((m for m in MEMOIRE_COURSES if m["article"] == article_name), None)
                         if match:
                             append_row_fast("Courses", [match["article"], match["qte"], match["rayon"]])
-                    st.success("Ajouté !")
+                    st.success("Ajouté avec amour !")
                     st.rerun()
 
         st.divider()
@@ -491,7 +451,7 @@ elif active_page == "📋 Quotidien" and json_str:
                                 delete_row_fast("Courses", real_idx)
                                 st.rerun()
             st.divider()
-        else: st.info("Panier vide.")
+        else: st.info("Votre panier est vide.")
 
         with st.form("form_courses", clear_on_submit=True):
             c_art = st.text_input("Article libre")
@@ -559,7 +519,7 @@ elif active_page == "📊 Budget" and json_str:
 
         if diff > 0: st.success(f"👉 **Alex doit {diff:.2f} € à Lucas**")
         elif diff < 0: st.success(f"👉 **Lucas doit {abs(diff):.2f} € à Alex**")
-        else: st.info("⚖️ Comptes parfaitement équilibrés !")
+        else: st.info("💖 Comptes parfaitement équilibrés !")
 
         st.divider()
         for idx, row in enumerate(budget_data):
