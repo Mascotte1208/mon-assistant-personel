@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.5"
+VERSION = "2.6"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -279,8 +279,7 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--pru
 .st-key-mtabs{margin-bottom:8px;}
 .st-key-mtabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
 .st-key-mtabs button{font-size:12.5px !important; padding:10px 4px !important; border-radius:16px !important;}
-.st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;
-}
+.st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
 
 .bloc-head{border-bottom:1.5px solid #fce7f3; margin-bottom:4px; padding-bottom:10px;}
 
@@ -316,6 +315,7 @@ DEFAULTS = {
     "erreur_synchro": None,
     "derniere_synchro": None,
     "annulation": None,
+    "show_add_tache": False,
     "_reset": {},
 }
 for cle, val in DEFAULTS.items():
@@ -780,7 +780,7 @@ if page_cle == "accueil":
         else:
             st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
 
-    # ================= 2. À FAIRE =================
+    # ================= 2. À FAIRE (Avec bouton d'ajout discret) =================
     with conteneur(bordure=True):
         entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
@@ -797,15 +797,24 @@ if page_cle == "accueil":
         else:
             st.markdown("<div class='today-none'>🎉 Tout est fait.</div>", unsafe_allow_html=True)
 
-        na_t, nc_t = st.columns([3, 1])
-        with na_t:
-            dash_t_txt = st.text_input("Tâche", key="dash_t_txt", placeholder="Nouvelle tâche…", label_visibility="collapsed")
-        with nc_t:
-            if st.button("＋", key="dash_add_t", type="primary") and dash_t_txt.strip():
-                add_row("Taches", [dash_t_txt.strip(), "À faire"])
-                reset_after(dash_t_txt="")
-                st.toast("Tâche ajoutée 🌸", icon="✅")
+        if not st.session_state.get("show_add_tache", False):
+            if st.button("＋ Ajouter une tâche", key="btn_toggle_tache"):
+                st.session_state["show_add_tache"] = True
                 st.rerun()
+        else:
+            dash_t_txt = st.text_input("Nouvelle tâche", key="dash_t_txt", placeholder="Écrire ici…", label_visibility="collapsed")
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("Enregistrer", key="dash_add_t", type="primary") and dash_t_txt.strip():
+                    add_row("Taches", [dash_t_txt.strip(), "À faire"])
+                    st.session_state["show_add_tache"] = False
+                    reset_after(dash_t_txt="")
+                    st.toast("Tâche ajoutée 🌸", icon="✅")
+                    st.rerun()
+            with col_b2:
+                if st.button("Annuler", key="dash_cancel_t"):
+                    st.session_state["show_add_tache"] = False
+                    st.rerun()
 
     # ================= 3. AUJOURD'HUI =================
     with conteneur(bordure=True):
