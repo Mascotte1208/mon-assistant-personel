@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.14"
+VERSION = "2.15"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -33,6 +33,7 @@ SHEETS = {
     "Budget":   ["Date", "Paye Par", "Intitule", "Montant", "Categorie"],
     "Repas":    ["Jour", "Repas", "Plat"],
     "Listes":   ["Categorie", "Element", "Notes"],
+    "IA_Lab":   ["Date", "Sujet", "Contenu", "Type"],
 }
 
 RAYONS = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
@@ -116,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Forçage absolu des grosses bulles sur mobile)
+# 2. STYLE
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -182,7 +183,6 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
-/* 💡 FORÇAGE MOBILE UNIVERSEL DES CONTENEURS (Streamlit border=True) */
 [data-testid="stVerticalBlockBorderWrapper"], 
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
 [data-baseweb="block"] {
@@ -194,27 +194,16 @@ div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapp
   margin-bottom: 18px !important;
 }
 
-/* Style des métriques budget */
-[data-testid="stMetricValue"] {
-  color: var(--prune) !important;
-  font-weight: 800 !important;
-}
-[data-testid="stMetricLabel"] {
-  color: var(--prune-clair) !important;
-  font-weight: 700 !important;
-}
+[data-testid="stMetricValue"] {color: var(--prune) !important; font-weight: 800 !important;}
+[data-testid="stMetricLabel"] {color: var(--prune-clair) !important; font-weight: 700 !important;}
 [data-testid="stMetric"] {
-  background: #ffffff;
-  border: 2.5px solid #f472b6 !important;
-  border-radius: 24px;
-  padding: 16px 20px;
-  box-shadow: 0 12px 28px rgba(236,72,153,.1);
+  background: #ffffff; border: 2.5px solid #f472b6 !important;
+  border-radius: 24px; padding: 16px 20px; box-shadow: 0 12px 28px rgba(236,72,153,.1);
 }
 
 .jour-titre{font-size:14px; font-weight:800; color:#a21caf; padding:10px 0 6px;}
 .section{font-weight:800; font-size:16.5px; color:var(--prune-clair); margin:20px 0 8px;}
 
-/* Lignes aérées et confortables pour le pouce */
 .line{font-size:15px; font-weight:600; color:var(--prune); padding:11px 0;}
 .line.done{color:#a3a3a3; text-decoration:line-through;}
 .line .q{font-weight:600; color:#a21caf; font-size:13px;}
@@ -324,6 +313,7 @@ DEFAULTS = {
     "derniere_synchro": None,
     "annulation": None,
     "show_add_tache": False,
+    "mode_ia": False,
     "_reset": {},
 }
 for cle, val in DEFAULTS.items():
@@ -449,10 +439,6 @@ def add_row(feuille, ligne_):
     db()[feuille].append(ligne_)
     pousser(("append", feuille, ligne_))
 
-def insert_row(feuille, index, ligne_):
-    db()[feuille].insert(index, ligne_)
-    pousser(("insert", feuille, ligne_, index))
-
 def delete_row(feuille, index, annulable=True, libelle="Élément supprimé"):
     donnees = db()[feuille]
     if not 0 < index < len(donnees):
@@ -473,23 +459,6 @@ def set_cell(feuille, index, colonne, valeur, annulable=False, libelle=""):
     ligne_[colonne - 1] = valeur
     donnees[index] = ligne_
     pousser(("update", feuille, index, colonne, valeur))
-    if annulable:
-        st.session_state["annulation"] = {"type": "cellule", "feuille": feuille, "index": index,
-                                         "colonne": colonne, "valeur": ancienne, "libelle": libelle}
-
-def clear_sheet(feuille):
-    db()[feuille] = [SHEETS[feuille]]
-    pousser(("clear", feuille))
-
-def annuler():
-    action = st.session_state.get("annulation")
-    if not action:
-        return
-    if action["type"] == "restaurer":
-        insert_row(action["feuille"], action["index"], action["ligne"])
-    elif action["type"] == "cellule":
-        set_cell(action["feuille"], action["index"], action["colonne"], action["valeur"])
-    st.session_state["annulation"] = None
 
 def to_float(valeur):
     try:
@@ -504,46 +473,6 @@ def parse_date(texte):
         except ValueError:
             continue
     return None
-
-def merge_qte(a, b):
-    motif = r"^\s*(\d+(?:[.,]\d+)?)\s*(.*)$"
-    ma, mb = re.match(motif, str(a or "")), re.match(motif, str(b or ""))
-    if ma and mb and ma.group(2).strip().lower() == mb.group(2).strip().lower():
-        total = float(ma.group(1).replace(",", ".")) + float(mb.group(1).replace(",", "."))
-        nombre = int(total) if total.is_integer() else round(total, 2)
-        return f"{nombre} {ma.group(2).strip()}".strip()
-    return f"{a} + {b}"
-
-def deviner_rayon(nom):
-    minus = nom.lower()
-    for memo in MEMOIRE_COURSES:
-        base = memo["article"].lower().split(" /")[0].strip()
-        if base and (base in minus or minus in memo["article"].lower()):
-            return memo["rayon"]
-    for rayon, mots in INDICES_RAYON:
-        if any(mot in minus for mot in mots):
-            return rayon
-    return "Autre"
-
-def separer_quantite(ligne_texte):
-    texte = re.sub(r"^\s*[-•*·]\s*", "", str(ligne_texte)).strip()
-    m = re.match(r"^(\d+(?:[.,]\d+)?)\s*([a-zA-Zàâçéèêëîïôûùüÿœ.]*)\s+(?:de\s+|d')?(.+)$", texte)
-    if m:
-        unite = m.group(2).lower().strip()
-        if unite in UNITES or unite == "":
-            return m.group(3).strip(), f"{m.group(1)} {unite}".strip()
-    return texte, "1"
-
-def add_course(article, qte, rayon=None):
-    article = str(article).strip()
-    if not article:
-        return
-    nom = article.lower()
-    for idx, r in rows("Courses"):
-        if pad(r, 3)[0].strip().lower() == nom:
-            set_cell("Courses", idx, 2, merge_qte(pad(r, 3)[1] or "1", qte))
-            return
-    add_row("Courses", [article, qte, rayon or deviner_rayon(article)])
 
 def evenements_tries():
     sortie = []
@@ -668,20 +597,10 @@ def bandeaux():
     if en_attente:
         c1, c2 = st.columns([3, 1])
         with c1:
-            st.markdown(f"<div class='bandeau warn'>⏳ {en_attente} modification(s) en attente "
-                        f"d'envoi vers Google</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='bandeau warn'>⏳ {en_attente} modification(s) en attente</div>", unsafe_allow_html=True)
         with c2:
             if st.button("Réessayer", key="retry_sync"):
                 vider_file()
-                st.rerun()
-    action = st.session_state.get("annulation")
-    if action:
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            st.markdown(f"<div class='bandeau info'>{action['libelle']}</div>", unsafe_allow_html=True)
-        with c2:
-            if st.button("↩️ Annuler", key="undo_btn"):
-                annuler()
                 st.rerun()
 
 def entete_bloc(texte, compteur=None):
@@ -702,8 +621,7 @@ ajd = date.today()
 
 if not st.session_state["creds_json"]:
     titre("Connexion à Google Sheets")
-    st.caption("Déposez le fichier JSON du compte de service. Pour ne plus jamais le redemander, "
-               "copiez son contenu dans `.streamlit/secrets.toml` sous `[gcp_service_account]`.")
+    st.caption("Déposez le fichier JSON du compte de service.")
     fichier = st.file_uploader("Configuration", type=["json"], label_visibility="collapsed")
     if fichier is not None:
         brut = fichier.read().decode("utf-8")
@@ -723,16 +641,21 @@ if st.session_state["ops"]:
     vider_file()
 
 # ==========================================================
-# 7. NAVIGATION
+# 7. NAVIGATION & MODE IA (Si activé)
 # ==========================================================
 params = st.query_params
 page_cle = params.get("p", "accueil")
-if page_cle not in PAGES:
+if page_cle not in PAGES and page_cle != "ialab":
     page_cle = "accueil"
 
+# Menu contextuel dynamique selon le mode IA
+pages_dispo = PAGES.copy()
+if st.session_state.get("mode_ia"):
+    pages_dispo["ialab"] = "🧠 Labo IA"
+
 with conteneur("navrow"):
-    cols = st.columns(3)
-    for col, (cle, libelle) in zip(cols, PAGES.items()):
+    cols = st.columns(len(pages_dispo))
+    for col, (cle, libelle) in zip(cols, pages_dispo.items()):
         with col:
             if st.button(libelle, key=f"nav_{cle}", type="primary" if page_cle == cle else "secondary"):
                 st.query_params["p"] = cle
@@ -746,7 +669,7 @@ for ev in evenements:
     par_jour.setdefault(ev[0], []).append(ev)
 
 # ==========================================================
-# 8a. ACCUEIL (Dashboard en grosses bulles cosy)
+# 8a. ACCUEIL
 # ==========================================================
 if page_cle == "accueil":
     courses = rows("Courses")
@@ -758,7 +681,7 @@ if page_cle == "accueil":
     a_venir = [e for e in evenements if e[0] > ajd]
     repas_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
 
-    # ================= 1. COURSES =================
+    # 1. COURSES
     with conteneur("carte-courses"):
         entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
         if courses:
@@ -768,33 +691,28 @@ if page_cle == "accueil":
                 if not du_rayon or montre >= 10:
                     continue
                 with conteneur(f"grp-{slug(rayon)}"):
-                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>",
-                                unsafe_allow_html=True)
+                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>", unsafe_allow_html=True)
                     for idx, r in du_rayon[:10 - montre]:
                         art, qte, _ = pad(r, 3)
                         if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
                             delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
                             st.rerun()
                 montre += len(du_rayon[:10 - montre])
-            if len(courses) > montre:
-                st.caption(f"+ {len(courses) - montre} autres articles · touchez le titre pour tout voir")
         else:
             st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
 
-    # ================= 2. À FAIRE =================
+    # 2. À FAIRE
     with conteneur("carte-taches"):
         entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
             for idx, nom in actives[:6]:
                 clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
                 if clique == f"acc_tk_{idx}":
-                    set_cell("Taches", idx, 2, "Fait", annulable=True, libelle=f"« {nom} » cochée")
+                    set_cell("Taches", idx, 2, "Fait")
                     st.rerun()
                 elif clique == f"acc_td_{idx}":
                     delete_row("Taches", idx, libelle=f"« {nom} » supprimée")
                     st.rerun()
-            if len(actives) > 6:
-                st.caption(f"+ {len(actives) - 6} autres tâches")
         else:
             st.markdown("<div class='today-none'>🎉 Tout est fait.</div>", unsafe_allow_html=True)
 
@@ -810,24 +728,17 @@ if page_cle == "accueil":
                     add_row("Taches", [dash_t_txt.strip(), "À faire"])
                     st.session_state["show_add_tache"] = False
                     reset_after(dash_t_txt="")
-                    st.toast("Tâche ajoutée 🌸", icon="✅")
                     st.rerun()
             with col_b2:
                 if st.button("Annuler", key="dash_cancel_t"):
                     st.session_state["show_add_tache"] = False
                     st.rerun()
 
-    # ================= 3. AUJOURD'HUI =================
+    # 3. AUJOURD'HUI
     with conteneur("carte-aujourdhui"):
         entete_bloc("📅 Aujourd'hui", len(evts_jour) + len(repas_jour) or None)
         if not evts_jour and not repas_jour:
-            if a_venir:
-                jd, h, ti, _, _ = a_venir[0]
-                quand = "demain" if jd == ajd + timedelta(days=1) else f"le {jd.day} {MOIS[jd.month - 1]}"
-                st.markdown(f"<div class='today-none'>Rien aujourd'hui. Ensuite : {ti}, {quand}.</div>",
-                            unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='today-none'>Journée libre 🌸</div>", unsafe_allow_html=True)
+            st.markdown("<div class='today-none'>Journée libre 🌸</div>", unsafe_allow_html=True)
         for jd, h, ti, desc, idx in evts_jour:
             detail = f"<br><span class='q'>{desc}</span>" if desc else ""
             if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}", [("🗑️", f"acc_ev_{idx}")]):
@@ -838,7 +749,7 @@ if page_cle == "accueil":
                 delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
 
-    # ================= 4. LE MOIS =================
+    # 4. LE MOIS
     if "dash_jour" not in st.session_state:
         st.session_state["dash_jour"] = ajd
     jour_sel = st.session_state["dash_jour"]
@@ -851,16 +762,8 @@ if page_cle == "accueil":
             st.session_state["dash_jour"] = clic
             st.rerun()
 
-        if (d_annee, d_mois) != (ajd.year, ajd.month):
-            if st.button("↩️ Revenir à ce mois-ci", key="dash_cal_today"):
-                st.session_state["dash_ym"] = (ajd.year, ajd.month)
-                st.session_state["dash_jour"] = ajd
-                st.rerun()
-
         marque = " · aujourd'hui" if jour_sel == ajd else ""
-        st.markdown(f"<div class='jour-titre'>{JOURS[jour_sel.weekday()]} {jour_sel.day} "
-                    f"{MOIS[jour_sel.month - 1]}{marque}</div>", unsafe_allow_html=True)
-
+        st.markdown(f"<div class='jour-titre'>{JOURS[jour_sel.weekday()]} {jour_sel.day} {MOIS[jour_sel.month - 1]}{marque}</div>", unsafe_allow_html=True)
         du_jour = par_jour.get(jour_sel, [])
         for jd, h, ti, desc, idx in du_jour:
             detail = f"<br><span class='q'>{desc}</span>" if desc else ""
@@ -874,47 +777,21 @@ if page_cle == "accueil":
         with na:
             n_heure = st.text_input("Heure", key="dash_eheure", placeholder="19:30", label_visibility="collapsed")
         with nb:
-            n_titre = st.text_input("Événement", key="dash_etitre", placeholder="Ajouter ici…",
-                                    label_visibility="collapsed")
+            n_titre = st.text_input("Événement", key="dash_etitre", placeholder="Ajouter ici…", label_visibility="collapsed")
         with nc:
             if st.button("＋", key="dash_add_ev", type="primary") and n_titre.strip():
                 add_row("Agenda", [str(jour_sel), n_heure.strip(), n_titre.strip(), ""])
                 reset_after(dash_etitre="", dash_eheure="")
-                st.toast("Événement ajouté 💖", icon="📅")
                 st.rerun()
 
-    # ================= 5. BUDGET PARTAGÉ =================
+    # 5. BUDGET PARTAGÉ
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
     ecart = (total_l - total_a) / 2
-    if ecart > 0.005:
-        debiteur, qui, combien = "Alex", "Alex doit à Lucas", f"{ecart:.2f} €"
-    elif ecart < -0.005:
-        debiteur, qui, combien = "Lucas", "Lucas doit à Alex", f"{abs(ecart):.2f} €"
-    else:
-        debiteur, qui, combien = None, "Comptes équilibrés", "💖"
+    qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés 💖"
+    st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>", unsafe_allow_html=True)
 
-    st.markdown(f"<div class='solde'><span>{qui}</span><span class='m'>{combien}</span></div>",
-                unsafe_allow_html=True)
-
-    if debiteur:
-        if st.session_state.get("confirm_solde"):
-            s1, s2 = st.columns(2)
-            with s1:
-                if st.button("Oui, c'est remboursé", type="primary", key="solde_ok"):
-                    crediteur = "Lucas" if debiteur == "Alex" else "Alex"
-                    add_row("Budget", [str(ajd), debiteur, f"Remboursement à {crediteur}",
-                                       f"{abs(total_l - total_a):.2f}", "Fixe/Admin"])
-                    st.session_state["confirm_solde"] = False
-                    st.rerun()
-            with s2:
-                if st.button("Annuler", key="solde_non"):
-                    st.session_state["confirm_solde"] = False
-                    st.rerun()
-        elif st.button(f"💸 {debiteur} a remboursé", key="solde_go"):
-            st.session_state["confirm_solde"] = True
-            st.rerun()
-
+    # ================= 6. RÉGLAGES & ACCÈS DISCRET LABO IA =================
     with st.expander("⚙️ Réglages"):
         d1, d2 = st.columns(2)
         with d1:
@@ -926,9 +803,20 @@ if page_cle == "accueil":
             if st.button("🚪 Déconnexion", key="logout"):
                 st.cache_data.clear()
                 st.cache_resource.clear()
-                for k in ["creds_json", "db", "ops", "annulation"]:
+                for k in ["creds_json", "db", "ops", "annulation", "mode_ia"]:
                     st.session_state.pop(k, None)
                 st.rerun()
+        
+        st.divider()
+        # Accès discret par mot de passe
+        pwd = st.text_input("🔑 Code Labo IA", type="password", key="sec_pwd_input", placeholder="Code secret…")
+        if pwd == "2026":  # Tu peux modifier ce mot de passe ici
+            st.session_state["mode_ia"] = True
+            st.success("Mode Labo IA activé ✨")
+            st.rerun()
+        elif pwd:
+            st.error("Code incorrect")
+
         st.caption(f"Synchronisé {depuis(st.session_state['derniere_synchro'])} · version {VERSION}")
 
 # ==========================================================
@@ -936,98 +824,55 @@ if page_cle == "accueil":
 # ==========================================================
 elif page_cle == "budget":
     budget = rows("Budget")
-
     if budget:
         lignes = []
         for idx, r in budget:
             d, pyr, lbl, mnt, cat = pad(r, 5)
-            jour = parse_date(d)
-            lignes.append({"idx": idx, "Date": jour, "Payeur": pyr, "Intitulé": lbl,
-                           "Montant": to_float(mnt), "Catégorie": cat or "Alimentation"})
+            lignes.append({"idx": idx, "Date": parse_date(d), "Payeur": pyr, "Intitulé": lbl, "Montant": to_float(mnt), "Catégorie": cat or "Alimentation"})
         df = pd.DataFrame(lignes)
-
-        total_l = df[df["Payeur"] == "Lucas"]["Montant"].sum()
-        total_a = df[df["Payeur"] == "Alex"]["Montant"].sum()
-        ecart = (total_l - total_a) / 2
-
         m1, m2 = st.columns(2)
-        m1.metric("Payé par Lucas", f"{total_l:.2f} €")
-        m2.metric("Payé par Alex", f"{total_a:.2f} €")
-
-        if ecart > 0.005:
-            st.success(f"👉 Alex doit **{ecart:.2f} €** à Lucas")
-        elif ecart < -0.005:
-            st.success(f"👉 Lucas doit **{abs(ecart):.2f} €** à Alex")
-        else:
-            st.info("💖 Comptes parfaitement équilibrés")
-
-        periode = pills("f_periode", ["Ce mois-ci", "Tout"], cols=2)
-        if periode == "Ce mois-ci":
-            masque = df["Date"].apply(lambda d: bool(d) and (d.year, d.month) == (ajd.year, ajd.month))
-            filtre_df = df[masque]
-            st.caption(f"Total de {MOIS[ajd.month - 1]} : {filtre_df['Montant'].sum():.2f} €")
-        else:
-            filtre_df = df
-
+        m1.metric("Payé par Lucas", f"{df[df['Payeur'] == 'Lucas']['Montant'].sum():.2f} €")
+        m2.metric("Payé par Alex", f"{df[df['Payeur'] == 'Alex']['Montant'].sum():.2f} €")
         titre("Dépenses")
-        cat_filtre = pills("f_budget", ["Toutes"] + CAT_BUDGET, cols=3)
-        visibles = filtre_df if cat_filtre == "Toutes" else filtre_df[filtre_df["Catégorie"] == cat_filtre]
-
-        for _, r in visibles.iloc[::-1].iterrows():
-            quand = r["Date"].strftime("%d/%m") if r["Date"] else "—"
-            if ligne_action(f"{r['Intitulé']} <span class='tag'>{r['Catégorie']}</span>"
-                            f"<br><span class='q'>{r['Montant']:.2f} € · {r['Payeur']} · {quand}</span>",
-                            [("🗑️", f"bu_{r['idx']}")]):
-                delete_row("Budget", int(r["idx"]), libelle=f"« {r['Intitulé']} » supprimée")
+        for _, r in df.iloc[::-1].iterrows():
+            if ligne_action(f"{r['Intitulé']} <span class='tag'>{r['Catégorie']}</span><br><span class='q'>{r['Montant']:.2f} € · {r['Payeur']}</span>", [("🗑️", f"bu_{r['idx']}")]):
+                delete_row("Budget", int(r["idx"]), libelle="Dépense supprimée")
                 st.rerun()
-        if visibles.empty:
-            vide("Aucune dépense sur cette sélection.")
-        else:
-            export = visibles.drop(columns=["idx"]).to_csv(index=False).encode("utf-8")
-            st.download_button("📤 Exporter en CSV", export, file_name="depenses.csv",
-                               mime="text/csv", key="dl_budget")
     else:
-        vide("Aucune dépense enregistrée pour l'instant.")
+        vide("Aucune dépense.")
 
     st.divider()
     titre("Nouvelle dépense")
     b_payeur = pills("new_bud_payeur", PERSONNES, cols=2)
     b_cat = pills("new_bud_cat", CAT_BUDGET, cols=2)
-    b_label = st.text_input("Intitulé", key="new_bud_label", placeholder="Courses Delhaize…")
+    b_label = st.text_input("Intitulé", key="new_bud_label", placeholder="Magasin…")
     bc1, bc2 = st.columns(2)
     with bc1:
         b_montant = st.number_input("Montant (€)", min_value=0.0, step=0.5, key="new_bud_montant")
     with bc2:
         b_date = st.date_input("Date", value=ajd, key="new_bud_date")
-    if st.button("Enregistrer la dépense", type="primary", key="add_budget") \
-            and b_label.strip() and b_montant > 0:
+    if st.button("Enregistrer", type="primary", key="add_budget") and b_label.strip() and b_montant > 0:
         add_row("Budget", [str(b_date), b_payeur, b_label.strip(), f"{b_montant:.2f}", b_cat])
         reset_after(new_bud_label="", new_bud_montant=0.0)
-        st.toast("Dépense enregistrée 💶", icon="✅")
         st.rerun()
 
 # ==========================================================
-# 8c. MAISON (Regroupe Courses, Recettes)
+# 8c. MAISON
 # ==========================================================
 elif page_cle == "maison":
     with conteneur("mtabs"):
         onglet_m = pills("m_tab", ONGLETS_M, cols=2)
 
-    # ---------- COURSES ----------
     if onglet_m == ONGLETS_M[0]:
         courses = rows("Courses")
-
-        titre("💖 Nos articles habituels")
+        titre("💖 Articles habituels")
         rayon_memo = pills("memo_rayon", RAYONS[:-1], cols=2)
         deja = {pad(r, 3)[0].strip().lower() for _, r in courses}
-        propositions = [m for m in MEMOIRE_COURSES if m["rayon"] == rayon_memo]
         mc1, mc2 = st.columns(2)
-        for i, memo in enumerate(propositions):
+        for i, memo in enumerate([m for m in MEMOIRE_COURSES if m["rayon"] == rayon_memo]):
             with (mc1 if i % 2 == 0 else mc2):
-                dedans = memo["article"].strip().lower() in deja
-                if st.button(("✅ " if dedans else "＋ ") + memo["article"], key=f"memo_{memo['article']}"):
-                    add_course(memo["article"], memo["qte"], memo["rayon"])
-                    st.toast(f"{memo['article']} au panier", icon="🛒")
+                if st.button(("✅ " if memo["article"].lower() in deja else "＋ ") + memo["article"], key=f"memo_{memo['article']}"):
+                    add_row("Courses", [memo["article"], memo["qte"], memo["rayon"]])
                     st.rerun()
 
         st.divider()
@@ -1038,87 +883,54 @@ elif page_cle == "maison":
                 if not du_rayon:
                     continue
                 with conteneur(f"grp-{slug(rayon)}"):
-                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>",
-                                unsafe_allow_html=True)
+                    st.markdown(f"<div class='rayon'>{rayon}</div>", unsafe_allow_html=True)
                     for idx, r in du_rayon:
                         art, qte, _ = pad(r, 3)
                         if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"co_{idx}")]):
-                            delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
+                            delete_row("Courses", idx, libelle="Article retiré")
                             st.rerun()
-
-            texte = "🛒 Liste de courses\n\n"
-            for rayon in RAYONS:
-                du_rayon = [pad(r, 3) for _, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
-                if du_rayon:
-                    texte += f"— {rayon} —\n" + "".join(f"  • {a} ({q})\n" for a, q, _ in du_rayon) + "\n"
-            e1, e2 = st.columns(2)
-            with e1:
-                st.download_button("📤 Exporter", texte, file_name="liste-de-courses.txt",
-                                   mime="text/plain", key="dl_courses")
-            with e2:
-                if st.session_state.get("confirm_vider"):
-                    if st.button("Confirmer", type="primary", key="vider_ok"):
-                        clear_sheet("Courses")
-                        st.session_state["confirm_vider"] = False
-                        st.rerun()
-                elif st.button("🧹 Vider", key="vider_go"):
-                    st.session_state["confirm_vider"] = True
-                    st.rerun()
         else:
-            vide("Le panier est vide. Piochez dans les habituels ci-dessus.")
+            vide("Panier vide.")
 
-        st.divider()
-        titre("Ajouter autre chose")
-        st.caption("Le rayon est deviné automatiquement, ajustez-le si besoin.")
-        c_rayon = pills("new_course_rayon", RAYONS, cols=2)
-        ca, cb = st.columns([3, 1])
-        with ca:
-            c_art = st.text_input("Article", key="new_course_art", placeholder="Fraises…")
-        with cb:
-            c_qte = st.text_input("Qté", key="new_course_qte", value="1")
-        if st.button("Ajouter au panier", type="primary", key="add_course") and c_art.strip():
-            add_course(c_art, c_qte or "1", c_rayon)
-            reset_after(new_course_art="", new_course_qte="1")
-            st.rerun()
-
-    # ---------- RECETTES ----------
     elif onglet_m == ONGLETS_M[1]:
         recettes = rows("Recettes")
-        recherche = st.text_input("Rechercher", key="rec_search", placeholder="🔎 Chercher une recette…",
-                                  label_visibility="collapsed")
-        trouvees = [(i, r) for i, r in recettes if recherche.lower() in " ".join(pad(r, 3)).lower()]
-        for idx, r in trouvees:
+        for idx, r in recettes:
             t, ing, inst = pad(r, 3)
             with st.expander(f"🍲 {t}"):
-                if ing:
-                    st.markdown(f"**Ingrédients**\n\n{ing}")
-                if inst:
-                    st.markdown(f"**Préparation**\n\n{inst}")
-                b1, b2 = st.columns(2)
-                with b1:
-                    if st.button("🛒 Au panier", key=f"rec_panier_{idx}") and ing:
-                        ajoutes = 0
-                        for brut in ing.splitlines():
-                            if brut.strip():
-                                article, qte = separer_quantite(brut)
-                                add_course(article, qte)
-                                ajoutes += 1
-                        st.toast(f"{ajoutes} ingrédient(s) ajouté(s) 🛒", icon="✅")
-                        st.rerun()
-                with b2:
-                    if st.button("🗑️ Supprimer", key=f"re_{idx}"):
-                        delete_row("Recettes", idx, libelle=f"Recette « {t} » supprimée")
-                        st.rerun()
-        if not trouvees:
-            vide("Aucune recette pour l'instant.")
+                st.markdown(f"**Ingrédients**\n\n{ing}")
+                if st.button("🗑️ Supprimer", key=f"re_{idx}"):
+                    delete_row("Recettes", idx, libelle="Recette supprimée")
+                    st.rerun()
+        if not recettes:
+            vide("Aucune recette.")
 
-        st.divider()
-        with st.form("form_recette", clear_on_submit=True):
-            titre("Nouvelle recette")
-            st.caption("Un ingrédient par ligne : « 200 g de farine ». Le panier saura les relire.")
-            r_titre = st.text_input("Nom")
-            r_ing = st.text_area("Ingrédients", height=90)
-            r_inst = st.text_area("Préparation", height=110)
-            if st.form_submit_button("Enregistrer la recette", type="primary") and r_titre.strip():
-                add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
-                st.rerun()
+# ==========================================================
+# 8d. LABO IA & FORMATIONS (Mode Caché)
+# ==========================================================
+elif page_cle == "ialab" and st.session_state.get("mode_ia"):
+    titre("🧠 Labo IA & Formations")
+    st.caption("Espace dédié à l'enregistrement de tes apprentissages, priorités et gestion des dangers.")
+
+    # Formulaire de saisie d'apprentissage ou règle de priorité
+    ialab_sujet = st.text_input("Sujet / Domaine", placeholder="Ex: Électricité - Câblage / Frigoriste / Stratégie Priorités")
+    ialab_type = pills("ialab_type_pills", ["Apprentissage / Note", "Règle de Priorité", "Sécurité & Dangers"], cols=3)
+    ialab_contenu = st.text_area("Notes de synthèse ou Consigne pour l'IA", height=130, placeholder="Détaille tes notes ici…")
+
+    if st.button("Enregistrer dans la base IA", type="primary", key="btn_save_ialab") and ialab_sujet.strip():
+        add_row("IA_Lab", [str(ajd), ialab_sujet.strip(), ialab_contenu.strip(), ialab_type])
+        st.toast("Contexte enregistré pour l'IA 🚀", icon="✅")
+        st.rerun()
+
+    st.divider()
+    titre("📚 Historique de vos notes & contextes enregistrés")
+    ialab_rows = rows("IA_Lab")
+    if ialab_rows:
+        for idx, r in reversed(ialab_rows):
+            d, suj, cont, typ = pad(r, 4)
+            with st.expander(f"📌 [{typ}] {suj} ({d})"):
+                st.write(cont or "_Aucun contenu_")
+                if st.button("🗑️ Supprimer", key=f"ialab_del_{idx}"):
+                    delete_row("IA_Lab", idx, libelle="Note supprimée")
+                    st.rerun()
+    else:
+        vide("Aucune note enregistrée pour le moment.")
