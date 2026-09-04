@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.28"
+VERSION = "2.29"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -734,7 +734,7 @@ if page_cle == "accueil":
         entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
             for idx, nom in actives[:6]:
-                clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx})"])
+                clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
                 if clique == f"acc_tk_{idx}":
                     set_cell("Taches", idx, 2, "Fait")
                     st.rerun()
