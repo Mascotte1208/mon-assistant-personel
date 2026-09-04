@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.33"
+VERSION = "2.34"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -118,7 +118,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE
+# 2. STYLE (Inspiré du Dashboard Clean / Style UI de la référence)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -274,8 +274,7 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--ros
   justify-content:flex-start !important; text-align:left !important;
 }
 [class*="st-key-goto-"] button p{font-size:16px !important; font-weight:800 !important;}
-[class*="st-key-goto-"] button::after{content:"›"; margin-left:auto; font-size:20px; opacity:.45;}
-[class*="st-key-goto-"] button:hover::after{opacity:.9;}
+[class*="st-key-goto-"] button::hover::after{opacity:.9;}
 
 .st-key-iatabs{margin-bottom:8px;}
 .st-key-iatabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
@@ -560,19 +559,20 @@ def depuis(instant):
     return f"il y a {int(secondes // 3600)} h"
 
 @st.cache_data(ttl=120, show_spinner=False)
-def fetch_market_data(ticker):
+def fetch_market_history(tickers_list, period="1mo"):
     try:
         import yfinance as yf
-        t = yf.Ticker(ticker)
-        df = t.history(period="5d")
-        if not df.empty:
-            dernier = float(df['Close'].iloc[-1])
-            precedent = float(df['Close'].iloc[-2]) if len(df) > 1 else dernier
-            variation = ((dernier - precedent) / precedent) * 100
-            return dernier, variation, None
+        data = yf.download(tickers_list, period=period, progress=False)
+        if 'Close' in data:
+            df_close = data['Close']
+            if isinstance(df_close, pd.Series):
+                df_close = df_close.to_frame(name=tickers_list[0])
+            return df_close.dropna(how="all"), None
+        elif not data.empty:
+            return data, None
     except Exception as e:
-        return None, None, str(e)
-    return None, None, "Données indisponibles"
+        return None, str(e)
+    return None, "Données indisponibles"
 
 # ==========================================================
 # 5. COMPOSANTS D'INTERFACE
@@ -985,7 +985,7 @@ elif page_cle == "maison":
                 st.rerun()
 
 # ==========================================================
-# 8d. LABO IA & FORMATIONS / MARCHÉS
+# 8d. LABO IA & FORMATIONS / MARCHÉS (Dashboard multi-actifs)
 # ==========================================================
 elif page_cle == "ialab" and st.session_state.get("mode_ia"):
     titre("🧠 Labo IA & Marchés Financiers")
@@ -1020,38 +1020,77 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
             vide("Aucune note enregistrée pour le moment.")
 
     elif onglet_ia == ONGLETS_IA[1]:
-        st.caption("Suivi en direct des cours et analyse rapide (via yfinance).")
+        st.caption("Dashboard de comparaison des marchés financiers en direct (Style UI épuré).")
 
-        actifs_suivis = [
-            {"nom": "Or (Gold)", "ticker": "GC=F", "unite": "$"},
-            {"nom": "Bitcoin", "ticker": "BTC-USD", "unite": "$"},
-            {"nom": "Apple", "ticker": "AAPL", "unite": "$"},
-            {"nom": "Nvidia", "ticker": "NVDA", "unite": "$"},
-            {"nom": "S&P 500", "ticker": "^GSPC", "unite": "$"}
-        ]
+        # Dictionnaire des actifs disponibles par défaut
+        dictionnaire_actifs = {
+            "Or (Gold)": "GC=F",
+            "Bitcoin": "BTC-USD",
+            "Apple": "AAPL",
+            "Nvidia": "NVDA",
+            "S&P 500": "^GSPC",
+            "Ethereum": "ETH-USD",
+            "Tesla": "TSLA",
+            "Microsoft": "MSFT"
+        }
 
-        selection_actif = st.selectbox("Choisir un actif à analyser en direct", [a["nom"] for a in actifs_suivis])
-        actif_actuel = next(a for a in actifs_suivis if a["nom"] == selection_actif)
+        # Sélection multiple d'actifs pour comparaison
+        selection_actifs_noms = st.multiselect(
+            "Sélectionner les actifs à comparer",
+            options=list(dictionnaire_actifs.keys()),
+            default=["Or (Gold)", "Bitcoin", "Apple"]
+        )
 
-        prix, variation, erreur = fetch_market_data(actif_actuel["ticker"])
+        periode_choisie = pills("market_period", ["1mo", "3mo", "6mo", "1y"], defaut="1mo", cols=4)
 
-        if erreur:
-            st.warning(f"Impossible de récupérer les données en direct pour {selection_actif} ({erreur}). Vérifiez que la bibliothèque yfinance est installée.")
-        elif prix is not None:
-            delta_str = f"{variation:+.2f}%"
-            st.metric(label=f"Cours actuel — {selection_actif}", value=f"{prix:,.2f} {actif_actuel['unite']}", delta=delta_str)
-
-            titre("🔍 Outil d'Analyse de Situation")
-            st.write("Évalue la configuration actuelle pour cet actif (stratégie DCA, support, résistance ou prise de décision) :")
-
-            strategie_choisie = st.selectbox("Type d'analyse", ["Analyse Technique / Tendance", "Opportunité DCA (Dollar-Cost Averaging)", "Gestion du Risque / Stop-Loss"])
+        if selection_actifs_noms:
+            tickers_a_charger = [dictionnaire_actifs[nom] for nom in selection_actifs_noms]
             
-            note_analyse = st.text_area("Notes d'analyse personnelle", placeholder="Ex: RSI bas, cassure de résistance imminente, zone d'accumulation intéressante...")
+            # Blocs de métriques rapides (Style cartes UI)
+            df_hist, err = fetch_market_history(tickers_a_charger, period=periode_choisie)
 
-            if st.button("Enregistrer cette analyse dans le Labo IA", type="primary", key="btn_save_market_analysis") and note_analyse.strip():
-                contenu_complet = f"Actif : {selection_actif} | Prix : {prix:,.2f} {actif_actuel['unite']} ({delta_str})\nAnalyse : {note_analyse}"
-                add_row("IA_Lab", [str(ajd), f"Analyse Marché - {selection_actif}", contenu_complet, strategie_choisie])
-                st.toast("Analyse enregistrée avec succès ! 📈", icon="✅")
-                st.rerun()
+            if err:
+                st.warning(f"Erreur de chargement des marchés : {err}. Vérifiez que 'yfinance' est installé.")
+            elif df_hist is not None and not df_hist.empty:
+                # Affichage des cartes de KPI (Inspiré du design dashboard)
+                cols_kpi = st.columns(len(selection_actifs_noms))
+                for idx, nom in enumerate(selection_actifs_noms):
+                    tk = dictionnaire_actifs[nom]
+                    with cols_kpi[idx % len(cols_kpi)]:
+                        try:
+                            serie_prix = df_hist[tk].dropna() if isinstance(df_hist.columns, pd.MultiIndex) or tk in df_hist.columns else df_hist.iloc[:, idx].dropna()
+                            if not serie_prix.empty:
+                                dernier_val = float(serie_prix.iloc[-1])
+                                premier_val = float(serie_prix.iloc[0])
+                                var_pct = ((dernier_val - premier_val) / premier_val) * 100
+                                st.metric(label=nom, value=f"{dernier_val:,.2f} $", delta=f"{var_pct:+.2f}%")
+                        except Exception:
+                            st.metric(label=nom, value="N/A")
+
+                st.divider()
+                titre("📊 Graphique comparatif des cours")
+                
+                # Normalisation ou tracé direct multi-lignes
+                try:
+                    if isinstance(df_hist.columns, pd.MultiIndex):
+                        # Si multiindex yfinance
+                        df_close = df_hist['Close']
+                    else:
+                        df_close = df_hist
+
+                    st.line_chart(df_close)
+                except Exception as e:
+                    st.info(fAffichage du graphique indisponible : {e})
+
+                st.divider()
+                titre("🔍 Enregistrer une analyse croisée")
+                note_comparaison = st.text_area("Notes de synthèse ou stratégie DCA multi-actifs", placeholder="Ex: Comparaison Or vs Bitcoin sur la période, arbitrage en cours...")
+                if st.button("Enregistrer l'analyse comparative", type="primary", key="btn_save_multi_market") and note_comparaison.strip():
+                    contenu_txt = f"Actifs comparés : {', '.join(selection_actifs_noms)} | Période : {periode_choisie}\nAnalyse : {note_comparaison}"
+                    add_row("IA_Lab", [str(ajd), f"Analyse Comparative Marchés", contenu_txt, "Analyse Technique / Tendance"])
+                    st.toast("Analyse comparative enregistrée avec succès ! 📈", icon="✅")
+                    st.rerun()
+            else:
+                st.info("Chargement des données boursières...")
         else:
-            st.info("Récupération des données boursières en cours...")
+            st.info("Veuillez sélectionner au moins un actif ci-dessus pour afficher le dashboard.")
