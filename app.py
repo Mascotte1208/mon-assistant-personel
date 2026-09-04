@@ -213,6 +213,15 @@ label p{font-weight:700 !important; font-size:13px !important; color:var(--prune
   margin-bottom:10px;
 }
 .jour-titre{font-size:13px; font-weight:800; color:#a21caf; padding:6px 0 2px;}
+
+/* --- Tuiles cliquables du dashboard --- */
+.st-key-dash-tiles [data-testid="column"]{padding:0 3px;}
+.st-key-dash-tiles button{
+  min-height:62px !important; border-radius:20px !important;
+  font-size:13px !important; font-weight:800 !important; line-height:1.35 !important;
+  white-space:normal !important;
+}
+.st-key-dash-tiles button p{font-size:13px !important; font-weight:800 !important;}
 .today-box{
   background:#fff; border:1.5px solid var(--bord); border-radius:22px; padding:15px 18px;
   box-shadow:0 10px 22px rgba(236,72,153,.08); margin-bottom:12px;
@@ -481,6 +490,14 @@ def ligne_action(html, boutons, done=False):
     return clique
 
 
+def conteneur(cle=None, bordure=False):
+    """st.container avec clé CSS quand la version de Streamlit le permet."""
+    try:
+        return st.container(border=bordure, key=cle) if cle else st.container(border=bordure)
+    except TypeError:
+        return st.container(border=bordure)
+
+
 def parse_date(txt):
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"):
         try:
@@ -614,9 +631,145 @@ if page == "🏠 Accueil":
                 delete_row("Repas", idx)
                 st.rerun()
 
-    # ---------- 2. Trois chiffres clés ----------
-    faites = len([r for _, r in taches if pad(r, 3)[2] == "Fait"])
-    a_faire = len(taches) - faites
+    # ---------- 2. Note épinglée ----------
+    epingle = next((pad(r, 2) for _, r in notes if "important" in pad(r, 2)[0].lower()), None)
+    if epingle:
+        st.markdown(f"""
+        <div class="note-box">
+          <div class="t">📌 {epingle[0]}</div>
+          <div class="c">{epingle[1]}</div>
+        </div>""", unsafe_allow_html=True)
+
+    # ---------- 3. Trois cadres cliquables ----------
+    actives = [(i, r) for i, r in taches if pad(r, 3)[2] != "Fait"]
+    actives.sort(key=lambda x: pad(x[1], 3)[1] != "Urgent")
+    faites = len(taches) - len(actives)
+
+    focus = st.session_state.get("focus", "taches")
+    tuiles = [
+        ("taches", f"🌸 {len(actives)}\n\nà faire"),
+        ("courses", f"🛒 {len(courses)}\n\ncourses"),
+        ("agenda", f"📅 {len(a_venir)}\n\nà venir"),
+    ]
+    with conteneur("dash-tiles"):
+        cols = st.columns(3)
+        for col, (cle, libelle) in zip(cols, tuiles):
+            with col:
+                if st.button(libelle, key=f"focus_{cle}",
+                             type="primary" if focus == cle else "secondary"):
+                    st.session_state["focus"] = None if focus == cle else cle
+                    st.rerun()
+
+    # --- Cadre : tâches ---
+    if focus == "taches":
+        with conteneur(bordure=True):
+            if actives:
+                for idx, r in actives[:8]:
+                    nom, cat, _ = pad(r, 3)
+                    clique = ligne_action(f"{nom}<span class='tag'>{cat or 'Général'}</span>",
+                                          [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
+                    if clique == f"acc_tk_{idx}":
+                        set_cell("Taches", idx, 3, "Fait")
+                        st.rerun()
+                    elif clique == f"acc_td_{idx}":
+                        delete_row("Taches", idx)
+                        st.rerun()
+                if len(actives) > 8:
+                    st.caption(f"+ {len(actives) - 8} autres dans Quotidien")
+            else:
+                st.markdown("<div class='today-none'>🎉 Tout est fait, profitez de votre soirée.</div>",
+                            unsafe_allow_html=True)
+            if faites:
+                st.caption(f"{faites} tâche(s) déjà cochée(s)")
+            ta, tb = st.columns([3, 1])
+            with ta:
+                dash_tache = st.text_input("Nouvelle tâche", key="dash_tache",
+                                           placeholder="Nouvelle tâche…", label_visibility="collapsed")
+            with tb:
+                if st.button("＋", key="dash_add_tache", type="primary") and dash_tache.strip():
+                    add_row("Taches", [dash_tache.strip(), "Autre", "À faire"])
+                    reset_after(dash_tache="")
+                    st.rerun()
+
+    # --- Cadre : courses ---
+    if focus == "courses":
+        with conteneur(bordure=True):
+            if courses:
+                for rayon in RAYONS:
+                    du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
+                    if not du_rayon:
+                        continue
+                    st.markdown(f"<div class='rayon'>{rayon}</div>", unsafe_allow_html=True)
+                    for idx, r in du_rayon:
+                        art, qte, _ = pad(r, 3)
+                        if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
+                            delete_row("Courses", idx)
+                            st.rerun()
+            else:
+                st.markdown("<div class='today-none'>Le panier est vide 🛒</div>", unsafe_allow_html=True)
+            ca, cb, cc = st.columns([3, 1, 1])
+            with ca:
+                dash_course = st.text_input("Article", key="dash_course",
+                                            placeholder="Ajouter un article…", label_visibility="collapsed")
+            with cb:
+                dash_qte = st.text_input("Qté", key="dash_qte", value="1", label_visibility="collapsed")
+            with cc:
+                if st.button("＋", key="dash_add_course", type="primary") and dash_course.strip():
+                    add_course(dash_course, dash_qte or "1", "Autre")
+                    reset_after(dash_course="", dash_qte="1")
+                    st.rerun()
+
+    # --- Cadre : agenda ---
+    if focus == "agenda":
+        with conteneur(bordure=True):
+            if "dash_ym" not in st.session_state:
+                st.session_state["dash_ym"] = (ajd.year, ajd.month)
+            d_annee, d_mois = st.session_state["dash_ym"]
+
+            m1, m2, m3 = st.columns([1, 3, 1])
+            with m1:
+                if st.button("◀", key="dash_prev"):
+                    st.session_state["dash_ym"] = (d_annee - 1, 12) if d_mois == 1 else (d_annee, d_mois - 1)
+                    st.rerun()
+            with m2:
+                st.markdown(f"<div class='cal-title'>{MOIS[d_mois - 1].capitalize()} {d_annee}</div>",
+                            unsafe_allow_html=True)
+            with m3:
+                if st.button("▶", key="dash_next"):
+                    st.session_state["dash_ym"] = (d_annee + 1, 1) if d_mois == 12 else (d_annee, d_mois + 1)
+                    st.rerun()
+
+            st.markdown(grille_mois(d_annee, d_mois, par_jour, ajd), unsafe_allow_html=True)
+
+            du_mois = [e for e in evenements if (e[0].year, e[0].month) == (d_annee, d_mois) and e[0] >= ajd]
+            for jd, h, ti, desc, idx in du_mois[:6]:
+                if jd == ajd:
+                    quand = "Aujourd'hui"
+                elif jd == ajd + timedelta(days=1):
+                    quand = "Demain"
+                else:
+                    quand = f"{JOURS[jd.weekday()][:3]} {jd.day}/{jd.month}"
+                if ligne_action(f"<span class='tag'>{quand}{f' · {h}' if h else ''}</span> {ti}",
+                                [("🗑️", f"acc_ev_next_{idx}")]):
+                    delete_row("Agenda", idx)
+                    st.rerun()
+            if not du_mois:
+                st.markdown("<div class='today-none'>Rien de prévu sur ce mois.</div>", unsafe_allow_html=True)
+
+            ea, eb, ec = st.columns([2, 3, 1])
+            with ea:
+                dash_edate = st.date_input("Date", key="dash_edate", value=ajd, label_visibility="collapsed")
+            with eb:
+                dash_etitre = st.text_input("Événement", key="dash_etitre",
+                                            placeholder="Nouvel événement…", label_visibility="collapsed")
+            with ec:
+                if st.button("＋", key="dash_add_ev", type="primary") and dash_etitre.strip():
+                    add_row("Agenda", [str(dash_edate), "", dash_etitre.strip(), ""])
+                    st.session_state["dash_ym"] = (dash_edate.year, dash_edate.month)
+                    reset_after(dash_etitre="")
+                    st.rerun()
+
+    # ---------- 4. Budget partagé ----------
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
     diff = (total_l - total_a) / 2
@@ -627,22 +780,16 @@ if page == "🏠 Accueil":
     else:
         debiteur, qui, combien = None, "Comptes équilibrés", "💖"
 
-    st.markdown(f"""
-    <div class="tiles">
-      <div class="tile"><div class="n">{a_faire}</div><div class="l">🌸 À faire</div></div>
-      <div class="tile"><div class="n">{len(courses)}</div><div class="l">🛒 Courses</div></div>
-      <div class="tile"><div class="n">{len(a_venir)}</div><div class="l">📅 À venir</div></div>
-    </div>
-    <div class="solde"><span>{qui}</span><span class="m">{combien}</span></div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"<div class='solde'><span>{qui}</span><span class='m'>{combien}</span></div>",
+                unsafe_allow_html=True)
 
     if debiteur:
         if st.session_state.get("confirm_solde"):
             s1, s2 = st.columns(2)
             with s1:
                 if st.button("Oui, c'est remboursé", type="primary"):
-                    add_row("Budget", [str(ajd), debiteur, f"Remboursement à "
-                                       f"{'Lucas' if debiteur == 'Alex' else 'Alex'}",
+                    créancier = "Lucas" if debiteur == "Alex" else "Alex"
+                    add_row("Budget", [str(ajd), debiteur, f"Remboursement à {créancier}",
                                        f"{abs(total_l - total_a):.2f}", "Fixe/Admin"])
                     st.session_state["confirm_solde"] = False
                     st.rerun()
@@ -652,95 +799,6 @@ if page == "🏠 Accueil":
                     st.rerun()
         elif st.button(f"💸 {debiteur} a remboursé"):
             st.session_state["confirm_solde"] = True
-            st.rerun()
-
-    # ---------- 3. Note épinglée ----------
-    epingle = next((pad(r, 2) for _, r in notes if "important" in pad(r, 2)[0].lower()), None)
-    if epingle:
-        st.markdown(f"""
-        <div class="note-box">
-          <div class="t">📌 {epingle[0]}</div>
-          <div class="c">{epingle[1]}</div>
-        </div>""", unsafe_allow_html=True)
-
-    # ---------- 4. Agenda du mois ----------
-    if "dash_ym" not in st.session_state:
-        st.session_state["dash_ym"] = (ajd.year, ajd.month)
-    d_annee, d_mois = st.session_state["dash_ym"]
-
-    titre("📅 Notre mois")
-    m1, m2, m3 = st.columns([1, 3, 1])
-    with m1:
-        if st.button("◀", key="dash_prev"):
-            st.session_state["dash_ym"] = (d_annee - 1, 12) if d_mois == 1 else (d_annee, d_mois - 1)
-            st.rerun()
-    with m2:
-        st.markdown(f"<div class='cal-title'>{MOIS[d_mois - 1].capitalize()} {d_annee}</div>",
-                    unsafe_allow_html=True)
-    with m3:
-        if st.button("▶", key="dash_next"):
-            st.session_state["dash_ym"] = (d_annee + 1, 1) if d_mois == 12 else (d_annee, d_mois + 1)
-            st.rerun()
-
-    st.markdown(grille_mois(d_annee, d_mois, par_jour, ajd), unsafe_allow_html=True)
-
-    suite = [e for e in evenements if e[0] > ajd and (e[0].year, e[0].month) == (d_annee, d_mois)] \
-        or a_venir
-    if suite:
-        for jd, h, ti, desc, idx in suite[:3]:
-            quand = "Demain" if jd == ajd + timedelta(days=1) else f"{JOURS[jd.weekday()][:3]} {jd.day}/{jd.month}"
-            if ligne_action(f"<span class='tag'>{quand}{f' · {h}' if h else ''}</span> {ti}",
-                            [("🗑️", f"acc_next_{idx}")]):
-                delete_row("Agenda", idx)
-                st.rerun()
-    else:
-        st.caption("Aucun rendez-vous à venir.")
-
-    # ---------- 5. Tâches, urgentes en premier ----------
-    actives = [(i, r) for i, r in taches if pad(r, 3)[2] != "Fait"]
-    actives.sort(key=lambda x: pad(x[1], 3)[1] != "Urgent")
-    if actives:
-        titre("🌸 À faire")
-        for idx, r in actives[:5]:
-            nom, cat, _ = pad(r, 3)
-            clique = ligne_action(f"{nom}<span class='tag'>{cat or 'Général'}</span>",
-                                  [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
-            if clique == f"acc_tk_{idx}":
-                set_cell("Taches", idx, 3, "Fait")
-                st.rerun()
-            elif clique == f"acc_td_{idx}":
-                delete_row("Taches", idx)
-                st.rerun()
-        if len(actives) > 5:
-            st.caption(f"+ {len(actives) - 5} autres dans l'onglet Quotidien")
-    else:
-        titre("🌸 À faire")
-        vide("🎉 Tout est fait, profitez de votre soirée.")
-
-    # ---------- 6. Panier express ----------
-    if courses:
-        titre(f"🛒 Panier ({len(courses)})")
-        for idx, r in courses[:5]:
-            art, qte, _ = pad(r, 3)
-            if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
-                delete_row("Courses", idx)
-                st.rerun()
-        if len(courses) > 5:
-            st.caption(f"+ {len(courses) - 5} autres articles dans l'onglet Quotidien")
-
-    with st.expander("⚡ Ajout rapide"):
-        cible = pills("quick_cible", ["Tâche", "Course", "Note"], cols=3)
-        q_txt = st.text_input("Quoi ?", key="quick_txt", placeholder=f"Nouvelle {cible.lower()}…",
-                              label_visibility="collapsed")
-        if st.button("Ajouter", key="quick_add", type="primary") and q_txt.strip():
-            if cible == "Tâche":
-                add_row("Taches", [q_txt.strip(), "Autre", "À faire"])
-            elif cible == "Course":
-                add_course(q_txt.strip(), "1", "Autre")
-            else:
-                add_row("Notes", [q_txt.strip(), ""])
-            reset_after(quick_txt="")
-            st.toast(f"{cible} ajoutée 💖", icon="✅")
             st.rerun()
 
     st.divider()
