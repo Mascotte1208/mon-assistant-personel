@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.29"
+VERSION = "2.30"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -777,7 +777,7 @@ if page_cle == "accueil":
                 delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
 
-    # 3. COURSES (Uniquement la redirection, sans liste d'articles)
+    # 3. COURSES (Redirection épurée)
     entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
 
     # 4. LE MOIS
