@@ -3,7 +3,8 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 import json
-from datetime import datetime
+from datetime import datetime, date
+import calendar
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
@@ -24,12 +25,11 @@ st.markdown("""
     </head>
 """, unsafe_allow_html=True)
 
-# --- STYLE CSS DESIGN SUR-MESURE ("WARM MINERAL & SAGE") ---
+# --- STYLE CSS DESIGN SUR-MESURE ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
-    /* Fond principal couleur sable / lin très doux */
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
         background: linear-gradient(180deg, #f8f8f6 0%, #f1f1ed 100%) !important;
@@ -79,6 +79,51 @@ st.markdown("""
         font-weight: 600;
     }
 
+    /* WIDGET CALENDRIER EN BLOCS EN BOIS */
+    .wooden-block-calendar {
+        background: linear-gradient(145deg, #2d241e, #1a1512);
+        border: 2px solid #524136;
+        border-radius: 24px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 14px 28px rgba(0,0,0,0.25);
+        margin-bottom: 20px;
+    }
+    .block-month {
+        font-size: 14px;
+        font-weight: 800;
+        color: #f59e0b;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+    }
+    .block-cubes {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+    .block-cube {
+        background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+        color: #1e293b;
+        font-size: 38px;
+        font-weight: 800;
+        width: 65px;
+        height: 70px;
+        line-height: 70px;
+        border-radius: 16px;
+        box-shadow: inset 0 -4px 0 rgba(0,0,0,0.15), 0 6px 12px rgba(0,0,0,0.3);
+    }
+    .block-dayname {
+        font-size: 13px;
+        font-weight: 700;
+        color: #e2e8f0;
+        background: rgba(255,255,255,0.1);
+        padding: 6px 14px;
+        border-radius: 12px;
+        display: inline-block;
+    }
+
     /* Navigation Onglets Flottante */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
@@ -107,7 +152,7 @@ st.markdown("""
         box-shadow: 0 6px 18px rgba(55, 48, 163, 0.15);
     }
 
-    /* Cartes Glassmorphism avec tons minéraux */
+    /* Cartes Glassmorphism */
     .glass-card-purple {
         background: #ffffff;
         border: 1px solid #e0e7ff;
@@ -287,6 +332,27 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
+# --- WIDGET CALENDRIER EN BLOCS EN BOIS DU JOUR ---
+today = date.today()
+mois_fr = ["JANVIER", "FÉVRIER", "MARS", "AVRIL", "MAI", "JUIN", "JUILLET", "AOÛT", "SEPTEMBRE", "OCTOBRE", "NOVEMBRE", "DÉCEMBRE"]
+jours_fr = ["LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI", "DIMANCHE"]
+
+day_str = f"{today.day:02d}"
+cube1, cube2 = day_str[0], day_str[1]
+month_str = mois_fr[today.month - 1]
+day_name_str = jours_fr[today.weekday()]
+
+st.markdown(f"""
+    <div class="wooden-block-calendar">
+        <div class="block-month">📅 {month_str}</div>
+        <div class="block-cubes">
+            <div class="block-cube">{cube1}</div>
+            <div class="block-cube">{cube2}</div>
+        </div>
+        <div class="block-dayname">{day_name_str}</div>
+    </div>
+""", unsafe_allow_html=True)
+
 # --- NAVIGATION RESTRUCTURÉE ---
 tab_dash, tab_quotidien, tab_budget_adv, tab_pro, tab_loisirs = st.tabs([
     "🏠 Dashboard", "📋 Quotidien", "📊 Budget", "🎓 Espace Pro", "🐾 Saiko & Cuisine"
@@ -423,7 +489,7 @@ json_str = st.session_state["json_credentials_str"]
 # ==========================================
 with tab_quotidien:
     if json_str:
-        sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda", "🛒 Courses", "🍽️ Repas"])
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda & Vue Mois", "🛒 Courses", "🍽️ Repas"])
         
         with sub_tab1:
             st.subheader("✅ Tâches à faire")
@@ -474,7 +540,28 @@ with tab_quotidien:
                     st.rerun()
 
         with sub_tab2:
-            st.subheader("📅 Agenda")
+            st.subheader("📅 Agenda & Vue Mois")
+            
+            # --- VUE CALENDRIER DU MOIS ---
+            st.markdown(f"#### 🗓️ Calendrier - {mois_fr[today.month - 1]} {today.year}")
+            cal = calendar.monthcalendar(today.year, today.month)
+            cols = st.columns(7)
+            jours_court = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+            for i, h in enumerate(jours_court):
+                cols[i].caption(f"**{h}**")
+            
+            for week in cal:
+                cols_w = st.columns(7)
+                for i, day_num in enumerate(week):
+                    if day_num != 0:
+                        if day_num == today.day:
+                            cols_w[i].markdown(f"🔵 **{day_num}**")
+                        else:
+                            cols_w[i].write(f"{day_num}")
+                    else:
+                        cols_w[i].write(" ")
+            st.divider()
+
             all_vals = get_data("Agenda")
             events_data = all_vals[1:] if len(all_vals) > 1 else []
 
