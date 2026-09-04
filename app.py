@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.26"
+VERSION = "2.27"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -762,7 +762,7 @@ if page_cle == "accueil":
                     st.session_state["show_add_tache"] = False
                     st.rerun()
 
-    # 2. AUJOURD'HUI (Passé avant courses)
+    # 2. AUJOURD'HUI
     with conteneur("carte-aujourdhui"):
         entete_bloc("📅 Aujourd'hui", len(evts_jour) + len(repas_jour) or None)
         if not evts_jour and not repas_jour:
@@ -777,23 +777,19 @@ if page_cle == "accueil":
                 delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
 
-    # 3. COURSES
+    # 3. COURSES (Version compacte / réduite sur le dashboard)
     with conteneur("carte-courses"):
         entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
         if courses:
-            montre = 0
-            for rayon in RAYONS:
-                du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
-                if not du_rayon or montre >= 10:
-                    continue
-                with conteneur(f"grp-{slug(rayon)}"):
-                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>", unsafe_allow_html=True)
-                    for idx, r in du_rayon[:10 - montre]:
-                        art, qte, _ = pad(r, 3)
-                        if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
-                            delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
-                            st.rerun()
-                montre += len(du_rayon[:10 - montre])
+            # Affichage compact : uniquement les 4 premiers articles pour ne pas encombrer le dashboard
+            A_AFFICHER = 4
+            for idx, r in courses[:A_AFFICHER]:
+                art, qte, rayon = pad(r, 3)
+                if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
+                    delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
+                    st.rerun()
+            if len(courses) > A_AFFICHER:
+                st.caption(f"Et {len(courses) - A_AFFICHER} autre(s) article(s)... (cliquez sur le titre ci-dessus pour tout voir)")
         else:
             st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
 
@@ -972,7 +968,7 @@ elif page_cle == "maison":
             st.caption("Un ingrédient par ligne : « 200 g de farine ». Le panier saura les relire.")
             r_titre = st.text_input("Nom")
             r_ing = st.text_area("Ingrédients", height=90)
-            r_inst = st.text_area("Préparation", height=110)
+            r_inst = st.text_area("Prép.")
             if st.form_submit_button("Enregistrer la recette", type="primary") and r_titre.strip():
                 add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
                 st.rerun()
