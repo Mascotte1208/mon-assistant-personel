@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.37"
+VERSION = "2.38"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -1073,8 +1073,8 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                         df_close = df_hist
 
                     st.line_chart(df_close)
-                except Exception as ex_chart:
-                    st.info(f"Affichage du graphique indisponible : {ex_chart}")
+                except Exception:
+                    st.info("Affichage du graphique indisponible.")
 
                 st.divider()
                 titre("🔍 Enregistrer une analyse croisée")
