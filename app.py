@@ -264,19 +264,37 @@ label p{font-weight:700 !important; font-size:13px !important; color:var(--prune
 .cal-title{text-align:center; font-size:16px; font-weight:800; color:var(--prune-clair); padding-top:10px;}
 
 /* --- Cases cliquables du calendrier --- */
-.st-key-cal-grid [data-testid="column"]{padding:0 2px !important; min-width:0 !important;}
+/* Sur téléphone, Streamlit empile les colonnes : on l'en empêche. */
+[data-testid="stHorizontalBlock"]{flex-wrap:nowrap !important; gap:6px !important;}
+[data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
+
+.st-key-cal-grid [data-testid="stHorizontalBlock"],
+[data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]){gap:3px !important;}
+.st-key-cal-grid [data-testid="stHorizontalBlock"] > div,
+[data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]) > div{
+  flex:1 1 0 !important; width:auto !important; min-width:0 !important; padding:0 !important;
+}
+.st-key-cal-grid{margin:0 -4px;}
+.st-key-dash-cal .cal-week{gap:3px; margin:0 -4px 6px;}
 [class*="st-key-cal_"] button{
-  min-height:0 !important; padding:9px 0 !important; border-radius:12px !important;
+  min-height:0 !important; padding:8px 0 !important; border-radius:11px !important;
   font-size:12px !important; font-weight:700 !important;
   background:#fdf2f8 !important; color:var(--prune) !important;
   border:1.5px solid transparent !important; box-shadow:none !important;
 }
-[class*="st-key-cal_"] button p{font-size:12px !important; font-weight:700 !important;}
+[class*="st-key-cal_"] button p{font-size:12px !important; font-weight:700 !important; line-height:1.1 !important;}
 [class*="st-key-cal_"] button:disabled{background:transparent !important; color:#ecd9f5 !important; opacity:1 !important;}
 [class*="st-key-cal_"] button[kind="primary"],
 [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
   background:linear-gradient(135deg,#ec4899,#a855f7) !important; color:#fff !important;
   box-shadow:0 5px 12px -3px rgba(219,39,119,.55) !important;
+}
+
+@media (max-width:480px){
+  .block-container{padding-left:.7rem !important; padding-right:.7rem !important;}
+  [class*="st-key-cal_"] button{padding:7px 0 !important; font-size:11px !important; border-radius:10px !important;}
+  [class*="st-key-cal_"] button p{font-size:11px !important;}
+  .cal-week span{font-size:10px;}
 }
 
 /* --- Divers --- */
