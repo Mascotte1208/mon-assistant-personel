@@ -22,11 +22,9 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.0"
+VERSION = "2.1"
 DOC_NAME = "MonAssistantData"
 
-# En-têtes de référence. Les feuilles existantes gardent leurs colonnes :
-# les colonnes ajoutées ici sont simplement remplies au fil de l'eau.
 SHEETS = {
     "Taches":   ["Tache", "Categorie", "Statut", "Echeance"],
     "Agenda":   ["Date", "Heure", "Titre", "Description"],
@@ -56,15 +54,14 @@ CAT_COULEURS = {
 }
 CAT_TACHES = ["Maison", "Urgent", "Courses", "Autre"]
 CAT_BUDGET = ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"]
-CAT_LISTES = ["Idées Cadeaux", "Valise / Voyage", "Maison"]
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 JOURS_COURT = ["L", "M", "M", "J", "V", "S", "D"]
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
         "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 PERSONNES = ["Lucas", "Alex"]
 
-ONGLETS_Q = ["✅ Tâches", "🛒 Courses", "📅 Agenda", "🍽️ Repas"]
-ONGLETS_M = ["🍲 Recettes", "📝 Notes", "🧳 Listes"]
+ONGLETS_Q = ["✅ Tâches", "🛒 Courses"]
+ONGLETS_M = ["🍲 Recettes", "📝 Notes"]
 
 PAGES = {
     "accueil": "🏠 Accueil",
@@ -109,11 +106,10 @@ MEMOIRE_COURSES = [
     {"article": "Sacs poubelle", "qte": "1 rlx", "rayon": "Entretien"},
 ]
 
-# Mots-clés pour ranger automatiquement un ingrédient dans le bon rayon.
 INDICES_RAYON = [
     ("Fruits & Légumes", ["tomate", "salade", "roquette", "pomme", "banane", "carotte", "oignon",
-                          "citron", "courgette", "avocat", "concombre", "ail", "poivron", "champignon",
-                          "épinard", "basilic", "persil", "fraise", "brocoli", "patate", "pomme de terre"]),
+                         "citron", "courgette", "avocat", "concombre", "ail", "poivron", "champignon",
+                         "épinard", "basilic", "persil", "fraise", "brocoli", "patate", "pomme de terre"]),
     ("Frais", ["lait", "yaourt", "fromage", "beurre", "œuf", "oeuf", "crème", "creme", "jambon",
                "poulet", "saumon", "mozzarella", "feta", "parmesan", "thon", "escalope", "tofu"]),
     ("Boulangerie", ["pain", "baguette", "panini", "brioche", "wrap", "tortilla"]),
@@ -124,21 +120,19 @@ INDICES_RAYON = [
 ]
 
 UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pincee", "tranche",
-          "tranches", "gousse", "gousses", "boîte", "boite", "sachet", "sachets", "pot", "pots",
-          "botte", "brique", "briques", "paquet", "paquets", "bouquet", "brin", "brins", "verre",
-          "verres", "cuillère", "cuillere", "cuillères", "cuilleres", "filet", "barquette",
-          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
+         "tranches", "gousse", "gousses", "boîte", "boite", "sachet", "sachets", "pot", "pots",
+         "botte", "brique", "briques", "paquet", "paquets", "bouquet", "brin", "brins", "verre",
+         "verres", "cuillère", "cuillere", "cuillères", "cuilleres", "filet", "barquette",
+         "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
 # 2. STYLE
 # ==========================================================
 def slug(texte):
-    """« Fruits & Légumes » → « fruits-legumes » (utilisé comme clé CSS)."""
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", "-", plat.lower()).strip("-")
 
 
-# Marge colorée à gauche de chaque rayon + couleur de son intitulé.
 CSS_CATEGORIES = "".join(
     f".st-key-grp-{slug(rayon)}{{border-left:3px solid {couleur};"
     f"padding-left:13px; margin:14px 0 2px;}}"
@@ -166,11 +160,9 @@ html, body, [class*="css"], .stApp{
 #MainMenu, footer, header{visibility:hidden;}
 .block-container{padding-top:1.1rem !important; padding-bottom:4rem !important; max-width:540px !important;}
 
-/* Les colonnes restent côte à côte sur téléphone. */
 [data-testid="stHorizontalBlock"]{flex-wrap:nowrap !important; gap:6px !important;}
 [data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
 
-/* --- Barre de titre compacte --- */
 .topbar{
   display:flex; justify-content:space-between; align-items:center; gap:10px;
   background:linear-gradient(135deg,#ec4899 0%,#a855f7 100%); color:#fff;
@@ -180,7 +172,6 @@ html, body, [class*="css"], .stApp{
 }
 .topbar .d{font-weight:700; font-size:12px; opacity:.92; white-space:nowrap;}
 
-/* --- Navigation compacte --- */
 .st-key-navrow{margin-bottom:6px;}
 .st-key-navrow [data-testid="stHorizontalBlock"]{gap:5px !important;}
 .st-key-navrow button{font-size:12px !important; padding:9px 2px !important; border-radius:14px !important;}
@@ -193,7 +184,6 @@ html, body, [class*="css"], .stApp{
 .bloc-head .n{background:#fce7f3; color:var(--rose-fonce); border-radius:12px;
   padding:2px 11px; font-size:12px; font-weight:800;}
 
-/* --- Boutons --- */
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
   border-radius:16px !important; font-weight:700 !important; font-size:14px !important;
   padding:11px 14px !important; width:100%; border:1.5px solid var(--bord) !important;
@@ -214,7 +204,6 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
-/* --- Conteneurs --- */
 [data-testid="stVerticalBlockBorderWrapper"]{
   background:#fff; border:1.5px solid var(--bord) !important; border-radius:22px !important;
   padding:8px 16px 6px !important; box-shadow:0 10px 22px rgba(236,72,153,.08); margin-bottom:10px;
@@ -249,7 +238,6 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 .bandeau.info{background:#f5f3ff; border:1.5px solid #ddd6fe; color:#5b21b6;}
 .bandeau.warn{background:#fff7ed; border:1.5px solid #fed7aa; color:#c2410c;}
 
-/* --- Champs --- */
 .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input, .stTimeInput input{
   color:var(--prune) !important; background:#fff !important; -webkit-text-fill-color:var(--prune) !important;
   border-radius:16px !important; border:1.5px solid #f9a8d4 !important;
@@ -258,19 +246,12 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 [data-baseweb="select"]>div{border-radius:16px !important; border:1.5px solid #f9a8d4 !important; background:#fff !important;}
 label p{font-weight:700 !important; font-size:13px !important; color:var(--prune-clair) !important;}
 
-/* --- Onglets --- */
 .stTabs [data-baseweb="tab-list"]{gap:6px; background:rgba(255,255,255,.75); padding:6px;
   border-radius:18px; border:1.5px solid var(--bord);}
 .stTabs [data-baseweb="tab"]{border-radius:13px; padding:7px 12px; font-weight:700; font-size:13px; color:var(--rose-fonce);}
 .stTabs [aria-selected="true"]{background:linear-gradient(135deg,#ec4899,#db2777); color:#fff !important;}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
 
-/* --- Tuiles cliquables --- */
-.st-key-dash-tiles button{min-height:60px !important; border-radius:20px !important;
-  font-size:13px !important; font-weight:800 !important; white-space:normal !important;}
-.st-key-dash-tiles button p{font-size:13px !important; font-weight:800 !important;}
-
-/* --- Calendrier --- */
 .cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin:0 -4px 6px;}
 .cal-week span{text-align:center; font-size:11px; font-weight:800; color:#c026d3;}
 .cal-title{text-align:center; font-size:16px; font-weight:800; color:var(--prune-clair); padding-top:10px;}
@@ -293,13 +274,6 @@ label p{font-weight:700 !important; font-size:13px !important; color:var(--prune
   box-shadow:0 5px 12px -3px rgba(219,39,119,.55) !important;
 }
 
-/* --- Divers --- */
-.stProgress > div > div > div > div{background-image:linear-gradient(90deg,#f472b6,#a855f7) !important;}
-[data-testid="stExpander"]{border-radius:18px !important; border:1.5px solid var(--bord) !important;
-  background:#fff !important; overflow:hidden;}
-hr{margin:12px 0 !important; border-color:#fbcfe8 !important;}
-[data-testid="stMetricValue"]{color:#701a75; font-weight:800;}
-/* --- Titres de bloc cliquables --- */
 [class*="st-key-goto-"] button{
   background:transparent !important; border:none !important; box-shadow:none !important;
   border-bottom:1px solid #fce7f3 !important; border-radius:0 !important;
@@ -311,19 +285,14 @@ hr{margin:12px 0 !important; border-color:#fbcfe8 !important;}
 [class*="st-key-goto-"] button::after{content:"›"; margin-left:auto; font-size:20px; opacity:.45;}
 [class*="st-key-goto-"] button:hover::after{opacity:.9;}
 
-/* --- Onglets de la page Quotidien --- */
 .st-key-qtabs{margin-bottom:6px;}
 .st-key-qtabs [data-testid="stHorizontalBlock"]{gap:5px !important;}
 .st-key-qtabs button{font-size:12px !important; padding:9px 2px !important; border-radius:14px !important;}
 .st-key-qtabs button p{font-size:12px !important; font-weight:800 !important;}
 
-.pied{text-align:center; font-size:11px; color:#c084fc; font-weight:600; padding:18px 0 4px;}
-
-/* --- Finitions : rythme, séparateurs, boutons d'action discrets --- */
 [data-testid="stVerticalBlockBorderWrapper"]{padding:12px 18px 10px !important; margin-bottom:14px;}
 .bloc-head{border-bottom:1px solid #fce7f3; margin-bottom:2px; padding-bottom:8px;}
 
-/* Une ligne de liste = un rang séparé, avec ses actions en retrait */
 [data-testid="stHorizontalBlock"]:has(.line){
   border-bottom:1px solid #fdf2f8; align-items:center !important; gap:2px !important;
 }
@@ -337,51 +306,38 @@ hr{margin:12px 0 !important; border-color:#fbcfe8 !important;}
 .line .q{font-variant-numeric:tabular-nums; opacity:.85;}
 .solde .m{font-variant-numeric:tabular-nums;}
 
-/* Intitulé de rayon : plus de pastille, la marge colorée suffit */
 .rayon{background:transparent; padding:0 0 2px; margin:0; font-size:12.5px; letter-spacing:-.1px;}
 .rayon .c{opacity:.55; font-weight:700;}
 
 .tag{font-variant-numeric:tabular-nums;}
 .today-none{padding:10px 0;}
 .empty{padding:24px 16px;}
-
-@media (max-width:480px){
-  .block-container{padding-left:.7rem !important; padding-right:.7rem !important;}
-  [class*="st-key-cal_"] button{padding:7px 0 !important; font-size:11px !important; border-radius:10px !important;}
-  [class*="st-key-cal_"] button p{font-size:11px !important;}
-  .cal-week span{font-size:10px;}
-}
 </style>
 """, unsafe_allow_html=True)
 
-# Couleurs par rayon et par catégorie (générées plus haut).
 st.markdown(f"<style>{CSS_CATEGORIES}</style>", unsafe_allow_html=True)
 
 # ==========================================================
 # 3. ÉTAT DE SESSION
 # ==========================================================
-DEFAUTS = {
+DEFAULTS = {
     "creds_json": None,
-    "ops": [],               # écritures Google en attente
+    "ops": [],
     "erreur_synchro": None,
     "derniere_synchro": None,
-    "annulation": None,      # dernière action réversible
+    "annulation": None,
     "_reset": {},
 }
-for cle, val in DEFAUTS.items():
+for cle, val in DEFAULTS.items():
     if cle not in st.session_state:
         st.session_state[cle] = val
 
-# Vide les champs demandés au tour précédent, avant création des widgets.
 for cle, val in st.session_state["_reset"].items():
     st.session_state[cle] = val
 st.session_state["_reset"] = {}
 
-
 def reset_after(**champs):
-    """Vide des champs de saisie au prochain rerun."""
     st.session_state["_reset"] = champs
-
 
 if not st.session_state["creds_json"]:
     try:
@@ -397,7 +353,6 @@ if not st.session_state["creds_json"]:
 def get_client(json_str):
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     return gspread.authorize(Credentials.from_service_account_info(json.loads(json_str), scopes=scope))
-
 
 @st.cache_resource(show_spinner=False)
 def get_doc(json_str):
@@ -418,15 +373,12 @@ def get_doc(json_str):
             pass
     return doc
 
-
 @st.cache_resource(show_spinner=False)
 def get_ws(json_str, feuille):
     return get_doc(json_str).worksheet(feuille)
 
-
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_all(json_str):
-    """Une seule requête réseau pour toutes les feuilles."""
     doc = get_doc(json_str)
     donnees = {}
     try:
@@ -444,7 +396,6 @@ def fetch_all(json_str):
             donnees[nom] = [entetes]
     return donnees
 
-
 def db():
     if "db" not in st.session_state:
         creds = st.session_state["creds_json"]
@@ -456,20 +407,13 @@ def db():
             st.session_state["db"] = {n: [e] for n, e in SHEETS.items()}
     return st.session_state["db"]
 
-
 def rows(feuille):
-    """[(index réel dans la feuille, ligne)] sans l'en-tête."""
     brut = db().get(feuille, [])
     return [(i + 1, r) for i, r in enumerate(brut[1:])]
-
 
 def pad(ligne_, n):
     return (list(ligne_) + [""] * n)[:n]
 
-
-# ---------- File d'écritures ----------
-# Les modifications sont appliquées localement puis poussées vers Google.
-# En cas d'échec réseau, elles restent en file et sont rejouées dans l'ordre.
 def _executer(op):
     creds = st.session_state["creds_json"]
     genre = op[0]
@@ -484,9 +428,7 @@ def _executer(op):
     elif genre == "clear":
         get_ws(creds, op[1]).batch_clear(["A2:Z2000"])
 
-
 def vider_file():
-    """Rejoue les écritures en attente. Renvoie True si tout est passé."""
     if not st.session_state.get("creds_json"):
         return True
     file = st.session_state["ops"]
@@ -501,22 +443,17 @@ def vider_file():
     st.session_state["erreur_synchro"] = None
     return True
 
-
 def pousser(op):
     st.session_state["ops"].append(op)
     vider_file()
 
-
-# ---------- Écritures ----------
 def add_row(feuille, ligne_):
     db()[feuille].append(ligne_)
     pousser(("append", feuille, ligne_))
 
-
 def insert_row(feuille, index, ligne_):
     db()[feuille].insert(index, ligne_)
     pousser(("insert", feuille, ligne_, index))
-
 
 def delete_row(feuille, index, annulable=True, libelle="Élément supprimé"):
     donnees = db()[feuille]
@@ -527,8 +464,7 @@ def delete_row(feuille, index, annulable=True, libelle="Élément supprimé"):
     pousser(("delete", feuille, index))
     if annulable:
         st.session_state["annulation"] = {"type": "restaurer", "feuille": feuille,
-                                          "index": index, "ligne": ancienne, "libelle": libelle}
-
+                                         "index": index, "ligne": ancienne, "libelle": libelle}
 
 def set_cell(feuille, index, colonne, valeur, annulable=False, libelle=""):
     donnees = db()[feuille]
@@ -541,13 +477,11 @@ def set_cell(feuille, index, colonne, valeur, annulable=False, libelle=""):
     pousser(("update", feuille, index, colonne, valeur))
     if annulable:
         st.session_state["annulation"] = {"type": "cellule", "feuille": feuille, "index": index,
-                                          "colonne": colonne, "valeur": ancienne, "libelle": libelle}
-
+                                         "colonne": colonne, "valeur": ancienne, "libelle": libelle}
 
 def clear_sheet(feuille):
     db()[feuille] = [SHEETS[feuille]]
     pousser(("clear", feuille))
-
 
 def annuler():
     action = st.session_state.get("annulation")
@@ -559,14 +493,11 @@ def annuler():
         set_cell(action["feuille"], action["index"], action["colonne"], action["valeur"])
     st.session_state["annulation"] = None
 
-
-# ---------- Petites logiques métier ----------
 def to_float(valeur):
     try:
         return float(str(valeur).replace(",", ".").replace("€", "").strip())
     except (ValueError, AttributeError):
         return 0.0
-
 
 def parse_date(texte):
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"):
@@ -576,9 +507,7 @@ def parse_date(texte):
             continue
     return None
 
-
 def merge_qte(a, b):
-    """« 1 bte » + « 2 bte » → « 3 bte », sinon on concatène lisiblement."""
     motif = r"^\s*(\d+(?:[.,]\d+)?)\s*(.*)$"
     ma, mb = re.match(motif, str(a or "")), re.match(motif, str(b or ""))
     if ma and mb and ma.group(2).strip().lower() == mb.group(2).strip().lower():
@@ -586,7 +515,6 @@ def merge_qte(a, b):
         nombre = int(total) if total.is_integer() else round(total, 2)
         return f"{nombre} {ma.group(2).strip()}".strip()
     return f"{a} + {b}"
-
 
 def deviner_rayon(nom):
     minus = nom.lower()
@@ -599,9 +527,7 @@ def deviner_rayon(nom):
             return rayon
     return "Autre"
 
-
 def separer_quantite(ligne_texte):
-    """« 200 g de farine » → (« farine », « 200 g »)."""
     texte = re.sub(r"^\s*[-•*·]\s*", "", str(ligne_texte)).strip()
     m = re.match(r"^(\d+(?:[.,]\d+)?)\s*([a-zA-Zàâçéèêëîïôûùüÿœ.]*)\s+(?:de\s+|d')?(.+)$", texte)
     if m:
@@ -610,9 +536,7 @@ def separer_quantite(ligne_texte):
             return m.group(3).strip(), f"{m.group(1)} {unite}".strip()
     return texte, "1"
 
-
 def add_course(article, qte, rayon=None):
-    """Ajoute au panier en fusionnant avec l'article déjà présent."""
     article = str(article).strip()
     if not article:
         return
@@ -623,9 +547,7 @@ def add_course(article, qte, rayon=None):
             return
     add_row("Courses", [article, qte, rayon or deviner_rayon(article)])
 
-
 def evenements_tries():
-    """[(date, heure, titre, description, index)] triés."""
     sortie = []
     for idx, r in rows("Agenda"):
         d, h, ti, desc = pad(r, 4)
@@ -634,9 +556,7 @@ def evenements_tries():
             sortie.append((jour, h, ti, desc, idx))
     return sorted(sortie, key=lambda e: (e[0], e[1] or "99:99"))
 
-
 def taches_actives():
-    """Tâches à faire, triées : échéance la plus proche d'abord, urgentes ensuite."""
     resultat = []
     for idx, r in rows("Taches"):
         nom, cat, statut, ech = pad(r, 4)
@@ -644,7 +564,6 @@ def taches_actives():
             continue
         resultat.append((idx, nom, cat or "Autre", parse_date(ech)))
     return sorted(resultat, key=lambda t: (t[3] or date.max, t[2] != "Urgent"))
-
 
 def badge_echeance(echeance, aujourd):
     if not echeance:
@@ -657,7 +576,6 @@ def badge_echeance(echeance, aujourd):
         return "<span class='tag'>Demain</span>"
     return f"<span class='tag'>{echeance.day}/{echeance.month}</span>"
 
-
 def depuis(instant):
     if not instant:
         return "jamais"
@@ -668,7 +586,6 @@ def depuis(instant):
         return f"il y a {int(secondes // 60)} min"
     return f"il y a {int(secondes // 3600)} h"
 
-
 # ==========================================================
 # 5. COMPOSANTS D'INTERFACE
 # ==========================================================
@@ -678,21 +595,16 @@ def conteneur(cle=None, bordure=False):
     except TypeError:
         return st.container(border=bordure)
 
-
 def titre(texte):
     st.markdown(f"<div class='section'>{texte}</div>", unsafe_allow_html=True)
-
 
 def vide(texte):
     st.markdown(f"<div class='empty'>{texte}</div>", unsafe_allow_html=True)
 
-
 def ligne(html, done=False):
     st.markdown(f"<div class='line{' done' if done else ''}'>{html}</div>", unsafe_allow_html=True)
 
-
 def ligne_action(html, boutons, done=False):
-    """Une ligne + ses boutons. boutons = [(icône, clé), …]. Renvoie la clé cliquée."""
     cols = st.columns([4] + [1] * len(boutons))
     with cols[0]:
         ligne(html, done)
@@ -703,9 +615,7 @@ def ligne_action(html, boutons, done=False):
                 clique = cle
     return clique
 
-
 def pills(cle, options, defaut=None, cols=3):
-    """Sélecteur en boutons. Renvoie l'option active."""
     if cle not in st.session_state or st.session_state[cle] not in options:
         st.session_state[cle] = defaut if defaut in options else options[0]
     for debut in range(0, len(options), cols):
@@ -719,9 +629,7 @@ def pills(cle, options, defaut=None, cols=3):
                     st.rerun()
     return st.session_state[cle]
 
-
 def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
-    """Grille de boutons. Renvoie le jour cliqué, sinon None."""
     st.markdown("<div class='cal-week'>" + "".join(f"<span>{j}</span>" for j in JOURS_COURT) + "</div>",
                 unsafe_allow_html=True)
     choisi, styles = None, []
@@ -750,9 +658,7 @@ def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
         st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
     return choisi
 
-
 def navigateur_mois(cle_etat, aujourd, prefixe):
-    """Ligne ◀ Mois Année ▶. Renvoie (année, mois)."""
     if cle_etat not in st.session_state:
         st.session_state[cle_etat] = (aujourd.year, aujourd.month)
     annee, mois = st.session_state[cle_etat]
@@ -770,9 +676,7 @@ def navigateur_mois(cle_etat, aujourd, prefixe):
             st.rerun()
     return st.session_state[cle_etat]
 
-
 def bandeaux():
-    """Synchronisation en attente + annulation de la dernière action."""
     en_attente = len(st.session_state.get("ops", []))
     if en_attente:
         c1, c2 = st.columns([3, 1])
@@ -793,21 +697,16 @@ def bandeaux():
                 annuler()
                 st.rerun()
 
-
 def entete_bloc(texte, compteur=None):
-    """Titre de bloc avec son compteur à droite."""
     pastille = f"<span class='n'>{compteur}</span>" if compteur is not None else ""
     st.markdown(f"<div class='bloc-head'><span>{texte}</span>{pastille}</div>", unsafe_allow_html=True)
 
-
 def entete_lien(cle, texte, compteur, onglet):
-    """Titre de bloc cliquable : ouvre l'onglet correspondant de Quotidien."""
     with conteneur(f"goto-{cle}"):
         if st.button(f"{texte}   ·   {compteur}", key=f"goto_{cle}"):
             st.session_state["q_tab"] = onglet
             st.query_params["p"] = "quotidien"
             st.rerun()
-
 
 # ==========================================================
 # 6. EN-TÊTE ET CONNEXION
@@ -839,7 +738,6 @@ if not st.session_state["creds_json"]:
             st.error(f"Connexion impossible : {err}")
     st.stop()
 
-# Une écriture avait échoué ? On retente dès le chargement suivant.
 if st.session_state["ops"]:
     vider_file()
 
@@ -889,8 +787,8 @@ if page_cle == "accueil":
         if actives:
             for idx, nom, cat, ech in actives[:6]:
                 clique = ligne_action(f"{nom}<span class='tag cat-{slug(cat)}'>{cat}</span>"
-                                      f"{badge_echeance(ech, ajd)}",
-                                      [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
+                                     f"{badge_echeance(ech, ajd)}",
+                                     [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
                 if clique == f"acc_tk_{idx}":
                     set_cell("Taches", idx, 3, "Fait", annulable=True, libelle=f"« {nom} » cochée")
                     st.rerun()
@@ -1055,7 +953,7 @@ if page_cle == "accueil":
 # ==========================================================
 elif page_cle == "quotidien":
     with conteneur("qtabs"):
-        onglet = pills("q_tab", ONGLETS_Q, cols=4)
+        onglet = pills("q_tab", ONGLETS_Q, cols=2)
 
     # ---------- TÂCHES ----------
     if onglet == ONGLETS_Q[0]:
@@ -1088,7 +986,7 @@ elif page_cle == "quotidien":
                 titre("Terminées")
                 for idx, r in terminees:
                     clique = ligne_action(f"{r[0]}<span class='tag'>{r[1] or 'Général'}</span>",
-                                          [("↩️", f"tu_{idx}"), ("🗑️", f"tdd_{idx}")], done=True)
+                                         [("↩️", f"tu_{idx}"), ("🗑️", f"tdd_{idx}")], done=True)
                     if clique == f"tu_{idx}":
                         set_cell("Taches", idx, 3, "À faire")
                         st.rerun()
@@ -1179,76 +1077,6 @@ elif page_cle == "quotidien":
             reset_after(new_course_art="", new_course_qte="1")
             st.rerun()
 
-    # ---------- AGENDA ----------
-    elif onglet == ONGLETS_Q[2]:
-        if "agenda_jour" not in st.session_state:
-            st.session_state["agenda_jour"] = ajd
-        jour_sel = st.session_state["agenda_jour"]
-
-        a_annee, a_mois = navigateur_mois("agenda_ym", ajd, "ag")
-        clic = grille_mois(a_annee, a_mois, par_jour, ajd, jour_sel, prefixe="agc")
-        if clic:
-            st.session_state["agenda_jour"] = clic
-            st.rerun()
-
-        titre(f"{JOURS[jour_sel.weekday()]} {jour_sel.day} {MOIS[jour_sel.month - 1]}")
-        du_jour = par_jour.get(jour_sel, [])
-        for jd, h, ti, desc, idx in du_jour:
-            with st.expander(f"{h or '—'} · {ti}"):
-                if desc:
-                    st.write(desc)
-                if st.button("🗑️ Supprimer", key=f"agx_{idx}"):
-                    delete_row("Agenda", idx, libelle=f"« {ti} » supprimé")
-                    st.rerun()
-        if not du_jour:
-            vide("Rien de prévu ce jour-là.")
-
-        st.divider()
-        with st.form("form_agenda", clear_on_submit=True):
-            titre("Nouvel événement")
-            fa, fb = st.columns(2)
-            with fa:
-                e_date = st.date_input("Date", value=jour_sel)
-            with fb:
-                e_heure = st.time_input("Heure", value=datetime.now().time())
-            e_titre = st.text_input("Titre")
-            e_desc = st.text_area("Détails", height=80)
-            if st.form_submit_button("Enregistrer", type="primary") and e_titre.strip():
-                add_row("Agenda", [str(e_date), e_heure.strftime("%H:%M"), e_titre.strip(), e_desc])
-                st.session_state["agenda_ym"] = (e_date.year, e_date.month)
-                st.session_state["agenda_jour"] = e_date
-                st.rerun()
-
-    # ---------- REPAS ----------
-    elif onglet == ONGLETS_Q[3]:
-        repas = rows("Repas")
-        recettes = rows("Recettes")
-        jour = pills("repas_jour", JOURS, cols=4)
-        du_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == jour]
-        if du_jour:
-            for idx, (_, typ, plat) in du_jour:
-                if ligne_action(f"<span class='tag'>{typ}</span> {plat}", [("🗑️", f"rp_{idx}")]):
-                    delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
-                    st.rerun()
-        else:
-            vide(f"Rien de prévu pour {jour.lower()}.")
-
-        st.divider()
-        titre(f"Ajouter un repas · {jour}")
-        r_type = pills("repas_type", ["Midi", "Soir"], cols=2)
-        titres_recettes = [pad(r, 3)[0] for _, r in recettes]
-        if titres_recettes:
-            choix = st.selectbox("Depuis une recette", ["— saisie libre —"] + titres_recettes,
-                                 key="repas_recette")
-        else:
-            choix = "— saisie libre —"
-        r_plat = st.text_input("Plat", key="new_repas_plat", placeholder="Tortellini crème & épinards…")
-        plat_final = r_plat.strip() or (choix if choix != "— saisie libre —" else "")
-        if st.button("Ajouter au planning", type="primary", key="add_repas") and plat_final:
-            add_row("Repas", [jour, r_type, plat_final])
-            reset_after(new_repas_plat="")
-            st.rerun()
-
 # ==========================================================
 # 8c. BUDGET
 # ==========================================================
@@ -1286,10 +1114,6 @@ elif page_cle == "budget":
             st.caption(f"Total de {MOIS[ajd.month - 1]} : {filtre_df['Montant'].sum():.2f} €")
         else:
             filtre_df = df
-
-        if not filtre_df.empty:
-            titre("Répartition par catégorie")
-            st.bar_chart(filtre_df.groupby("Catégorie")["Montant"].sum(), color="#ec4899", height=200)
 
         titre("Dépenses")
         cat_filtre = pills("f_budget", ["Toutes"] + CAT_BUDGET, cols=3)
@@ -1333,7 +1157,7 @@ elif page_cle == "budget":
 # ==========================================================
 elif page_cle == "maison":
     with conteneur("qtabs"):
-        onglet_m = pills("m_tab", ONGLETS_M, cols=3)
+        onglet_m = pills("m_tab", ONGLETS_M, cols=2)
 
     if onglet_m == ONGLETS_M[0]:
         recettes = rows("Recettes")
@@ -1405,31 +1229,3 @@ elif page_cle == "maison":
             if st.form_submit_button("Enregistrer la note", type="primary") and n_titre.strip():
                 add_row("Notes", [n_titre.strip(), n_contenu, "1" if n_pin else ""])
                 st.rerun()
-
-    elif onglet_m == ONGLETS_M[2]:
-        listes = rows("Listes")
-        cat_l = pills("f_listes", CAT_LISTES, cols=3)
-        visibles = [(i, r) for i, r in listes if pad(r, 3)[0] == cat_l]
-        for idx, r in visibles:
-            _, elm, nts = pad(r, 3)
-            clique = ligne_action(f"{elm}" + (f"<br><span class='q'>{nts}</span>" if nts else ""),
-                                  [("🛒", f"li_p_{idx}"), ("🗑️", f"li_{idx}")])
-            if clique == f"li_p_{idx}":
-                add_course(elm, "1")
-                st.toast(f"{elm} ajouté au panier", icon="🛒")
-                st.rerun()
-            elif clique == f"li_{idx}":
-                delete_row("Listes", idx, libelle=f"« {elm} » supprimé")
-                st.rerun()
-        if not visibles:
-            vide(f"Rien dans « {cat_l} » pour le moment.")
-
-        st.divider()
-        titre(f"Ajouter à « {cat_l} »")
-        l_elem = st.text_input("Élément", key="new_liste_elem")
-        l_notes = st.text_input("Note (facultatif)", key="new_liste_notes")
-        if st.button("Ajouter", type="primary", key="add_liste") and l_elem.strip():
-            add_row("Listes", [cat_l, l_elem.strip(), l_notes])
-            reset_after(new_liste_elem="", new_liste_notes="")
-            st.rerun()
-  
