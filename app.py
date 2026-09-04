@@ -608,7 +608,7 @@ with tab_quotidien:
         with sub_tab3:
             st.subheader("🛒 Liste de Courses")
             
-            # --- BOUTON DE CHARGEMENT DES HABITUDES DE TICKETS (SÉPARÉS) ---
+            # --- BOUTON POUR CHARGER LES HABITUDES DE TICKETS INDIVIDUELLEMENT ---
             if st.button("⚡ Charger mes habitudes (Basé sur mes tickets Delhaize)"):
                 habitudes_tickets = [
                     ["Tomates cerises", "1 bte", "Fruits & Légumes"],
@@ -627,7 +627,7 @@ with tab_quotidien:
                 ]
                 for item in habitudes_tickets:
                     append_row_fast("Courses", item)
-                st.success("Vos produits récurrents ont été ajoutés un par un !")
+                st.success("Vos produits récurrents ont été ajoutés un par un dans la liste !")
                 st.rerun()
 
             st.divider()
@@ -950,7 +950,7 @@ with tab_loisirs:
         with sub_tab_l:
             st.subheader("🧳 Listes & Cadeaux")
             all_vals = get_data("Listes")
-            listes_data = all_vals[1:] if len(all_vals) > 1 else []
+            listes_data = all_vals[1:] if len(listes_data) > 1 else []
             cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
 
             filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_l]
