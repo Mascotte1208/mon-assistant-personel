@@ -11,7 +11,7 @@ st.set_page_config(
     page_title="Notre Assistant Shared", 
     page_icon="✨", 
     layout="centered",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # --- BALISES PWA & NATIVE MOBILE ---
@@ -45,15 +45,6 @@ st.markdown("""
         padding-top: 1rem !important;
         padding-bottom: 4rem !important;
         max-width: 550px !important;
-    }
-
-    /* Style de la Sidebar (Marge latérale) */
-    [data-testid="stSidebar"] {
-        background-color: #1e1b18 !important;
-        padding: 20px 10px;
-    }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
-        color: #ffffff !important;
     }
 
     .hero-banner {
@@ -156,6 +147,7 @@ st.markdown("""
         border: none;
         padding: 12px 18px;
         box-shadow: 0 4px 12px rgba(67, 56, 202, 0.2);
+        width: 100%;
     }
     .stButton button:active { transform: scale(0.97); }
 
@@ -265,19 +257,9 @@ def update_cell_fast(sheet_name, row_idx, col_idx, value):
 if "json_credentials_str" not in st.session_state:
     st.session_state["json_credentials_str"] = None
 
-# --- MENU NAVIGATION DANS LA MARGE (SIDEBAR) ---
-with st.sidebar:
-    st.markdown("### 🧭 Menu Principal")
-    selected_page = st.radio(
-        "Navigation", 
-        ["🏠 Dashboard", "📋 Quotidien", "📊 Budget", "🐾 Maison & Loisirs"],
-        label_visibility="collapsed"
-    )
-    st.divider()
-    if st.button("🔄 Actualiser les données"):
-        for key in list(st.session_state.keys()):
-            if key.startswith("data_"): del st.session_state[key]
-        st.rerun()
+# Initialisation de la page active en mémoire
+if "active_page" not in st.session_state:
+    st.session_state["active_page"] = "🏠 Dashboard"
 
 # --- HERO BANNER ---
 st.markdown("""
@@ -304,11 +286,34 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
+# --- MENU DE NAVIGATION SOUS FORME DE BOUTONS VISIBLES ---
+st.markdown("<p style='font-size: 11px; font-weight: 800; color: #78716c; text-transform: uppercase; letter-spacing: 0.9px; margin-bottom: 8px;'>Navigation</p>", unsafe_allow_html=True)
+b1, b2 = st.columns(2)
+with b1:
+    if st.button("🏠 Dashboard"):
+        st.session_state["active_page"] = "🏠 Dashboard"
+        st.rerun()
+    if st.button("📊 Budget"):
+        st.session_state["active_page"] = "📊 Budget"
+        st.rerun()
+with b2:
+    if st.button("📋 Quotidien"):
+        st.session_state["active_page"] = "📋 Quotidien"
+        st.rerun()
+    if st.button("🐾 Maison & Loisirs"):
+        st.session_state["active_page"] = "🐾 Maison & Loisirs"
+        st.rerun()
+
+st.divider()
+
+active_page = st.session_state["active_page"]
+json_str = st.session_state["json_credentials_str"]
+
 # ==========================================
 # 1. DASHBOARD
 # ==========================================
-if selected_page == "🏠 Dashboard":
-    if not st.session_state["json_credentials_str"]:
+if active_page == "🏠 Dashboard":
+    if not json_str:
         st.warning("⚠️ Connexion Google Sheets requise.")
         uploaded_json = st.file_uploader("Glissez votre fichier JSON de configuration ici", type=["json"])
         if uploaded_json is not None:
@@ -335,7 +340,6 @@ if selected_page == "🏠 Dashboard":
             st.success("Connexion réussie !")
             st.rerun()
     else:
-        json_str = st.session_state["json_credentials_str"]
         taches_vals = get_data("Taches")
         courses_vals = get_data("Courses")
         budget_vals = get_data("Budget")
@@ -368,7 +372,7 @@ if selected_page == "🏠 Dashboard":
             </div>
             <div class="metric-card">
                 <span class="metric-title">💶 Équilibre Budget</span>
-                <span class="metric-value" style="font-size: 15px; font-weight: 700; color: #4338ca;">{bilan_str}</span>
+                <span class="metric-value" style="font-size: 14px; font-weight: 700; color: #4338ca;">{bilan_str}</span>
             </div>
         """, unsafe_allow_html=True)
 
@@ -379,12 +383,10 @@ if selected_page == "🏠 Dashboard":
                 if key.startswith("data_"): del st.session_state[key]
             st.rerun()
 
-json_str = st.session_state.get("json_credentials_str")
-
 # ==========================================
 # 2. QUOTIDIEN
 # ==========================================
-if selected_page == "📋 Quotidien" and json_str:
+elif active_page == "📋 Quotidien" and json_str:
     sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda", "🛒 Courses", "🍽️ Repas"])
     
     with sub_tab1:
@@ -532,7 +534,7 @@ if selected_page == "📋 Quotidien" and json_str:
 # ==========================================
 # 3. BUDGET
 # ==========================================
-if selected_page == "📊 Budget" and json_str:
+elif active_page == "📊 Budget" and json_str:
     st.subheader("📊 Tableau de Bord Financier")
     all_vals = get_data("Budget")
     budget_data = all_vals[1:] if len(all_vals) > 1 else []
@@ -587,7 +589,7 @@ if selected_page == "📊 Budget" and json_str:
 # ==========================================
 # 4. MAISON & LOISIRS
 # ==========================================
-if selected_page == "🐾 Maison & Loisirs" and json_str:
+elif active_page == "🐾 Maison & Loisirs" and json_str:
     sub_tab_r, sub_tab_n, sub_tab_l = st.tabs(["🍲 Recettes", "📝 Notes", "🧳 Listes & Cadeaux"])
 
     with sub_tab_r:
