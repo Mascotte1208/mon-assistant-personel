@@ -78,7 +78,7 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* Cartes Métriques Dashboard Douces */
+    /* Cartes Dashboard & Notes Importantes */
     .metric-card {
         background: #ffffff;
         border-radius: 20px;
@@ -101,6 +101,15 @@ st.markdown("""
         font-size: 20px;
         font-weight: 800;
         color: #701a75;
+    }
+
+    .important-note-box {
+        background: linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%);
+        border: 2px dashed #e879f9;
+        border-radius: 20px;
+        padding: 18px;
+        margin-bottom: 16px;
+        box-shadow: 0 6px 16px rgba(217, 70, 239, 0.08);
     }
 
     /* Boutons de Navigation Stylés */
@@ -270,7 +279,7 @@ active_page = st.session_state["active_page"]
 json_str = st.session_state["json_credentials_str"]
 
 # ==========================================
-# 1. DASHBOARD (SANS DATE)
+# 1. DASHBOARD INTERACTIF & NOTES IMPORTANTES
 # ==========================================
 if active_page == "🏠 Dashboard":
     if not json_str:
@@ -303,12 +312,14 @@ if active_page == "🏠 Dashboard":
         taches_vals = get_data("Taches")
         courses_vals = get_data("Courses")
         budget_vals = get_data("Budget")
+        notes_vals = get_data("Notes")
         
         taches_data = taches_vals[1:] if len(taches_vals) > 1 else []
         taches_faites = len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"])
         total_taches = len(taches_data)
         nb_courses = max(0, len(courses_vals) - 1)
 
+        # Calcul budget
         total_lucas, total_alex = 0.0, 0.0
         for r in (budget_vals[1:] if len(budget_vals) > 1 else []):
             payer = r[1] if len(r) > 1 else ""
@@ -319,8 +330,26 @@ if active_page == "🏠 Dashboard":
         diff = (total_lucas - total_alex) / 2
         bilan_str = f"Alex doit {diff:.2f} € à Lucas" if diff > 0 else (f"Lucas doit {abs(diff):.2f} € à Alex" if diff < 0 else "Comptes parfaitement équilibrés 💖")
 
-        st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-bottom: 12px;'>💖 En un coup d'œil</p>", unsafe_allow_html=True)
+        # --- BLOC NOTES IMPORTANTES ---
+        st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-bottom: 8px;'>📌 Note importante du moment</p>", unsafe_allow_html=True)
+        
+        # Chercher s'il y a une note intitulée "Important" ou prendre la dernière note
+        notes_data = notes_vals[1:] if len(notes_vals) > 1 else []
+        note_importante = next((n[1] for n in notes_data if len(n) > 1 and "important" in n[0].lower()), None)
+        if not note_importante and notes_data:
+            note_importante = notes_data[-1][1] if len(notes_data[-1]) > 1 else "Aucune note importante pour l'instant."
+        elif not note_importante:
+            note_importante = "Écrivez une note importante depuis l'onglet Maison & Loisirs !"
 
+        st.markdown(f"""
+            <div class="important-note-box">
+                <div style="font-size: 14px; font-weight: 700; color: #9333ea; margin-bottom: 4px;">✨ Message cosy :</div>
+                <div style="font-size: 15px; color: #581c87; font-weight: 600;">{note_importante}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # --- BLOC CHIFFRES CLÉS ---
+        st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-bottom: 8px;'>💖 En un coup d'œil</p>", unsafe_allow_html=True)
         st.markdown(f"""
             <div class="metric-card">
                 <span class="metric-title">🌸 Tâches accomplies</span>
@@ -335,6 +364,25 @@ if active_page == "🏠 Dashboard":
                 <span class="metric-value" style="font-size: 14px; font-weight: 700; color: #db2777;">{bilan_str}</span>
             </div>
         """, unsafe_allow_html=True)
+
+        # --- BLOC TÂCHES URGENTES / À FAIRE VISIBLE DIRECTEMENT SUR LE DASHBOARD ---
+        st.markdown("<p style='font-weight: 800; font-size: 15px; color: #831843; margin-top: 16px; margin-bottom: 8px;'>✨ Tâches en cours à valider</p>", unsafe_allow_html=True)
+        taches_actives = [t for t in taches_data if len(t) > 2 and t[2] != "Fait"]
+        
+        if taches_actives:
+            for row in taches_actives[:4]: # Afficher les 4 premières tâches en cours
+                nom_t, cat_t = (row + ["Sans nom", "Général"])[:2]
+                real_idx = taches_vals.index(row)
+                
+                c_t1, c_t2 = st.columns([3, 1])
+                with c_t1:
+                    st.markdown(f"- **{nom_t}** <span class='badge-tag'>{cat_t}</span>", unsafe_allow_html=True)
+                with c_t2:
+                    if st.button("✔️ Fait", key=f"dash_t_{real_idx}"):
+                        update_cell_fast("Taches", real_idx, 3, "Fait")
+                        st.rerun()
+        else:
+            st.success("🎉 Bravo, toutes les tâches sont accomplies !")
 
         st.divider()
         if st.button("💖 Déconnexion du compte"):
@@ -579,7 +627,7 @@ elif active_page == "🐾 Maison & Loisirs" and json_str:
                 st.rerun()
 
     with sub_tab_n:
-        st.subheader("📝 Notes Partagées")
+        st.subheader("📝 Notes Partagées (dont Notes Importantes)")
         all_vals = get_data("Notes")
         notes_data = all_vals[1:] if len(all_vals) > 1 else []
 
@@ -596,7 +644,7 @@ elif active_page == "🐾 Maison & Loisirs" and json_str:
 
         st.divider()
         with st.form("form_note", clear_on_submit=True):
-            n_titre = st.text_input("Titre")
+            n_titre = st.text_input("Titre (Mettez 'Important' pour l'afficher sur le Dashboard)")
             n_contenu = st.text_area("Contenu")
             if st.form_submit_button("Enregistrer la note") and n_titre:
                 append_row_fast("Notes", [n_titre, n_contenu])
@@ -605,7 +653,7 @@ elif active_page == "🐾 Maison & Loisirs" and json_str:
     with sub_tab_l:
         st.subheader("🧳 Listes & Cadeaux")
         all_vals = get_data("Listes")
-        listes_data = all_vals[1:] if len(listes_data) > 1 else []
+        listes_data = all_vals[1:] if len(all_vals) > 1 else []
         cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
 
         filtered = [l for l in listes_data if len(l) > 0 and l[0] == cat_l]
