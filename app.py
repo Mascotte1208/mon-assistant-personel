@@ -4,6 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import json
 from datetime import datetime, date
+import calendar
 
 # --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
@@ -539,7 +540,7 @@ with tab_quotidien:
                     st.rerun()
 
         with sub_tab2:
-            st.subheader("📅 Agenda & Vue Mois Mobile")
+            st.subheader("📅 Agenda & Vue Mois")
             
             # --- INDEXATION DES ÉVÉNEMENTS ---
             all_agenda_vals = get_data("Agenda")
@@ -554,24 +555,35 @@ with tab_quotidien:
                         events_by_date[d_key] = []
                     events_by_date[d_key].append(titre_ev)
 
-            # --- VUE CHRONOLOGIQUE MOBILE DU MOIS (PARFAIT POUR SMARTPHONE) ---
-            st.markdown(f"#### 🗓️ Événements de {mois_fr[today.month - 1]} {today.year}")
+            # --- VUE CALENDRIER DU MOIS COMPLÈTEMENT LISIBLE SUR MOBILE ---
+            st.markdown(f"#### 🗓️ Calendrier - {mois_fr[today.month - 1]} {today.year}")
             
-            # Afficher uniquement les jours du mois en cours qui contiennent un événement ou aujourd'hui
-            import calendar
             num_days = calendar.monthrange(today.year, today.month)[1]
             
-            has_month_events = False
+            # Affichage en blocs élégants pour chaque jour du mois
             for day_num in range(1, num_days + 1):
                 d_str = f"{today.year}-{today.month:02d}-{day_num:02d}"
-                if d_str in events_by_date:
-                    has_month_events = True
-                    evs_str = ", ".join(events_by_date[d_str])
-                    is_today = " (Aujourd'hui)" if day_num == today.day else ""
-                    st.markdown(f"📌 **Jour {day_num}{is_today}** : <span style='color:#4338ca; font-weight:700;'>{evs_str}</span>", unsafe_allow_html=True)
-            
-            if not has_month_events:
-                st.info("Aucun événement planifié ce mois-ci.")
+                is_today = day_num == today.day
+                has_events = d_str in events_by_date
+                
+                # Style de la ligne du jour
+                day_bg = "#e0e7ff" if is_today else ("#ffffff" if has_events else "#fafaf9")
+                border_col = "#4338ca" if is_today else ("#cbd5e1" if has_events else "#e7e5e4")
+                
+                evs_html = ""
+                if has_events:
+                    evs_html = "<br>".join([f"<span style='color:#4338ca; font-weight:700; font-size:13px;'>• {t}</span>" for t in events_by_date[d_str]])
+                else:
+                    evs_html = "<span style='color:#a8a29e; font-size:12px;'>Rien de prévu</span>"
+                
+                today_badge = " ⭐ (Aujourd'hui)" if is_today else ""
+                
+                st.markdown(f"""
+                    <div style="background:{day_bg}; border: 1.5px solid {border_col}; border-radius: 14px; padding: 10px 14px; margin-bottom: 8px;">
+                        <div style="font-weight: 800; font-size: 13px; color: #1c1917; margin-bottom: 2px;">Jour {day_num}{today_badge}</div>
+                        <div>{evs_html}</div>
+                    </div>
+                """, unsafe_allow_html=True)
 
             st.divider()
 
