@@ -12,6 +12,7 @@ import io
 import re
 import json
 import calendar
+import unicodedata
 import streamlit as st
 import pandas as pd
 import gspread
@@ -38,6 +39,21 @@ SHEETS = {
 }
 
 RAYONS = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
+RAYON_COULEURS = {
+    "Fruits & Légumes": "#16a34a",
+    "Frais": "#0891b2",
+    "Boulangerie": "#d97706",
+    "Supermarché": "#7c3aed",
+    "Boissons": "#2563eb",
+    "Entretien": "#db2777",
+    "Autre": "#6b7280",
+}
+CAT_COULEURS = {
+    "Maison": "#0891b2",
+    "Urgent": "#b45309",
+    "Courses": "#16a34a",
+    "Autre": "#7c3aed",
+}
 CAT_TACHES = ["Maison", "Urgent", "Courses", "Autre"]
 CAT_BUDGET = ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"]
 CAT_LISTES = ["Idées Cadeaux", "Valise / Voyage", "Maison"]
@@ -113,6 +129,23 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
 # ==========================================================
 # 2. STYLE
 # ==========================================================
+def slug(texte):
+    """« Fruits & Légumes » → « fruits-legumes » (utilisé comme clé CSS)."""
+    plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", plat.lower()).strip("-")
+
+
+# Marge colorée à gauche de chaque rayon + couleur de son intitulé.
+CSS_CATEGORIES = "".join(
+    f".st-key-grp-{slug(rayon)}{{border-left:3px solid {couleur};"
+    f"padding-left:13px; margin:14px 0 2px;}}"
+    f".st-key-grp-{slug(rayon)} .rayon{{color:{couleur};}}"
+    for rayon, couleur in RAYON_COULEURS.items()
+) + "".join(
+    f".tag.cat-{slug(cat)}{{background:{couleur}1a; color:{couleur};}}"
+    for cat, couleur in CAT_COULEURS.items()
+)
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -265,6 +298,32 @@ hr{margin:12px 0 !important; border-color:#fbcfe8 !important;}
 [data-testid="stMetricValue"]{color:#701a75; font-weight:800;}
 .pied{text-align:center; font-size:11px; color:#c084fc; font-weight:600; padding:18px 0 4px;}
 
+/* --- Finitions : rythme, séparateurs, boutons d'action discrets --- */
+[data-testid="stVerticalBlockBorderWrapper"]{padding:12px 18px 10px !important; margin-bottom:14px;}
+.bloc-head{border-bottom:1px solid #fce7f3; margin-bottom:2px; padding-bottom:8px;}
+
+/* Une ligne de liste = un rang séparé, avec ses actions en retrait */
+[data-testid="stHorizontalBlock"]:has(.line){
+  border-bottom:1px solid #fdf2f8; align-items:center !important; gap:2px !important;
+}
+[data-testid="stHorizontalBlock"]:has(.line) button{
+  background:transparent !important; border:none !important; box-shadow:none !important;
+  color:#be185d !important; padding:6px 0 !important; font-size:15px !important;
+  opacity:.5; transition:opacity .15s ease;
+}
+[data-testid="stHorizontalBlock"]:has(.line) button:hover{opacity:1;}
+.line{padding:11px 0; line-height:1.35;}
+.line .q{font-variant-numeric:tabular-nums; opacity:.85;}
+.solde .m{font-variant-numeric:tabular-nums;}
+
+/* Intitulé de rayon : plus de pastille, la marge colorée suffit */
+.rayon{background:transparent; padding:0 0 2px; margin:0; font-size:12.5px; letter-spacing:-.1px;}
+.rayon .c{opacity:.55; font-weight:700;}
+
+.tag{font-variant-numeric:tabular-nums;}
+.today-none{padding:10px 0;}
+.empty{padding:24px 16px;}
+
 @media (max-width:480px){
   .block-container{padding-left:.7rem !important; padding-right:.7rem !important;}
   [class*="st-key-cal_"] button{padding:7px 0 !important; font-size:11px !important; border-radius:10px !important;}
@@ -273,6 +332,9 @@ hr{margin:12px 0 !important; border-color:#fbcfe8 !important;}
 }
 </style>
 """, unsafe_allow_html=True)
+
+# Couleurs par rayon et par catégorie (générées plus haut).
+st.markdown(f"<style>{CSS_CATEGORIES}</style>", unsafe_allow_html=True)
 
 # ==========================================================
 # 3. ÉTAT DE SESSION
