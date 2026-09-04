@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.6"
+VERSION = "2.7"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -191,6 +191,23 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
   box-shadow:0 8px 18px -6px rgba(219,39,119,.55) !important;
 }
 button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
+
+/* Correction de la couleur des chiffres dans les métriques Streamlit */
+[data-testid="stMetricValue"] {
+  color: var(--prune) !important;
+  font-weight: 800 !important;
+}
+[data-testid="stMetricLabel"] {
+  color: var(--prune-clair) !important;
+  font-weight: 700 !important;
+}
+[data-testid="stMetric"] {
+  background: #ffffff;
+  border: 1.5px solid #fbcfe8 !important;
+  border-radius: 20px;
+  padding: 12px 16px;
+  box-shadow: 0 8px 20px rgba(236,72,153,.06);
+}
 
 /* Cartes flottantes aux contours doux */
 [data-testid="stVerticalBlockBorderWrapper"]{
@@ -780,7 +797,7 @@ if page_cle == "accueil":
         else:
             st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
 
-    # ================= 2. À FAIRE (Avec bouton d'ajout discret) =================
+    # ================= 2. À FAIRE =================
     with conteneur(bordure=True):
         entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
