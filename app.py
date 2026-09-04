@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.18"
+VERSION = "2.19"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Dashboard Mode Sombre Pro / Style Home Assistant)
+# 2. STYLE (Dashboard Mode Sombre / Style Smart Home & Cartes Pro)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -145,7 +145,6 @@ html, body, [class*="css"], .stApp{
   font-family:'Plus Jakarta Sans', sans-serif !important;
   color:var(--text-main); -webkit-tap-highlight-color:transparent;
 }
-/* Fond sombre élégant style Dashboard Pro */
 .stApp{
   background: var(--bg-app) fixed !important;
 }
@@ -188,7 +187,7 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:2px solid #60a5fa !important; outline-offset:2px;}
 
-/* Cartes sombres aux bordures nettes style Smart Home / Dashboard */
+/* Cartes sombres et nettes */
 [data-testid="stVerticalBlockBorderWrapper"], 
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
 [data-baseweb="block"] {
