@@ -24,7 +24,7 @@ st.markdown("""
     </head>
 """, unsafe_allow_html=True)
 
-# --- STYLE CSS APPLI NATIVE ---
+# --- STYLE CSS APPLI NATIVE ET VISIBILITÉ DU TEXTE ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -48,7 +48,7 @@ st.markdown("""
         max-width: 550px !important;
     }
 
-    /* Barre d'Onglets Tactiles (PWA Bottom-Nav Style) */
+    /* Barre d'Onglets Tactiles (PWA Style) */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
         background-color: #e2e8f0;
@@ -67,7 +67,7 @@ st.markdown("""
         background-color: transparent;
         border: none;
         white-space: nowrap;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.2s ease;
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
@@ -83,11 +83,6 @@ st.markdown("""
         padding: 18px;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04);
         margin-bottom: 12px;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .widget-card:active {
-        transform: scale(0.98);
-        box-shadow: 0 6px 14px -5px rgba(0, 0, 0, 0.06);
     }
     .widget-title {
         font-size: 11px;
@@ -130,19 +125,21 @@ st.markdown("""
         border: none;
         padding: 14px 20px;
         box-shadow: 0 4px 16px rgba(99, 102, 241, 0.28);
-        transition: all 0.15s ease;
-    }
-    .stButton button:active {
-        transform: scale(0.96);
     }
 
-    /* Formulaires fluides sans zoom */
+    /* CORRECTIF DE VISIBILITÉ DE LA SAISIE SUR MOBILE */
     .stTextInput input, .stTextArea textarea, .stSelectbox select {
-        border-radius: 16px !important;
-        border: 1px solid #e2e8f0 !important;
-        padding: 12px 16px !important;
-        font-size: 16px !important; /* Empêche le zoom auto sur iPhone */
+        color: #0f172a !important;
         background-color: #ffffff !important;
+        -webkit-text-fill-color: #0f172a !important;
+        border-radius: 16px !important;
+        border: 1.5px solid #cbd5e1 !important;
+        padding: 12px 16px !important;
+        font-size: 16px !important;
+    }
+    .stTextInput input:focus, .stTextArea textarea:focus {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
     }
 
     .streamlit-expanderHeader {
@@ -288,13 +285,6 @@ with tab_dash:
             ''', unsafe_allow_html=True)
 
         st.divider()
-        
-        with st.expander("📲 **Installer sur Smartphone (Mode App)**"):
-            st.markdown("""
-            * **Sur iPhone (Safari) :** Appuyez sur le bouton de partage <span style='font-size:16px;'>🔗</span> puis sélectionnez **"Sur l'écran d'accueil"**.
-            * **Sur Android (Chrome) :** Appuyez sur les 3 points <span style='font-size:16px;'>⋮</span> puis sélectionnez **"Installer l'application"**.
-            """)
-
         col_act1, col_act2 = st.columns(2)
         with col_act1:
             if st.button("🔄 Actualiser"):
