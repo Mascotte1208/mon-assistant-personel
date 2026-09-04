@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.30"
+VERSION = "2.31"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -54,6 +54,7 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
 PERSONNES = ["Lucas", "Alex"]
 
 ONGLETS_M = ["🛒 Courses", "🍲 Recettes"]
+ONGLETS_IA = ["📝 Notes & Contexte", "📈 Marchés & Analyse"]
 
 PAGES = {
     "accueil": "🏠 Accueil",
@@ -276,6 +277,11 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--ros
 [class*="st-key-goto-"] button::after{content:"›"; margin-left:auto; font-size:20px; opacity:.45;}
 [class*="st-key-goto-"] button:hover::after{opacity:.9;}
 
+.st-key-iatabs{margin-bottom:8px;}
+.st-key-iatabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
+.st-key-iatabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
+.st-key-iatabs button p{font-size:12.5px !important; font-weight:800 !important;}
+
 .st-key-mtabs{margin-bottom:8px;}
 .st-key-mtabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
 .st-key-mtabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
@@ -323,6 +329,7 @@ DEFAULTS = {
     "annulation": None,
     "show_add_tache": False,
     "mode_ia": False,
+    "ia_tab": "📝 Notes & Contexte",
     "_reset": {},
 }
 for cle, val in DEFAULTS.items():
@@ -550,6 +557,21 @@ def depuis(instant):
     if secondes < 3600:
         return f"il y a {int(secondes // 60)} min"
     return f"il y a {int(secondes // 3600)} h"
+
+@st.cache_data(ttl=120, show_spinner=False)
+def fetch_market_data(ticker):
+    try:
+        import yfinance as yf
+        t = yf.Ticker(ticker)
+        df = t.history(period="5d")
+        if not df.empty:
+            dernier = float(df['Close'].iloc[-1])
+            precedent = float(df['Close'].iloc[-2]) if len(df) > 1 else dernier
+            variation = ((dernier - precedent) / precedent) * 100
+            return dernier, variation, None
+    except Exception as e:
+        return None, None, str(e)
+    return None, None, "Données indisponibles"
 
 # ==========================================================
 # 5. COMPOSANTS D'INTERFACE
@@ -961,31 +983,73 @@ elif page_cle == "maison":
                 st.rerun()
 
 # ==========================================================
-# 8d. LABO IA & FORMATIONS
+# 8d. LABO IA & FORMATIONS / MARCHÉS
 # ==========================================================
 elif page_cle == "ialab" and st.session_state.get("mode_ia"):
-    titre("🧠 Labo IA & Formations")
-    st.caption("Espace dédié à l'enregistrement de tes apprentissages, priorités et gestion des dangers.")
+    titre("🧠 Labo IA & Marchés Financiers")
+    
+    with conteneur("iatabs"):
+        onglet_ia = pills("ia_tab", ONGLETS_IA, cols=2)
 
-    ialab_sujet = st.text_input("Sujet / Domaine", placeholder="Ex: Électricité - Câblage / Frigoriste / Stratégie Priorités")
-    ialab_type = pills("ialab_type_pills", ["Apprentissage / Note", "Règle de Priorité", "Sécurité & Dangers"], cols=3)
-    ialab_contenu = st.text_area("Notes de synthèse ou Consigne pour l'IA", height=130, placeholder="Détaille tes notes ici…")
+    if onglet_ia == ONGLETS_IA[0]:
+        st.caption("Espace dédié à l'enregistrement de tes apprentissages, priorités et gestion des dangers.")
 
-    if st.button("Enregistrer dans la base IA", type="primary", key="btn_save_ialab") and ialab_sujet.strip():
-        add_row("IA_Lab", [str(ajd), ialab_sujet.strip(), ialab_contenu.strip(), ialab_type])
-        st.toast("Contexte enregistré pour l'IA 🚀", icon="✅")
-        st.rerun()
+        ialab_sujet = st.text_input("Sujet / Domaine", placeholder="Ex: Électricité - Câblage / Frigoriste / Stratégie Priorités")
+        ialab_type = pills("ialab_type_pills", ["Apprentissage / Note", "Règle de Priorité", "Sécurité & Dangers"], cols=3)
+        ialab_contenu = st.text_area("Notes de synthèse ou Consigne pour l'IA", height=130, placeholder="Détaille tes notes ici…")
 
-    st.divider()
-    titre("📚 Historique de vos notes & contextes enregistrés")
-    ialab_rows = rows("IA_Lab")
-    if ialab_rows:
-        for idx, r in reversed(ialab_rows):
-            d, suj, cont, typ = pad(r, 4)
-            with st.expander(f"📌 [{typ}] {suj} ({d})"):
-                st.write(cont or "_Aucun contenu_")
-                if st.button("🗑️ Supprimer", key=f"ialab_del_{idx}"):
-                    delete_row("IA_Lab", idx, libelle="Note supprimée")
-                    st.rerun()
-    else:
-        vide("Aucune note enregistrée pour le moment.")
+        if st.button("Enregistrer dans la base IA", type="primary", key="btn_save_ialab") and ialab_sujet.strip():
+            add_row("IA_Lab", [str(ajd), ialab_sujet.strip(), ialab_contenu.strip(), ialab_type])
+            st.toast("Contexte enregistré pour l'IA 🚀", icon="✅")
+            st.rerun()
+
+        st.divider()
+        titre("📚 Historique de vos notes & contextes enregistrés")
+        ialab_rows = rows("IA_Lab")
+        if ialab_rows:
+            for idx, r in reversed(ialab_rows):
+                d, suj, cont, typ = pad(r, 4)
+                with st.expander(f"📌 [{typ}] {suj} ({d})"):
+                    st.write(cont or "_Aucun contenu_")
+                    if st.button("🗑️ Supprimer", key=f"ialab_del_{idx}"):
+                        delete_row("IA_Lab", idx, libelle="Note supprimée")
+                        st.rerun()
+        else:
+            vide("Aucune note enregistrée pour le moment.")
+
+    elif onglet_ia == ONGLETS_IA[1]:
+        st.caption("Suivi en direct des cours et analyse rapide (via yfinance).")
+
+        actifs_suivis = [
+            {"nom": "Or (Gold)", "ticker": "GC=F", "unite": "$"},
+            {"nom": "Bitcoin", "ticker": "BTC-USD", "unite": "$"},
+            {"nom": "Apple", "ticker": "AAPL", "unite": "$"},
+            {"nom": "Nvidia", "ticker": "NVDA", "unite": "$"},
+            {"nom": "S&P 500", "ticker": "^GSPC", "unite": "$"}
+        ]
+
+        selection_actif = st.selectbox("Choisir un actif à analyser en direct", [a["nom"] for a in actifs_suivis])
+        actif_actuel = next(a for a in actifs_suivis if a["nom"] == selection_actif)
+
+        prix, variation, erreur = fetch_market_data(actif_actuel["ticker"])
+
+        if erreur:
+            st.warning(f"Impossible de récupérer les données en direct pour {selection_actif} ({erreur}). Vérifiez que la bibliothèque yfinance est installée.")
+        elif prix is not None:
+            delta_str = f"{variation:+.2f}%"
+            st.metric(label=f"Cours actuel — {selection_actif}", value=f"{prix:,.2f} {actif_actuel['unite']}", delta=delta_str)
+
+            titre("🔍 Outil d'Analyse de Situation")
+            st.write("Évalue la configuration actuelle pour cet actif (stratégie DCA, support, résistance ou prise de décision) :")
+
+            strategie_choisie = st.selectbox("Type d'analyse", ["Analyse Technique / Tendance", "Opportunité DCA (Dollar-Cost Averaging)", "Gestion du Risque / Stop-Loss"])
+            
+            note_analyse = st.text_area("Notes d'analyse personnelle", placeholder="Ex: RSI bas, cassure de résistance imminente, zone d'accumulation intéressante...")
+
+            if st.button("Enregistrer cette analyse dans le Labo IA", type="primary", key="btn_save_market_analysis") and note_analyse.strip():
+                contenu_complet = f"Actif : {selection_actif} | Prix : {prix:,.2f} {actif_actuel['unite']} ({delta_str})\nAnalyse : {note_analyse}"
+                add_row("IA_Lab", [str(ajd), f"Analyse Marché - {selection_actif}", contenu_complet, strategie_choisie])
+                st.toast("Analyse enregistrée avec succès ! 📈", icon="✅")
+                st.rerun()
+        else:
+            st.info("Récupération des données boursières en cours...")
