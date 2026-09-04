@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.35"
+VERSION = "2.36"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
