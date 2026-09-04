@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.11"
+VERSION = "2.12"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -149,15 +149,6 @@ html, body, [class*="css"], .stApp{
 
 [data-testid="stHorizontalBlock"]{flex-wrap:nowrap !important; gap:8px !important;}
 [data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
-
-.topbar{
-  display:flex; justify-content:space-between; align-items:center; gap:10px;
-  background:linear-gradient(135deg,#ec4899 0%,#a855f7 100%); color:#fff;
-  border-radius:22px; padding:14px 20px; margin-bottom:18px;
-  font-weight:800; font-size:15px; letter-spacing:-.2px;
-  box-shadow:0 12px 28px -8px rgba(219,39,119,.5);
-}
-.topbar .d{font-weight:700; font-size:13px; opacity:.94; white-space:nowrap;}
 
 .st-key-navrow{margin-bottom:12px;}
 .st-key-navrow [data-testid="stHorizontalBlock"]{gap:8px !important;}
@@ -703,15 +694,9 @@ def entete_lien(cle, texte, compteur, onglet):
             st.rerun()
 
 # ==========================================================
-# 6. EN-TÊTE ET CONNEXION
+# 6. CONNEXION
 # ==========================================================
 ajd = date.today()
-st.markdown(f"""
-<div class="topbar">
-  <span>🌸 Lucas &amp; Alex</span>
-  <span class="d">{JOURS[ajd.weekday()]} {ajd.day} {MOIS[ajd.month - 1]}</span>
-</div>
-""", unsafe_allow_html=True)
 
 if not st.session_state["creds_json"]:
     titre("Connexion à Google Sheets")
