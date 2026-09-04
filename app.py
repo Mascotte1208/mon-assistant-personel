@@ -1,3 +1,14 @@
+"""
+Notre Assistant — l'appli partagée du quotidien de Lucas & Alex.
+
+Streamlit + Google Sheets, un seul fichier organisé en sections :
+  1. Configuration      5. Composants d'interface
+  2. Style              6. Connexion
+  3. État de session    7. Navigation
+  4. Couche données     8. Pages
+"""
+
+import io
 import re
 import json
 import calendar
@@ -7,16 +18,19 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, date, timedelta
 
-# ==========================================
-# CONFIG
-# ==========================================
+# ==========================================================
+# 1. CONFIGURATION
+# ==========================================================
+VERSION = "2.0"
 DOC_NAME = "MonAssistantData"
 
+# En-têtes de référence. Les feuilles existantes gardent leurs colonnes :
+# les colonnes ajoutées ici sont simplement remplies au fil de l'eau.
 SHEETS = {
-    "Taches":   ["Tache", "Categorie", "Statut"],
+    "Taches":   ["Tache", "Categorie", "Statut", "Echeance"],
     "Agenda":   ["Date", "Heure", "Titre", "Description"],
     "Courses":  ["Article", "Quantite", "Categorie"],
-    "Notes":    ["Titre", "Contenu"],
+    "Notes":    ["Titre", "Contenu", "Epingle"],
     "Recettes": ["Titre", "Ingredients", "Instructions"],
     "Budget":   ["Date", "Paye Par", "Intitule", "Montant", "Categorie"],
     "Repas":    ["Jour", "Repas", "Plat"],
@@ -24,7 +38,7 @@ SHEETS = {
 }
 
 RAYONS = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
-CAT_TACHES = ["Maison", "Urgent", "Autre"]
+CAT_TACHES = ["Maison", "Urgent", "Courses", "Autre"]
 CAT_BUDGET = ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"]
 CAT_LISTES = ["Idées Cadeaux", "Valise / Voyage", "Maison"]
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
@@ -33,12 +47,15 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
         "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 PERSONNES = ["Lucas", "Alex"]
 
-st.set_page_config(
-    page_title="Notre Assistant",
-    page_icon="🌸",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
+PAGES = {
+    "accueil": "🏠 Accueil",
+    "quotidien": "📋 Quotidien",
+    "budget": "📊 Budget",
+    "maison": "🐾 Maison",
+}
+
+st.set_page_config(page_title="Notre Assistant", page_icon="🌸",
+                   layout="centered", initial_sidebar_state="collapsed")
 
 MEMOIRE_COURSES = [
     {"article": "Tomates cerises", "qte": "1 bte", "rayon": "Fruits & Légumes"},
@@ -73,9 +90,29 @@ MEMOIRE_COURSES = [
     {"article": "Sacs poubelle", "qte": "1 rlx", "rayon": "Entretien"},
 ]
 
-# ==========================================
-# STYLE
-# ==========================================
+# Mots-clés pour ranger automatiquement un ingrédient dans le bon rayon.
+INDICES_RAYON = [
+    ("Fruits & Légumes", ["tomate", "salade", "roquette", "pomme", "banane", "carotte", "oignon",
+                          "citron", "courgette", "avocat", "concombre", "ail", "poivron", "champignon",
+                          "épinard", "basilic", "persil", "fraise", "brocoli", "patate", "pomme de terre"]),
+    ("Frais", ["lait", "yaourt", "fromage", "beurre", "œuf", "oeuf", "crème", "creme", "jambon",
+               "poulet", "saumon", "mozzarella", "feta", "parmesan", "thon", "escalope", "tofu"]),
+    ("Boulangerie", ["pain", "baguette", "panini", "brioche", "wrap", "tortilla"]),
+    ("Boissons", ["jus", "eau", "soda", "sirop", "vin", "bière", "biere", "limonade"]),
+    ("Entretien", ["papier", "lessive", "éponge", "eponge", "savon", "poubelle", "vaisselle"]),
+    ("Supermarché", ["pâtes", "pates", "riz", "farine", "sucre", "huile", "café", "cafe", "sel",
+                     "poivre", "épice", "epice", "conserve", "sauce", "bouillon", "lentille", "semoule"]),
+]
+
+UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pincee", "tranche",
+          "tranches", "gousse", "gousses", "boîte", "boite", "sachet", "sachets", "pot", "pots",
+          "botte", "brique", "briques", "paquet", "paquets", "bouquet", "brin", "brins", "verre",
+          "verres", "cuillère", "cuillere", "cuillères", "cuilleres", "filet", "barquette",
+          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
+
+# ==========================================================
+# 2. STYLE
+# ==========================================================
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -87,42 +124,38 @@ st.markdown("""
 
 html, body, [class*="css"], .stApp{
   font-family:'Plus Jakarta Sans', sans-serif !important;
-  color:var(--prune);
-  -webkit-tap-highlight-color:transparent;
+  color:var(--prune); -webkit-tap-highlight-color:transparent;
 }
-.stApp{
-  background:linear-gradient(180deg,#fff1f2 0%,#fdf2f8 45%,#faf5ff 100%) fixed !important;
-}
-#MainMenu, footer, header {visibility:hidden;}
+.stApp{background:linear-gradient(180deg,#fff1f2 0%,#fdf2f8 45%,#faf5ff 100%) fixed !important;}
+#MainMenu, footer, header{visibility:hidden;}
+.block-container{padding-top:1.1rem !important; padding-bottom:4rem !important; max-width:540px !important;}
 
-.block-container{
-  padding-top:1.2rem !important;
-  padding-bottom:4rem !important;
-  max-width:540px !important;
-}
-[data-testid="column"]{min-width:0 !important;}
+/* Les colonnes restent côte à côte sur téléphone. */
+[data-testid="stHorizontalBlock"]{flex-wrap:nowrap !important; gap:6px !important;}
+[data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
 
-/* --- Hero --- */
+/* --- En-tête --- */
 .hero{
   background:linear-gradient(135deg,#ec4899 0%,#d946ef 55%,#8b5cf6 100%);
-  border-radius:28px; padding:22px 22px; color:#fff; margin-bottom:16px;
-  box-shadow:0 16px 30px -12px rgba(219,39,119,.45);
-  position:relative; overflow:hidden;
+  border-radius:26px; padding:20px 22px; color:#fff; margin-bottom:14px;
+  box-shadow:0 16px 30px -12px rgba(219,39,119,.45); position:relative; overflow:hidden;
 }
-.hero::after{content:"💖"; position:absolute; right:-6px; bottom:-18px; font-size:78px; opacity:.16;}
-.hero h1{font-size:23px; font-weight:800; margin:0; letter-spacing:-.4px; line-height:1.2;}
+.hero::after{content:"💖"; position:absolute; right:-6px; bottom:-18px; font-size:74px; opacity:.16;}
+.hero h1{font-size:22px; font-weight:800; margin:0; letter-spacing:-.4px; line-height:1.2;}
 .hero p{font-size:13px; opacity:.95; margin:4px 0 0; font-weight:600;}
 
 /* --- Boutons --- */
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
   border-radius:16px !important; font-weight:700 !important; font-size:14px !important;
   padding:11px 14px !important; width:100%; border:1.5px solid var(--bord) !important;
-  transition:transform .12s ease, box-shadow .12s ease;
+  transition:transform .12s ease;
 }
 .stButton>button:active, .stFormSubmitButton>button:active{transform:scale(.97);}
 button[kind="secondary"], button[data-testid="stBaseButton-secondary"],
-button[kind="secondaryFormSubmit"], button[data-testid="stBaseButton-secondaryFormSubmit"]{
-  background:#fff !important; color:var(--rose-fonce) !important; box-shadow:0 2px 8px rgba(236,72,153,.08) !important;
+button[kind="secondaryFormSubmit"], button[data-testid="stBaseButton-secondaryFormSubmit"],
+.stDownloadButton>button{
+  background:#fff !important; color:var(--rose-fonce) !important;
+  box-shadow:0 2px 8px rgba(236,72,153,.08) !important;
 }
 button[kind="primary"], button[data-testid="stBaseButton-primary"],
 button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSubmit"]{
@@ -132,39 +165,40 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
-/* --- Cartes --- */
-.card{
-  background:#fff; border-radius:20px; padding:14px 18px; border:1.5px solid var(--bord);
-  box-shadow:0 8px 18px rgba(236,72,153,.07); margin-bottom:10px;
-  display:flex; align-items:center; justify-content:space-between; gap:10px;
+/* --- Conteneurs --- */
+[data-testid="stVerticalBlockBorderWrapper"]{
+  background:#fff; border:1.5px solid var(--bord) !important; border-radius:22px !important;
+  padding:8px 16px 6px !important; box-shadow:0 10px 22px rgba(236,72,153,.08); margin-bottom:10px;
 }
-.card .k{font-size:13px; font-weight:700; color:var(--rose-fonce);}
-.card .v{font-size:19px; font-weight:800; color:#701a75; text-align:right;}
-.card .v.small{font-size:14px; font-weight:700; color:var(--rose-fonce);}
+.jour-titre{font-size:13px; font-weight:800; color:#a21caf; padding:6px 0 2px;}
+.section{font-weight:800; font-size:15px; color:var(--prune-clair); margin:16px 0 6px;}
+.line{font-size:15px; font-weight:600; color:var(--prune); padding:9px 0;}
+.line.done{color:#a3a3a3; text-decoration:line-through;}
+.line .q{font-weight:600; color:#a21caf; font-size:12.5px;}
+.tag{display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;
+     background:#fce7f3; color:var(--rose-fonce); margin-left:6px; vertical-align:middle;}
+.tag.retard{background:#fee2e2; color:#b91c1c;}
+.tag.jour{background:#dcfce7; color:#15803d;}
+.tag.urgent{background:#fef3c7; color:#b45309;}
+.rayon{font-size:12px; font-weight:800; color:#a21caf; background:#fae8ff;
+       display:inline-block; padding:5px 12px; border-radius:12px; margin:12px 0 2px;}
+.empty{text-align:center; padding:20px 16px; border-radius:20px; background:#fff;
+       border:1.5px dashed var(--bord); color:#9d174d; font-weight:600; font-size:14px;}
+.today-none{font-size:14px; color:#9d174d; font-weight:600; opacity:.7; padding:6px 0;}
 
-.note-box{
-  background:linear-gradient(135deg,#fdf4ff 0%,#fae8ff 100%);
-  border:2px dashed #e879f9; border-radius:20px; padding:16px 18px; margin-bottom:14px;
-}
+.note-box{background:linear-gradient(135deg,#fdf4ff 0%,#fae8ff 100%); border:2px dashed #e879f9;
+          border-radius:20px; padding:14px 18px; margin-bottom:12px;}
 .note-box .t{font-size:13px; font-weight:700; color:#9333ea; margin-bottom:4px;}
 .note-box .c{font-size:15px; color:#581c87; font-weight:600;}
 
-.section{font-weight:800; font-size:15px; color:var(--prune-clair); margin:18px 0 8px;}
-.line{font-size:15px; font-weight:600; color:var(--prune); padding:9px 0;}
-.line.done{color:#a3a3a3; text-decoration:line-through;}
-.line .q{font-weight:600; color:#a21caf; font-size:13px;}
-.tag{
-  display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px;
-  font-weight:700; background:#fce7f3; color:var(--rose-fonce); margin-left:6px; vertical-align:middle;
-}
-.rayon{
-  font-size:12px; font-weight:800; color:#a21caf; background:#fae8ff;
-  display:inline-block; padding:5px 12px; border-radius:12px; margin:14px 0 4px;
-}
-.empty{
-  text-align:center; padding:22px 16px; border-radius:20px; background:#fff;
-  border:1.5px dashed var(--bord); color:#9d174d; font-weight:600; font-size:14px;
-}
+.solde{border-radius:18px; padding:13px 16px; margin:10px 0; font-weight:700; font-size:14px;
+       background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:1.5px solid #f0abfc; color:#701a75;
+       display:flex; justify-content:space-between; align-items:center; gap:10px;}
+.solde .m{font-size:17px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
+
+.bandeau{border-radius:16px; padding:10px 14px; font-size:13px; font-weight:700; margin-bottom:8px;}
+.bandeau.info{background:#f5f3ff; border:1.5px solid #ddd6fe; color:#5b21b6;}
+.bandeau.warn{background:#fff7ed; border:1.5px solid #fed7aa; color:#c2410c;}
 
 /* --- Champs --- */
 .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input, .stTimeInput input{
@@ -172,123 +206,51 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
   border-radius:16px !important; border:1.5px solid #f9a8d4 !important;
   padding:11px 15px !important; font-size:15px !important;
 }
-[data-baseweb="select"]>div{
-  border-radius:16px !important; border:1.5px solid #f9a8d4 !important; background:#fff !important;
-}
+[data-baseweb="select"]>div{border-radius:16px !important; border:1.5px solid #f9a8d4 !important; background:#fff !important;}
 label p{font-weight:700 !important; font-size:13px !important; color:var(--prune-clair) !important;}
 
 /* --- Onglets --- */
-.stTabs [data-baseweb="tab-list"]{
-  gap:6px; background:rgba(255,255,255,.75); padding:6px; border-radius:18px;
-  border:1.5px solid var(--bord);
-}
-.stTabs [data-baseweb="tab"]{
-  border-radius:13px; padding:7px 12px; font-weight:700; font-size:13px; color:var(--rose-fonce);
-}
-.stTabs [aria-selected="true"]{
-  background:linear-gradient(135deg,#ec4899,#db2777); color:#fff !important;
-}
+.stTabs [data-baseweb="tab-list"]{gap:6px; background:rgba(255,255,255,.75); padding:6px;
+  border-radius:18px; border:1.5px solid var(--bord);}
+.stTabs [data-baseweb="tab"]{border-radius:13px; padding:7px 12px; font-weight:700; font-size:13px; color:var(--rose-fonce);}
+.stTabs [aria-selected="true"]{background:linear-gradient(135deg,#ec4899,#db2777); color:#fff !important;}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
 
-/* --- Tuiles de synthèse --- */
-.tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:10px;}
-.tile{
-  background:#fff; border:1.5px solid var(--bord); border-radius:18px; padding:12px 8px;
-  text-align:center; box-shadow:0 6px 14px rgba(236,72,153,.06);
-}
-.tile .n{font-size:21px; font-weight:800; color:#701a75; line-height:1.15;}
-.tile .l{font-size:11px; font-weight:700; color:var(--rose-fonce); margin-top:2px;}
-
-.solde{
-  border-radius:18px; padding:13px 16px; margin-bottom:10px; font-weight:700; font-size:14px;
-  background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:1.5px solid #f0abfc; color:#701a75;
-  display:flex; justify-content:space-between; align-items:center; gap:10px;
-}
-.solde .m{font-size:17px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
-
-/* --- Bloc « aujourd'hui » --- */
-[data-testid="stVerticalBlockBorderWrapper"]{
-  background:#fff; border:1.5px solid var(--bord) !important; border-radius:22px !important;
-  padding:8px 16px 4px !important; box-shadow:0 10px 22px rgba(236,72,153,.08);
-  margin-bottom:10px;
-}
-.jour-titre{font-size:13px; font-weight:800; color:#a21caf; padding:6px 0 2px;}
-
-/* --- Tuiles cliquables du dashboard --- */
-.st-key-dash-tiles [data-testid="column"]{padding:0 3px;}
-.st-key-dash-tiles button{
-  min-height:62px !important; border-radius:20px !important;
-  font-size:13px !important; font-weight:800 !important; line-height:1.35 !important;
-  white-space:normal !important;
-}
+/* --- Tuiles cliquables --- */
+.st-key-dash-tiles button{min-height:60px !important; border-radius:20px !important;
+  font-size:13px !important; font-weight:800 !important; white-space:normal !important;}
 .st-key-dash-tiles button p{font-size:13px !important; font-weight:800 !important;}
-.today-box{
-  background:#fff; border:1.5px solid var(--bord); border-radius:22px; padding:15px 18px;
-  box-shadow:0 10px 22px rgba(236,72,153,.08); margin-bottom:12px;
-}
-.today-box .d{font-size:13px; font-weight:800; color:#a21caf; margin-bottom:8px;}
-.today-row{
-  display:flex; gap:10px; align-items:baseline; padding:5px 0;
-  font-size:14px; font-weight:600; color:var(--prune); border-top:1px solid #fdf2f8;
-}
-.today-row .h{font-size:12px; font-weight:800; color:var(--rose-fonce); min-width:46px;}
-.today-none{font-size:14px; color:#9d174d; font-weight:600; opacity:.7;}
 
-/* --- Calendrier mensuel --- */
-.cal{
-  background:#fff; border:1.5px solid var(--bord); border-radius:22px; padding:14px 12px 12px;
-  box-shadow:0 10px 22px rgba(236,72,153,.08); margin-bottom:12px;
-}
-.cal-week, .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
-.cal-week{margin-bottom:6px;}
+/* --- Calendrier --- */
+.cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin:0 -4px 6px;}
 .cal-week span{text-align:center; font-size:11px; font-weight:800; color:#c026d3;}
-.cal-cell{
-  aspect-ratio:1/1; border-radius:13px; background:#fdf2f8; color:var(--prune);
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  font-size:13px; font-weight:700; line-height:1;
-}
-.cal-cell.out{background:transparent; color:#ecd9f5; font-weight:600;}
-.cal-cell.ev{background:linear-gradient(135deg,#fce7f3,#fae8ff); color:#9d174d;}
-.cal-cell.today{
-  background:linear-gradient(135deg,#ec4899,#a855f7); color:#fff;
-  box-shadow:0 5px 12px -2px rgba(219,39,119,.55);
-}
-.cal-dots{display:flex; gap:3px; height:5px; margin-top:4px;}
-.cal-dots i{width:5px; height:5px; border-radius:50%; background:#db2777; display:block;}
-.cal-cell.today .cal-dots i{background:#fff;}
-
-.day-head{
-  font-size:12px; font-weight:800; color:#a21caf; background:#fae8ff;
-  display:inline-block; padding:5px 12px; border-radius:12px; margin:14px 0 2px;
-}
 .cal-title{text-align:center; font-size:16px; font-weight:800; color:var(--prune-clair); padding-top:10px;}
-
-/* --- Cases cliquables du calendrier --- */
-/* Sur téléphone, Streamlit empile les colonnes : on l'en empêche. */
-[data-testid="stHorizontalBlock"]{flex-wrap:nowrap !important; gap:6px !important;}
-[data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
-
+.st-key-cal-grid{margin:0 -4px;}
 .st-key-cal-grid [data-testid="stHorizontalBlock"],
 [data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]){gap:3px !important;}
 .st-key-cal-grid [data-testid="stHorizontalBlock"] > div,
 [data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]) > div{
   flex:1 1 0 !important; width:auto !important; min-width:0 !important; padding:0 !important;
 }
-.st-key-cal-grid{margin:0 -4px;}
-.st-key-dash-cal .cal-week{gap:3px; margin:0 -4px 6px;}
 [class*="st-key-cal_"] button{
   min-height:0 !important; padding:8px 0 !important; border-radius:11px !important;
-  font-size:12px !important; font-weight:700 !important;
-  background:#fdf2f8 !important; color:var(--prune) !important;
-  border:1.5px solid transparent !important; box-shadow:none !important;
+  font-size:12px !important; font-weight:700 !important; background:#fdf2f8 !important;
+  color:var(--prune) !important; border:1.5px solid transparent !important; box-shadow:none !important;
 }
 [class*="st-key-cal_"] button p{font-size:12px !important; font-weight:700 !important; line-height:1.1 !important;}
 [class*="st-key-cal_"] button:disabled{background:transparent !important; color:#ecd9f5 !important; opacity:1 !important;}
-[class*="st-key-cal_"] button[kind="primary"],
-[class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
+[class*="st-key-cal_"] button[kind="primary"], [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
   background:linear-gradient(135deg,#ec4899,#a855f7) !important; color:#fff !important;
   box-shadow:0 5px 12px -3px rgba(219,39,119,.55) !important;
 }
+
+/* --- Divers --- */
+.stProgress > div > div > div > div{background-image:linear-gradient(90deg,#f472b6,#a855f7) !important;}
+[data-testid="stExpander"]{border-radius:18px !important; border:1.5px solid var(--bord) !important;
+  background:#fff !important; overflow:hidden;}
+hr{margin:12px 0 !important; border-color:#fbcfe8 !important;}
+[data-testid="stMetricValue"]{color:#701a75; font-weight:800;}
+.pied{text-align:center; font-size:11px; color:#c084fc; font-weight:600; padding:18px 0 4px;}
 
 @media (max-width:480px){
   .block-container{padding-left:.7rem !important; padding-right:.7rem !important;}
@@ -296,36 +258,35 @@ label p{font-weight:700 !important; font-size:13px !important; color:var(--prune
   [class*="st-key-cal_"] button p{font-size:11px !important;}
   .cal-week span{font-size:10px;}
 }
-
-/* --- Divers --- */
-.stProgress > div > div > div > div{background-image:linear-gradient(90deg,#f472b6,#a855f7) !important;}
-[data-testid="stExpander"]{
-  border-radius:18px !important; border:1.5px solid var(--bord) !important;
-  background:#fff !important; overflow:hidden;
-}
-hr{margin:14px 0 !important; border-color:#fbcfe8 !important;}
-[data-testid="stMetricValue"]{color:#701a75; font-weight:800;}
 </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# ÉTAT & RÉINITIALISATION DES CHAMPS
-# ==========================================
-for key, val in [("creds_json", None), ("page", "Accueil"), ("_reset", {})]:
-    if key not in st.session_state:
-        st.session_state[key] = val
+# ==========================================================
+# 3. ÉTAT DE SESSION
+# ==========================================================
+DEFAUTS = {
+    "creds_json": None,
+    "ops": [],               # écritures Google en attente
+    "erreur_synchro": None,
+    "derniere_synchro": None,
+    "annulation": None,      # dernière action réversible
+    "_reset": {},
+}
+for cle, val in DEFAUTS.items():
+    if cle not in st.session_state:
+        st.session_state[cle] = val
 
-# Vide les champs demandés au tour précédent (avant création des widgets)
-for k, v in st.session_state["_reset"].items():
-    st.session_state[k] = v
+# Vide les champs demandés au tour précédent, avant création des widgets.
+for cle, val in st.session_state["_reset"].items():
+    st.session_state[cle] = val
 st.session_state["_reset"] = {}
 
 
-def reset_after(**fields):
-    st.session_state["_reset"] = fields
+def reset_after(**champs):
+    """Vide des champs de saisie au prochain rerun."""
+    st.session_state["_reset"] = champs
 
 
-# Credentials via st.secrets (évite de réimporter le JSON à chaque visite)
 if not st.session_state["creds_json"]:
     try:
         if "gcp_service_account" in st.secrets:
@@ -333,15 +294,13 @@ if not st.session_state["creds_json"]:
     except Exception:
         pass
 
-
-# ==========================================
-# COUCHE DONNÉES
-# ==========================================
+# ==========================================================
+# 4. COUCHE DONNÉES
+# ==========================================================
 @st.cache_resource(show_spinner=False)
 def get_client(json_str):
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_info(json.loads(json_str), scopes=scope)
-    return gspread.authorize(creds)
+    return gspread.authorize(Credentials.from_service_account_info(json.loads(json_str), scopes=scope))
 
 
 @st.cache_resource(show_spinner=False)
@@ -352,10 +311,10 @@ def get_doc(json_str):
     except gspread.SpreadsheetNotFound:
         doc = client.create(DOC_NAME)
     titres = {ws.title: ws for ws in doc.worksheets()}
-    for name, headers in SHEETS.items():
-        if name not in titres:
-            ws = doc.add_worksheet(title=name, rows=1000, cols=max(8, len(headers)))
-            ws.append_row(headers)
+    for nom, entetes in SHEETS.items():
+        if nom not in titres:
+            ws = doc.add_worksheet(title=nom, rows=1000, cols=max(8, len(entetes)))
+            ws.append_row(entetes)
     if "Sheet1" in titres and len(titres) > 1:
         try:
             doc.del_worksheet(titres["Sheet1"])
@@ -365,29 +324,29 @@ def get_doc(json_str):
 
 
 @st.cache_resource(show_spinner=False)
-def get_ws(json_str, sheet):
-    return get_doc(json_str).worksheet(sheet)
+def get_ws(json_str, feuille):
+    return get_doc(json_str).worksheet(feuille)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_all(json_str):
-    """Un seul appel réseau pour les 8 feuilles."""
+    """Une seule requête réseau pour toutes les feuilles."""
     doc = get_doc(json_str)
-    data = {}
+    donnees = {}
     try:
         res = doc.values_batch_get([f"'{n}'!A1:Z2000" for n in SHEETS])
-        for name, vr in zip(SHEETS.keys(), res.get("valueRanges", [])):
-            data[name] = vr.get("values", []) or []
+        for nom, vr in zip(SHEETS.keys(), res.get("valueRanges", [])):
+            donnees[nom] = vr.get("values", []) or []
     except Exception:
-        for name in SHEETS:
+        for nom in SHEETS:
             try:
-                data[name] = doc.worksheet(name).get_all_values()
+                donnees[nom] = doc.worksheet(nom).get_all_values()
             except Exception:
-                data[name] = []
-    for name, headers in SHEETS.items():
-        if not data.get(name):
-            data[name] = [headers]
-    return data
+                donnees[nom] = []
+    for nom, entetes in SHEETS.items():
+        if not donnees.get(nom):
+            donnees[nom] = [entetes]
+    return donnees
 
 
 def db():
@@ -396,115 +355,240 @@ def db():
         if creds:
             with st.spinner("Chargement de vos données…"):
                 st.session_state["db"] = fetch_all(creds)
+                st.session_state["derniere_synchro"] = datetime.now()
         else:
-            st.session_state["db"] = {n: [h] for n, h in SHEETS.items()}
+            st.session_state["db"] = {n: [e] for n, e in SHEETS.items()}
     return st.session_state["db"]
 
 
-def rows(sheet):
-    """Lignes de données (sans l'en-tête), avec leur index réel dans la feuille."""
-    raw = db().get(sheet, [])
-    return [(i + 1, r) for i, r in enumerate(raw[1:])]
+def rows(feuille):
+    """[(index réel dans la feuille, ligne)] sans l'en-tête."""
+    brut = db().get(feuille, [])
+    return [(i + 1, r) for i, r in enumerate(brut[1:])]
 
 
-def pad(row, n):
-    return (list(row) + [""] * n)[:n]
+def pad(ligne_, n):
+    return (list(ligne_) + [""] * n)[:n]
 
 
-def _push(fn):
-    creds = st.session_state.get("creds_json")
-    if not creds:
+# ---------- File d'écritures ----------
+# Les modifications sont appliquées localement puis poussées vers Google.
+# En cas d'échec réseau, elles restent en file et sont rejouées dans l'ordre.
+def _executer(op):
+    creds = st.session_state["creds_json"]
+    genre = op[0]
+    if genre == "append":
+        get_ws(creds, op[1]).append_row(op[2], value_input_option="USER_ENTERED")
+    elif genre == "insert":
+        get_ws(creds, op[1]).insert_row(op[2], op[3] + 1, value_input_option="USER_ENTERED")
+    elif genre == "delete":
+        get_ws(creds, op[1]).delete_rows(op[2] + 1)
+    elif genre == "update":
+        get_ws(creds, op[1]).update_cell(op[2] + 1, op[3], op[4])
+    elif genre == "clear":
+        get_ws(creds, op[1]).batch_clear(["A2:Z2000"])
+
+
+def vider_file():
+    """Rejoue les écritures en attente. Renvoie True si tout est passé."""
+    if not st.session_state.get("creds_json"):
+        return True
+    file = st.session_state["ops"]
+    while file:
+        try:
+            _executer(file[0])
+            file.pop(0)
+            st.session_state["derniere_synchro"] = datetime.now()
+        except Exception as err:
+            st.session_state["erreur_synchro"] = str(err)[:140]
+            return False
+    st.session_state["erreur_synchro"] = None
+    return True
+
+
+def pousser(op):
+    st.session_state["ops"].append(op)
+    vider_file()
+
+
+# ---------- Écritures ----------
+def add_row(feuille, ligne_):
+    db()[feuille].append(ligne_)
+    pousser(("append", feuille, ligne_))
+
+
+def insert_row(feuille, index, ligne_):
+    db()[feuille].insert(index, ligne_)
+    pousser(("insert", feuille, ligne_, index))
+
+
+def delete_row(feuille, index, annulable=True, libelle="Élément supprimé"):
+    donnees = db()[feuille]
+    if not 0 < index < len(donnees):
         return
+    ancienne = list(donnees[index])
+    donnees.pop(index)
+    pousser(("delete", feuille, index))
+    if annulable:
+        st.session_state["annulation"] = {"type": "restaurer", "feuille": feuille,
+                                          "index": index, "ligne": ancienne, "libelle": libelle}
+
+
+def set_cell(feuille, index, colonne, valeur, annulable=False, libelle=""):
+    donnees = db()[feuille]
+    if not 0 < index < len(donnees):
+        return
+    ligne_ = pad(donnees[index], max(colonne, len(donnees[index])))
+    ancienne = ligne_[colonne - 1]
+    ligne_[colonne - 1] = valeur
+    donnees[index] = ligne_
+    pousser(("update", feuille, index, colonne, valeur))
+    if annulable:
+        st.session_state["annulation"] = {"type": "cellule", "feuille": feuille, "index": index,
+                                          "colonne": colonne, "valeur": ancienne, "libelle": libelle}
+
+
+def clear_sheet(feuille):
+    db()[feuille] = [SHEETS[feuille]]
+    pousser(("clear", feuille))
+
+
+def annuler():
+    action = st.session_state.get("annulation")
+    if not action:
+        return
+    if action["type"] == "restaurer":
+        insert_row(action["feuille"], action["index"], action["ligne"])
+    elif action["type"] == "cellule":
+        set_cell(action["feuille"], action["index"], action["colonne"], action["valeur"])
+    st.session_state["annulation"] = None
+
+
+# ---------- Petites logiques métier ----------
+def to_float(valeur):
     try:
-        fn()
-    except Exception:
-        st.toast("Modification enregistrée localement, synchronisation Google en échec.", icon="⚠️")
-
-
-def add_row(sheet, row):
-    db()[sheet].append(row)
-    creds = st.session_state["creds_json"]
-    _push(lambda: get_ws(creds, sheet).append_row(row, value_input_option="USER_ENTERED"))
-
-
-def delete_row(sheet, idx):
-    data = db()[sheet]
-    if 0 < idx < len(data):
-        data.pop(idx)
-        creds = st.session_state["creds_json"]
-        _push(lambda: get_ws(creds, sheet).delete_rows(idx + 1))
-
-
-def set_cell(sheet, idx, col, value):
-    data = db()[sheet]
-    if 0 < idx < len(data):
-        row = pad(data[idx], max(col, len(data[idx])))
-        row[col - 1] = value
-        data[idx] = row
-        creds = st.session_state["creds_json"]
-        _push(lambda: get_ws(creds, sheet).update_cell(idx + 1, col, value))
-
-
-def clear_sheet(sheet):
-    db()[sheet] = [SHEETS[sheet]]
-    creds = st.session_state["creds_json"]
-    _push(lambda: get_ws(creds, sheet).batch_clear(["A2:Z2000"]))
-
-
-def merge_qte(a, b):
-    """1 bte + 2 bte -> 3 bte ; sinon concaténation lisible."""
-    pat = r"^\s*(\d+(?:[.,]\d+)?)\s*(.*)$"
-    ma, mb = re.match(pat, str(a or "")), re.match(pat, str(b or ""))
-    if ma and mb and ma.group(2).strip().lower() == mb.group(2).strip().lower():
-        total = float(ma.group(1).replace(",", ".")) + float(mb.group(1).replace(",", "."))
-        num = int(total) if total.is_integer() else round(total, 2)
-        return f"{num} {ma.group(2).strip()}".strip()
-    return f"{a} + {b}"
-
-
-def add_course(article, qte, rayon):
-    """Fusionne avec l'article existant s'il est déjà dans le panier."""
-    nom = article.strip().lower()
-    for idx, r in rows("Courses"):
-        if pad(r, 3)[0].strip().lower() == nom:
-            set_cell("Courses", idx, 2, merge_qte(pad(r, 3)[1] or "1", qte))
-            return
-    add_row("Courses", [article.strip(), qte, rayon])
-
-
-def to_float(v):
-    try:
-        return float(str(v).replace(",", ".").replace("€", "").strip())
+        return float(str(valeur).replace(",", ".").replace("€", "").strip())
     except (ValueError, AttributeError):
         return 0.0
 
 
-# ==========================================
-# COMPOSANTS UI
-# ==========================================
-def pills(key, options, default=None, cols=3, prefix=""):
-    """Sélecteur de catégorie en boutons. Renvoie l'option active."""
-    if key not in st.session_state or st.session_state[key] not in options:
-        st.session_state[key] = default if default in options else options[0]
-    for start in range(0, len(options), cols):
-        ligne = options[start:start + cols]
-        columns = st.columns(cols)
-        for c, opt in zip(columns, ligne):
-            with c:
-                actif = st.session_state[key] == opt
-                if st.button(f"{prefix}{opt}", key=f"pill_{key}_{opt}",
-                             type="primary" if actif else "secondary"):
-                    st.session_state[key] = opt
-                    st.rerun()
-    return st.session_state[key]
+def parse_date(texte):
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(str(texte).strip(), fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
-def titre(txt):
-    st.markdown(f"<div class='section'>{txt}</div>", unsafe_allow_html=True)
+def merge_qte(a, b):
+    """« 1 bte » + « 2 bte » → « 3 bte », sinon on concatène lisiblement."""
+    motif = r"^\s*(\d+(?:[.,]\d+)?)\s*(.*)$"
+    ma, mb = re.match(motif, str(a or "")), re.match(motif, str(b or ""))
+    if ma and mb and ma.group(2).strip().lower() == mb.group(2).strip().lower():
+        total = float(ma.group(1).replace(",", ".")) + float(mb.group(1).replace(",", "."))
+        nombre = int(total) if total.is_integer() else round(total, 2)
+        return f"{nombre} {ma.group(2).strip()}".strip()
+    return f"{a} + {b}"
 
 
-def vide(txt):
-    st.markdown(f"<div class='empty'>{txt}</div>", unsafe_allow_html=True)
+def deviner_rayon(nom):
+    minus = nom.lower()
+    for memo in MEMOIRE_COURSES:
+        base = memo["article"].lower().split(" /")[0].strip()
+        if base and (base in minus or minus in memo["article"].lower()):
+            return memo["rayon"]
+    for rayon, mots in INDICES_RAYON:
+        if any(mot in minus for mot in mots):
+            return rayon
+    return "Autre"
+
+
+def separer_quantite(ligne_texte):
+    """« 200 g de farine » → (« farine », « 200 g »)."""
+    texte = re.sub(r"^\s*[-•*·]\s*", "", str(ligne_texte)).strip()
+    m = re.match(r"^(\d+(?:[.,]\d+)?)\s*([a-zA-Zàâçéèêëîïôûùüÿœ.]*)\s+(?:de\s+|d')?(.+)$", texte)
+    if m:
+        unite = m.group(2).lower().strip()
+        if unite in UNITES or unite == "":
+            return m.group(3).strip(), f"{m.group(1)} {unite}".strip()
+    return texte, "1"
+
+
+def add_course(article, qte, rayon=None):
+    """Ajoute au panier en fusionnant avec l'article déjà présent."""
+    article = str(article).strip()
+    if not article:
+        return
+    nom = article.lower()
+    for idx, r in rows("Courses"):
+        if pad(r, 3)[0].strip().lower() == nom:
+            set_cell("Courses", idx, 2, merge_qte(pad(r, 3)[1] or "1", qte))
+            return
+    add_row("Courses", [article, qte, rayon or deviner_rayon(article)])
+
+
+def evenements_tries():
+    """[(date, heure, titre, description, index)] triés."""
+    sortie = []
+    for idx, r in rows("Agenda"):
+        d, h, ti, desc = pad(r, 4)
+        jour = parse_date(d)
+        if jour:
+            sortie.append((jour, h, ti, desc, idx))
+    return sorted(sortie, key=lambda e: (e[0], e[1] or "99:99"))
+
+
+def taches_actives():
+    """Tâches à faire, triées : échéance la plus proche d'abord, urgentes ensuite."""
+    resultat = []
+    for idx, r in rows("Taches"):
+        nom, cat, statut, ech = pad(r, 4)
+        if statut == "Fait":
+            continue
+        resultat.append((idx, nom, cat or "Autre", parse_date(ech)))
+    return sorted(resultat, key=lambda t: (t[3] or date.max, t[2] != "Urgent"))
+
+
+def badge_echeance(echeance, aujourd):
+    if not echeance:
+        return ""
+    if echeance < aujourd:
+        return "<span class='tag retard'>En retard</span>"
+    if echeance == aujourd:
+        return "<span class='tag jour'>Aujourd'hui</span>"
+    if echeance == aujourd + timedelta(days=1):
+        return "<span class='tag'>Demain</span>"
+    return f"<span class='tag'>{echeance.day}/{echeance.month}</span>"
+
+
+def depuis(instant):
+    if not instant:
+        return "jamais"
+    secondes = (datetime.now() - instant).total_seconds()
+    if secondes < 60:
+        return "à l'instant"
+    if secondes < 3600:
+        return f"il y a {int(secondes // 60)} min"
+    return f"il y a {int(secondes // 3600)} h"
+
+
+# ==========================================================
+# 5. COMPOSANTS D'INTERFACE
+# ==========================================================
+def conteneur(cle=None, bordure=False):
+    try:
+        return st.container(border=bordure, key=cle) if cle else st.container(border=bordure)
+    except TypeError:
+        return st.container(border=bordure)
+
+
+def titre(texte):
+    st.markdown(f"<div class='section'>{texte}</div>", unsafe_allow_html=True)
+
+
+def vide(texte):
+    st.markdown(f"<div class='empty'>{texte}</div>", unsafe_allow_html=True)
 
 
 def ligne(html, done=False):
@@ -524,45 +608,33 @@ def ligne_action(html, boutons, done=False):
     return clique
 
 
-def conteneur(cle=None, bordure=False):
-    """st.container avec clé CSS quand la version de Streamlit le permet."""
-    try:
-        return st.container(border=bordure, key=cle) if cle else st.container(border=bordure)
-    except TypeError:
-        return st.container(border=bordure)
+def pills(cle, options, defaut=None, cols=3):
+    """Sélecteur en boutons. Renvoie l'option active."""
+    if cle not in st.session_state or st.session_state[cle] not in options:
+        st.session_state[cle] = defaut if defaut in options else options[0]
+    for debut in range(0, len(options), cols):
+        groupe = options[debut:debut + cols]
+        colonnes = st.columns(cols)
+        for col, opt in zip(colonnes, groupe):
+            with col:
+                actif = st.session_state[cle] == opt
+                if st.button(opt, key=f"pill_{cle}_{opt}", type="primary" if actif else "secondary"):
+                    st.session_state[cle] = opt
+                    st.rerun()
+    return st.session_state[cle]
 
 
-def parse_date(txt):
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"):
-        try:
-            return datetime.strptime(str(txt).strip(), fmt).date()
-        except ValueError:
-            continue
-    return None
-
-
-def evenements_tries():
-    """(date, heure, titre, description, index) triés, dates illisibles écartées."""
-    out = []
-    for idx, r in rows("Agenda"):
-        d, h, ti, desc = pad(r, 4)
-        jd = parse_date(d)
-        if jd:
-            out.append((jd, h, ti, desc, idx))
-    return sorted(out, key=lambda e: (e[0], e[1] or "99:99"))
-
-
-def grille_mois_cliquable(annee, mois, par_jour, aujourd, selection):
-    """Grille de boutons : renvoie le jour cliqué, sinon None."""
+def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
+    """Grille de boutons. Renvoie le jour cliqué, sinon None."""
     st.markdown("<div class='cal-week'>" + "".join(f"<span>{j}</span>" for j in JOURS_COURT) + "</div>",
                 unsafe_allow_html=True)
     choisi, styles = None, []
     with conteneur("cal-grid"):
         for semaine in calendar.Calendar(firstweekday=0).monthdatescalendar(annee, mois):
-            cols = st.columns(7)
-            for col, jour in zip(cols, semaine):
+            colonnes = st.columns(7)
+            for col, jour in zip(colonnes, semaine):
                 with col:
-                    cle = f"cal_{jour.isoformat()}"
+                    cle = f"{prefixe}_{jour.isoformat()}"
                     if jour.month != mois:
                         st.button(str(jour.day), key=cle, disabled=True)
                         continue
@@ -573,9 +645,8 @@ def grille_mois_cliquable(annee, mois, par_jour, aujourd, selection):
                     if jour == selection:
                         continue
                     if nb:
-                        styles.append(f".st-key-{cle} button{{background:"
-                                      f"linear-gradient(135deg,#fce7f3,#fae8ff) !important;"
-                                      f"color:#9d174d !important;}}")
+                        styles.append(f".st-key-{cle} button{{background:linear-gradient("
+                                      f"135deg,#fce7f3,#fae8ff) !important;color:#9d174d !important;}}")
                     if jour == aujourd:
                         styles.append(f".st-key-{cle} button{{border:2px solid #db2777 !important;"
                                       f"color:#db2777 !important;}}")
@@ -584,33 +655,52 @@ def grille_mois_cliquable(annee, mois, par_jour, aujourd, selection):
     return choisi
 
 
-def grille_mois(annee, mois, par_jour, aujourd):
-    """Rend le mois en grille HTML, avec un point par événement (3 max)."""
-    semaines = calendar.Calendar(firstweekday=0).monthdatescalendar(annee, mois)
-    cells = ""
-    for semaine in semaines:
-        for jour in semaine:
-            classes = ["cal-cell"]
-            nb = 0
-            if jour.month != mois:
-                classes.append("out")
-            else:
-                nb = len(par_jour.get(jour, []))
-                if nb:
-                    classes.append("ev")
-            if jour == aujourd:
-                classes.append("today")
-            points = "".join("<i></i>" for _ in range(min(nb, 3)))
-            cells += (f"<div class='{' '.join(classes)}'>{jour.day}"
-                      f"<div class='cal-dots'>{points}</div></div>")
-    entetes = "".join(f"<span>{j}</span>" for j in JOURS_COURT)
-    return (f"<div class='cal'><div class='cal-week'>{entetes}</div>"
-            f"<div class='cal-grid'>{cells}</div></div>")
+def navigateur_mois(cle_etat, aujourd, prefixe):
+    """Ligne ◀ Mois Année ▶. Renvoie (année, mois)."""
+    if cle_etat not in st.session_state:
+        st.session_state[cle_etat] = (aujourd.year, aujourd.month)
+    annee, mois = st.session_state[cle_etat]
+    c1, c2, c3 = st.columns([1, 3, 1])
+    with c1:
+        if st.button("◀", key=f"{prefixe}_prev"):
+            st.session_state[cle_etat] = (annee - 1, 12) if mois == 1 else (annee, mois - 1)
+            st.rerun()
+    with c2:
+        st.markdown(f"<div class='cal-title'>{MOIS[mois - 1].capitalize()} {annee}</div>",
+                    unsafe_allow_html=True)
+    with c3:
+        if st.button("▶", key=f"{prefixe}_next"):
+            st.session_state[cle_etat] = (annee + 1, 1) if mois == 12 else (annee, mois + 1)
+            st.rerun()
+    return st.session_state[cle_etat]
 
 
-# ==========================================
-# EN-TÊTE
-# ==========================================
+def bandeaux():
+    """Synchronisation en attente + annulation de la dernière action."""
+    en_attente = len(st.session_state.get("ops", []))
+    if en_attente:
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.markdown(f"<div class='bandeau warn'>⏳ {en_attente} modification(s) en attente "
+                        f"d'envoi vers Google</div>", unsafe_allow_html=True)
+        with c2:
+            if st.button("Réessayer", key="retry_sync"):
+                vider_file()
+                st.rerun()
+    action = st.session_state.get("annulation")
+    if action:
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.markdown(f"<div class='bandeau info'>{action['libelle']}</div>", unsafe_allow_html=True)
+        with c2:
+            if st.button("↩️ Annuler", key="undo_btn"):
+                annuler()
+                st.rerun()
+
+
+# ==========================================================
+# 6. EN-TÊTE ET CONNEXION
+# ==========================================================
 st.markdown("""
 <div class="hero">
   <h1>Bonjour Lucas & Alex ✨</h1>
@@ -618,63 +708,69 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# CONNEXION
-# ==========================================
 if not st.session_state["creds_json"]:
-    st.markdown("<div class='section'>Connexion à Google Sheets</div>", unsafe_allow_html=True)
-    st.caption("Déposez le fichier JSON du compte de service. Astuce : placez-le dans "
-               "`.streamlit/secrets.toml` sous `[gcp_service_account]` pour ne plus jamais le redemander.")
-    fichier = st.file_uploader("Fichier de configuration", type=["json"], label_visibility="collapsed")
+    titre("Connexion à Google Sheets")
+    st.caption("Déposez le fichier JSON du compte de service. Pour ne plus jamais le redemander, "
+               "copiez son contenu dans `.streamlit/secrets.toml` sous `[gcp_service_account]`.")
+    fichier = st.file_uploader("Configuration", type=["json"], label_visibility="collapsed")
     if fichier is not None:
-        raw = fichier.read().decode("utf-8")
+        brut = fichier.read().decode("utf-8")
         try:
             with st.spinner("Préparation du classeur…"):
-                st.session_state["creds_json"] = raw
-                get_doc(raw)
+                st.session_state["creds_json"] = brut
+                get_doc(brut)
             st.session_state.pop("db", None)
             st.toast("Connexion réussie 💖", icon="✨")
             st.rerun()
-        except Exception as e:
+        except Exception as err:
             st.session_state["creds_json"] = None
-            st.error(f"Connexion impossible : {e}")
+            st.error(f"Connexion impossible : {err}")
     st.stop()
 
-# ==========================================
-# NAVIGATION
-# ==========================================
-PAGES = ["🏠 Accueil", "📋 Quotidien", "📊 Budget", "🐾 Maison"]
+# Une écriture avait échoué ? On retente dès le chargement suivant.
+if st.session_state["ops"]:
+    vider_file()
+
+# ==========================================================
+# 7. NAVIGATION
+# ==========================================================
+params = st.query_params
+page_cle = params.get("p", "accueil")
+if page_cle not in PAGES:
+    page_cle = "accueil"
+
 n1, n2 = st.columns(2)
-for i, p in enumerate(PAGES):
+for i, (cle, libelle) in enumerate(PAGES.items()):
     with (n1 if i % 2 == 0 else n2):
-        if st.button(p, key=f"nav_{p}", type="primary" if st.session_state["page"] == p else "secondary"):
-            st.session_state["page"] = p
+        if st.button(libelle, key=f"nav_{cle}", type="primary" if page_cle == cle else "secondary"):
+            st.query_params["p"] = cle
             st.rerun()
 
-page = st.session_state["page"]
 st.divider()
+bandeaux()
 
-# ==========================================
-# 1. ACCUEIL
-# ==========================================
-if page == "🏠 Accueil":
-    taches = rows("Taches")
+ajd = date.today()
+evenements = evenements_tries()
+par_jour = {}
+for ev in evenements:
+    par_jour.setdefault(ev[0], []).append(ev)
+
+# ==========================================================
+# 8a. ACCUEIL
+# ==========================================================
+if page_cle == "accueil":
     courses = rows("Courses")
     budget = rows("Budget")
     notes = rows("Notes")
     repas = rows("Repas")
-    evenements = evenements_tries()
+    actives = taches_actives()
 
-    ajd = date.today()
-    par_jour = {}
-    for e in evenements:
-        par_jour.setdefault(e[0], []).append(e)
     evts_jour = par_jour.get(ajd, [])
     a_venir = [e for e in evenements if e[0] > ajd]
     repas_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
 
-    # ---------- 1. Aujourd'hui ----------
-    with st.container(border=True):
+    # ---- Aujourd'hui ----
+    with conteneur(bordure=True):
         st.markdown(f"<div class='jour-titre'>{JOURS[ajd.weekday()]} {ajd.day} {MOIS[ajd.month - 1]}</div>",
                     unsafe_allow_html=True)
         if not evts_jour and not repas_jour:
@@ -688,38 +784,22 @@ if page == "🏠 Accueil":
                             unsafe_allow_html=True)
         for jd, h, ti, desc, idx in evts_jour:
             detail = f"<br><span class='q'>{desc}</span>" if desc else ""
-            if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}",
-                            [("🗑️", f"acc_ev_{idx}")]):
-                delete_row("Agenda", idx)
+            if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}", [("🗑️", f"acc_ev_{idx}")]):
+                delete_row("Agenda", idx, libelle=f"« {ti} » supprimé")
                 st.rerun()
         for idx, (_, typ, plat) in repas_jour:
             if ligne_action(f"<span class='tag'>{typ}</span> 🍽️ {plat}", [("🗑️", f"acc_rp_{idx}")]):
-                delete_row("Repas", idx)
+                delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
 
-    # ---------- 2. Le mois, toujours visible et cliquable ----------
-    if "dash_ym" not in st.session_state:
-        st.session_state["dash_ym"] = (ajd.year, ajd.month)
+    # ---- Le mois, cliquable ----
     if "dash_jour" not in st.session_state:
         st.session_state["dash_jour"] = ajd
-    d_annee, d_mois = st.session_state["dash_ym"]
     jour_sel = st.session_state["dash_jour"]
 
     with conteneur("dash-cal", bordure=True):
-        m1, m2, m3 = st.columns([1, 3, 1])
-        with m1:
-            if st.button("◀", key="dash_prev"):
-                st.session_state["dash_ym"] = (d_annee - 1, 12) if d_mois == 1 else (d_annee, d_mois - 1)
-                st.rerun()
-        with m2:
-            st.markdown(f"<div class='cal-title'>{MOIS[d_mois - 1].capitalize()} {d_annee}</div>",
-                        unsafe_allow_html=True)
-        with m3:
-            if st.button("▶", key="dash_next"):
-                st.session_state["dash_ym"] = (d_annee + 1, 1) if d_mois == 12 else (d_annee, d_mois + 1)
-                st.rerun()
-
-        clic = grille_mois_cliquable(d_annee, d_mois, par_jour, ajd, jour_sel)
+        d_annee, d_mois = navigateur_mois("dash_ym", ajd, "dash")
+        clic = grille_mois(d_annee, d_mois, par_jour, ajd, jour_sel)
         if clic:
             st.session_state["dash_jour"] = clic
             st.rerun()
@@ -730,25 +810,22 @@ if page == "🏠 Accueil":
                 st.session_state["dash_jour"] = ajd
                 st.rerun()
 
-        # --- Le jour choisi ---
         marque = " · aujourd'hui" if jour_sel == ajd else ""
-        st.markdown(f"<div class='day-head'>{JOURS[jour_sel.weekday()]} {jour_sel.day} "
+        st.markdown(f"<div class='jour-titre'>{JOURS[jour_sel.weekday()]} {jour_sel.day} "
                     f"{MOIS[jour_sel.month - 1]}{marque}</div>", unsafe_allow_html=True)
 
         du_jour = par_jour.get(jour_sel, [])
         for jd, h, ti, desc, idx in du_jour:
             detail = f"<br><span class='q'>{desc}</span>" if desc else ""
-            if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}",
-                            [("🗑️", f"cal_ev_{idx}")]):
-                delete_row("Agenda", idx)
+            if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}", [("🗑️", f"cal_ev_{idx}")]):
+                delete_row("Agenda", idx, libelle=f"« {ti} » supprimé")
                 st.rerun()
         if not du_jour:
             st.markdown("<div class='today-none'>Rien de prévu ce jour-là.</div>", unsafe_allow_html=True)
 
         na, nb, nc = st.columns([1.2, 3, 1])
         with na:
-            n_heure = st.text_input("Heure", key="dash_eheure", placeholder="19:30",
-                                    label_visibility="collapsed")
+            n_heure = st.text_input("Heure", key="dash_eheure", placeholder="19:30", label_visibility="collapsed")
         with nb:
             n_titre = st.text_input("Événement", key="dash_etitre", placeholder="Ajouter ici…",
                                     label_visibility="collapsed")
@@ -759,8 +836,9 @@ if page == "🏠 Accueil":
                 st.toast("Événement ajouté 💖", icon="📅")
                 st.rerun()
 
-    # ---------- 3. Note épinglée ----------
-    epingle = next((pad(r, 2) for _, r in notes if "important" in pad(r, 2)[0].lower()), None)
+    # ---- Note épinglée ----
+    epingle = next((pad(r, 3) for _, r in notes
+                    if pad(r, 3)[2] == "1" or "important" in pad(r, 3)[0].lower()), None)
     if epingle:
         st.markdown(f"""
         <div class="note-box">
@@ -768,58 +846,53 @@ if page == "🏠 Accueil":
           <div class="c">{epingle[1]}</div>
         </div>""", unsafe_allow_html=True)
 
-    # ---------- 3. Trois cadres cliquables ----------
-    actives = [(i, r) for i, r in taches if pad(r, 3)[2] != "Fait"]
-    actives.sort(key=lambda x: pad(x[1], 3)[1] != "Urgent")
-    faites = len(taches) - len(actives)
-
+    # ---- Trois cadres cliquables ----
+    en_retard = len([t for t in actives if t[3] and t[3] < ajd])
     focus = st.session_state.get("focus", "taches")
-    tuiles = [
-        ("taches", f"🌸 {len(actives)}\n\nà faire"),
-        ("courses", f"🛒 {len(courses)}\n\ncourses"),
-        ("agenda", f"📅 {len(a_venir)}\n\nà venir"),
-    ]
+    tuiles = [("taches", f"🌸 {len(actives)}\n\nà faire"),
+              ("courses", f"🛒 {len(courses)}\n\ncourses"),
+              ("agenda", f"📅 {len(a_venir)}\n\nà venir")]
     with conteneur("dash-tiles"):
         cols = st.columns(3)
         for col, (cle, libelle) in zip(cols, tuiles):
             with col:
-                if st.button(libelle, key=f"focus_{cle}",
-                             type="primary" if focus == cle else "secondary"):
+                if st.button(libelle, key=f"focus_{cle}", type="primary" if focus == cle else "secondary"):
                     st.session_state["focus"] = None if focus == cle else cle
                     st.rerun()
+    if en_retard:
+        st.caption(f"⚠️ {en_retard} tâche(s) en retard")
 
-    # --- Cadre : tâches ---
+    # Cadre tâches
     if focus == "taches":
         with conteneur(bordure=True):
             if actives:
-                for idx, r in actives[:8]:
-                    nom, cat, _ = pad(r, 3)
-                    clique = ligne_action(f"{nom}<span class='tag'>{cat or 'Général'}</span>",
+                for idx, nom, cat, ech in actives[:8]:
+                    urgent = " urgent" if cat == "Urgent" else ""
+                    clique = ligne_action(f"{nom}<span class='tag{urgent}'>{cat}</span>"
+                                          f"{badge_echeance(ech, ajd)}",
                                           [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
                     if clique == f"acc_tk_{idx}":
-                        set_cell("Taches", idx, 3, "Fait")
+                        set_cell("Taches", idx, 3, "Fait", annulable=True, libelle=f"« {nom} » cochée")
                         st.rerun()
                     elif clique == f"acc_td_{idx}":
-                        delete_row("Taches", idx)
+                        delete_row("Taches", idx, libelle=f"« {nom} » supprimée")
                         st.rerun()
                 if len(actives) > 8:
                     st.caption(f"+ {len(actives) - 8} autres dans Quotidien")
             else:
                 st.markdown("<div class='today-none'>🎉 Tout est fait, profitez de votre soirée.</div>",
                             unsafe_allow_html=True)
-            if faites:
-                st.caption(f"{faites} tâche(s) déjà cochée(s)")
             ta, tb = st.columns([3, 1])
             with ta:
-                dash_tache = st.text_input("Nouvelle tâche", key="dash_tache",
-                                           placeholder="Nouvelle tâche…", label_visibility="collapsed")
+                d_tache = st.text_input("Tâche", key="dash_tache", placeholder="Nouvelle tâche…",
+                                        label_visibility="collapsed")
             with tb:
-                if st.button("＋", key="dash_add_tache", type="primary") and dash_tache.strip():
-                    add_row("Taches", [dash_tache.strip(), "Autre", "À faire"])
+                if st.button("＋", key="dash_add_tache", type="primary") and d_tache.strip():
+                    add_row("Taches", [d_tache.strip(), "Autre", "À faire", ""])
                     reset_after(dash_tache="")
                     st.rerun()
 
-    # --- Cadre : courses ---
+    # Cadre courses
     if focus == "courses":
         with conteneur(bordure=True):
             if courses:
@@ -827,33 +900,31 @@ if page == "🏠 Accueil":
                     du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
                     if not du_rayon:
                         continue
-                    st.markdown(f"<div class='rayon'>{rayon}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='rayon'>{rayon} · {len(du_rayon)}</div>", unsafe_allow_html=True)
                     for idx, r in du_rayon:
                         art, qte, _ = pad(r, 3)
                         if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
-                            delete_row("Courses", idx)
+                            delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
                             st.rerun()
             else:
                 st.markdown("<div class='today-none'>Le panier est vide 🛒</div>", unsafe_allow_html=True)
             ca, cb, cc = st.columns([3, 1, 1])
             with ca:
-                dash_course = st.text_input("Article", key="dash_course",
-                                            placeholder="Ajouter un article…", label_visibility="collapsed")
+                d_course = st.text_input("Article", key="dash_course", placeholder="Ajouter un article…",
+                                         label_visibility="collapsed")
             with cb:
-                dash_qte = st.text_input("Qté", key="dash_qte", value="1", label_visibility="collapsed")
+                d_qte = st.text_input("Qté", key="dash_qte", value="1", label_visibility="collapsed")
             with cc:
-                if st.button("＋", key="dash_add_course", type="primary") and dash_course.strip():
-                    add_course(dash_course, dash_qte or "1", "Autre")
+                if st.button("＋", key="dash_add_course", type="primary") and d_course.strip():
+                    add_course(d_course, d_qte or "1")
                     reset_after(dash_course="", dash_qte="1")
                     st.rerun()
 
-    # --- Cadre : agenda ---
+    # Cadre agenda
     if focus == "agenda":
         with conteneur(bordure=True):
-            st.caption(f"Rendez-vous de {MOIS[d_mois - 1]} — utilisez ◀ ▶ ci-dessus pour changer de mois")
-
-            du_mois = [e for e in evenements if (e[0].year, e[0].month) == (d_annee, d_mois) and e[0] >= ajd]
-            for jd, h, ti, desc, idx in du_mois[:6]:
+            prochains = [e for e in evenements if e[0] >= ajd][:6]
+            for jd, h, ti, desc, idx in prochains:
                 if jd == ajd:
                     quand = "Aujourd'hui"
                 elif jd == ajd + timedelta(days=1):
@@ -861,22 +932,22 @@ if page == "🏠 Accueil":
                 else:
                     quand = f"{JOURS[jd.weekday()][:3]} {jd.day}/{jd.month}"
                 if ligne_action(f"<span class='tag'>{quand}{f' · {h}' if h else ''}</span> {ti}",
-                                [("🗑️", f"acc_ev_next_{idx}")]):
-                    delete_row("Agenda", idx)
+                                [("🗑️", f"acc_next_{idx}")]):
+                    delete_row("Agenda", idx, libelle=f"« {ti} » supprimé")
                     st.rerun()
-            if not du_mois:
-                st.markdown("<div class='today-none'>Rien de prévu sur ce mois.</div>", unsafe_allow_html=True)
+            if not prochains:
+                st.markdown("<div class='today-none'>Rien de prévu à venir.</div>", unsafe_allow_html=True)
             else:
                 st.caption("Touchez un jour du calendrier pour le remplir.")
 
-    # ---------- 4. Budget partagé ----------
+    # ---- Budget partagé ----
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
-    diff = (total_l - total_a) / 2
-    if diff > 0.005:
-        debiteur, qui, combien = "Alex", "Alex doit à Lucas", f"{diff:.2f} €"
-    elif diff < -0.005:
-        debiteur, qui, combien = "Lucas", "Lucas doit à Alex", f"{abs(diff):.2f} €"
+    ecart = (total_l - total_a) / 2
+    if ecart > 0.005:
+        debiteur, qui, combien = "Alex", "Alex doit à Lucas", f"{ecart:.2f} €"
+    elif ecart < -0.005:
+        debiteur, qui, combien = "Lucas", "Lucas doit à Alex", f"{abs(ecart):.2f} €"
     else:
         debiteur, qui, combien = None, "Comptes équilibrés", "💖"
 
@@ -887,75 +958,94 @@ if page == "🏠 Accueil":
         if st.session_state.get("confirm_solde"):
             s1, s2 = st.columns(2)
             with s1:
-                if st.button("Oui, c'est remboursé", type="primary"):
-                    créancier = "Lucas" if debiteur == "Alex" else "Alex"
-                    add_row("Budget", [str(ajd), debiteur, f"Remboursement à {créancier}",
+                if st.button("Oui, c'est remboursé", type="primary", key="solde_ok"):
+                    crediteur = "Lucas" if debiteur == "Alex" else "Alex"
+                    add_row("Budget", [str(ajd), debiteur, f"Remboursement à {crediteur}",
                                        f"{abs(total_l - total_a):.2f}", "Fixe/Admin"])
                     st.session_state["confirm_solde"] = False
                     st.rerun()
             with s2:
-                if st.button("Annuler"):
+                if st.button("Annuler", key="solde_non"):
                     st.session_state["confirm_solde"] = False
                     st.rerun()
-        elif st.button(f"💸 {debiteur} a remboursé"):
+        elif st.button(f"💸 {debiteur} a remboursé", key="solde_go"):
             st.session_state["confirm_solde"] = True
             st.rerun()
 
     st.divider()
     d1, d2 = st.columns(2)
     with d1:
-        if st.button("🔄 Actualiser"):
+        if st.button("🔄 Actualiser", key="refresh"):
             st.cache_data.clear()
             st.session_state.pop("db", None)
             st.rerun()
     with d2:
-        if st.button("🚪 Déconnexion"):
+        if st.button("🚪 Déconnexion", key="logout"):
             st.cache_data.clear()
             st.cache_resource.clear()
-            for k in ["creds_json", "db"]:
+            for k in ["creds_json", "db", "ops", "annulation"]:
                 st.session_state.pop(k, None)
             st.rerun()
+    st.markdown(f"<div class='pied'>Synchronisé {depuis(st.session_state['derniere_synchro'])} "
+                f"· v{VERSION}</div>", unsafe_allow_html=True)
 
-# ==========================================
-# 2. QUOTIDIEN
-# ==========================================
-elif page == "📋 Quotidien":
+# ==========================================================
+# 8b. QUOTIDIEN
+# ==========================================================
+elif page_cle == "quotidien":
     t1, t2, t3, t4 = st.tabs(["✅ Tâches", "🛒 Courses", "📅 Agenda", "🍽️ Repas"])
 
     # ---------- TÂCHES ----------
     with t1:
-        taches = rows("Taches")
-        if taches:
-            faites = len([r for _, r in taches if pad(r, 3)[2] == "Fait"])
-            st.progress(faites / len(taches), text=f"{faites} sur {len(taches)} terminées")
+        toutes = rows("Taches")
+        actives = taches_actives()
+        faites = len(toutes) - len(actives)
+        if toutes:
+            st.progress(faites / len(toutes), text=f"{faites} sur {len(toutes)} terminées")
 
-        filtre = pills("f_taches", ["Toutes"] + CAT_TACHES, cols=4)
-        visibles = [(i, r) for i, r in taches if filtre == "Toutes" or pad(r, 3)[1] == filtre]
+        filtre = pills("f_taches", ["Toutes"] + CAT_TACHES, cols=3)
+        montrer_faites = st.toggle("Afficher les tâches terminées", key="voir_faites")
 
-        if visibles:
-            for idx, r in visibles:
-                nom, cat, statut = pad(r, 3)
-                fait = statut == "Fait"
-                c1, c2, c3 = st.columns([4, 1, 1])
-                with c1:
-                    ligne(f"{nom}<span class='tag'>{cat or 'Général'}</span>", done=fait)
-                with c2:
-                    if st.button("↩️" if fait else "✔️", key=f"tk_{idx}"):
-                        set_cell("Taches", idx, 3, "À faire" if fait else "Fait")
+        visibles = [t for t in actives if filtre == "Toutes" or t[2] == filtre]
+        for idx, nom, cat, ech in visibles:
+            urgent = " urgent" if cat == "Urgent" else ""
+            clique = ligne_action(f"{nom}<span class='tag{urgent}'>{cat}</span>{badge_echeance(ech, ajd)}",
+                                  [("✔️", f"tk_{idx}"), ("🗑️", f"td_{idx}")])
+            if clique == f"tk_{idx}":
+                set_cell("Taches", idx, 3, "Fait", annulable=True, libelle=f"« {nom} » cochée")
+                st.rerun()
+            elif clique == f"td_{idx}":
+                delete_row("Taches", idx, libelle=f"« {nom} » supprimée")
+                st.rerun()
+        if not visibles:
+            vide("Rien à faire dans cette catégorie 🎉")
+
+        if montrer_faites:
+            terminees = [(i, pad(r, 4)) for i, r in toutes if pad(r, 4)[2] == "Fait"]
+            if terminees:
+                titre("Terminées")
+                for idx, r in terminees:
+                    clique = ligne_action(f"{r[0]}<span class='tag'>{r[1] or 'Général'}</span>",
+                                          [("↩️", f"tu_{idx}"), ("🗑️", f"tdd_{idx}")], done=True)
+                    if clique == f"tu_{idx}":
+                        set_cell("Taches", idx, 3, "À faire")
                         st.rerun()
-                with c3:
-                    if st.button("🗑️", key=f"td_{idx}"):
-                        delete_row("Taches", idx)
+                    elif clique == f"tdd_{idx}":
+                        delete_row("Taches", idx, libelle=f"« {r[0]} » supprimée")
                         st.rerun()
-        else:
-            vide("Aucune tâche dans cette catégorie.")
+                if st.button("🧹 Effacer les tâches terminées", key="clean_taches"):
+                    for idx, _ in sorted(terminees, key=lambda x: -x[0]):
+                        delete_row("Taches", idx, annulable=False)
+                    st.rerun()
 
         st.divider()
         titre("Nouvelle tâche")
-        n_cat = pills("new_tache_cat", CAT_TACHES, cols=3)
+        n_cat = pills("new_tache_cat", CAT_TACHES, cols=4)
         n_txt = st.text_input("Intitulé", key="new_tache_txt", placeholder="Sortir les poubelles…")
-        if st.button("Ajouter la tâche", type="primary") and n_txt.strip():
-            add_row("Taches", [n_txt.strip(), n_cat, "À faire"])
+        avec_date = st.toggle("Avec une échéance", key="new_tache_date_on")
+        n_ech = st.date_input("Échéance", value=ajd, key="new_tache_date") if avec_date else None
+        if st.button("Ajouter la tâche", type="primary", key="add_tache") and n_txt.strip():
+            add_row("Taches", [n_txt.strip(), n_cat, "À faire", str(n_ech) if n_ech else ""])
             reset_after(new_tache_txt="")
             st.rerun()
 
@@ -967,17 +1057,14 @@ elif page == "📋 Quotidien":
         rayon_memo = pills("memo_rayon", RAYONS[:-1], cols=2)
         deja = {pad(r, 3)[0].strip().lower() for _, r in courses}
         propositions = [m for m in MEMOIRE_COURSES if m["rayon"] == rayon_memo]
-        if propositions:
-            mc1, mc2 = st.columns(2)
-            for i, m in enumerate(propositions):
-                with (mc1 if i % 2 == 0 else mc2):
-                    dedans = m["article"].strip().lower() in deja
-                    if st.button(("✅ " if dedans else "＋ ") + m["article"], key=f"memo_{m['article']}"):
-                        add_course(m["article"], m["qte"], m["rayon"])
-                        st.toast(f"{m['article']} au panier", icon="🛒")
-                        st.rerun()
-        else:
-            vide("Rien de mémorisé pour ce rayon.")
+        mc1, mc2 = st.columns(2)
+        for i, memo in enumerate(propositions):
+            with (mc1 if i % 2 == 0 else mc2):
+                dedans = memo["article"].strip().lower() in deja
+                if st.button(("✅ " if dedans else "＋ ") + memo["article"], key=f"memo_{memo['article']}"):
+                    add_course(memo["article"], memo["qte"], memo["rayon"])
+                    st.toast(f"{memo['article']} au panier", icon="🛒")
+                    st.rerun()
 
         st.divider()
         titre(f"🛒 Panier ({len(courses)})")
@@ -986,189 +1073,177 @@ elif page == "📋 Quotidien":
                 du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
                 if not du_rayon:
                     continue
-                st.markdown(f"<div class='rayon'>{rayon}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='rayon'>{rayon} · {len(du_rayon)}</div>", unsafe_allow_html=True)
                 for idx, r in du_rayon:
                     art, qte, _ = pad(r, 3)
-                    c1, c2 = st.columns([4, 1])
-                    with c1:
-                        ligne(f"{art} <span class='q'>· {qte}</span>")
-                    with c2:
-                        if st.button("✔️", key=f"co_{idx}"):
-                            delete_row("Courses", idx)
-                            st.rerun()
-            st.write("")
-            if st.session_state.get("confirm_vider"):
-                cc1, cc2 = st.columns(2)
-                with cc1:
-                    if st.button("Oui, tout vider", type="primary"):
+                    if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"co_{idx}")]):
+                        delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
+                        st.rerun()
+
+            texte = "🛒 Liste de courses\n\n"
+            for rayon in RAYONS:
+                du_rayon = [pad(r, 3) for _, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
+                if du_rayon:
+                    texte += f"— {rayon} —\n" + "".join(f"  • {a} ({q})\n" for a, q, _ in du_rayon) + "\n"
+            e1, e2 = st.columns(2)
+            with e1:
+                st.download_button("📤 Exporter", texte, file_name="liste-de-courses.txt",
+                                   mime="text/plain", key="dl_courses")
+            with e2:
+                if st.session_state.get("confirm_vider"):
+                    if st.button("Confirmer", type="primary", key="vider_ok"):
                         clear_sheet("Courses")
                         st.session_state["confirm_vider"] = False
                         st.rerun()
-                with cc2:
-                    if st.button("Annuler"):
-                        st.session_state["confirm_vider"] = False
-                        st.rerun()
-            elif st.button("🧹 Vider le panier"):
-                st.session_state["confirm_vider"] = True
-                st.rerun()
+                elif st.button("🧹 Vider", key="vider_go"):
+                    st.session_state["confirm_vider"] = True
+                    st.rerun()
         else:
             vide("Le panier est vide. Piochez dans les habituels ci-dessus.")
 
         st.divider()
         titre("Ajouter autre chose")
+        st.caption("Le rayon est deviné automatiquement, ajustez-le si besoin.")
         c_rayon = pills("new_course_rayon", RAYONS, cols=2)
         ca, cb = st.columns([3, 1])
         with ca:
             c_art = st.text_input("Article", key="new_course_art", placeholder="Fraises…")
         with cb:
             c_qte = st.text_input("Qté", key="new_course_qte", value="1")
-        if st.button("Ajouter au panier", type="primary") and c_art.strip():
+        if st.button("Ajouter au panier", type="primary", key="add_course") and c_art.strip():
             add_course(c_art, c_qte or "1", c_rayon)
             reset_after(new_course_art="", new_course_qte="1")
             st.rerun()
 
     # ---------- AGENDA ----------
     with t3:
-        ajd = date.today()
-        if "cal_ym" not in st.session_state:
-            st.session_state["cal_ym"] = (ajd.year, ajd.month)
-        annee, mois = st.session_state["cal_ym"]
+        if "agenda_jour" not in st.session_state:
+            st.session_state["agenda_jour"] = ajd
+        jour_sel = st.session_state["agenda_jour"]
 
-        evenements = evenements_tries()
-        par_jour = {}
-        for e in evenements:
-            par_jour.setdefault(e[0], []).append(e)
+        a_annee, a_mois = navigateur_mois("agenda_ym", ajd, "ag")
+        clic = grille_mois(a_annee, a_mois, par_jour, ajd, jour_sel, prefixe="agc")
+        if clic:
+            st.session_state["agenda_jour"] = clic
+            st.rerun()
 
-        h1, h2, h3 = st.columns([1, 3, 1])
-        with h1:
-            if st.button("◀", key="cal_prev"):
-                st.session_state["cal_ym"] = (annee - 1, 12) if mois == 1 else (annee, mois - 1)
-                st.rerun()
-        with h2:
-            st.markdown(f"<div class='cal-title'>{MOIS[mois - 1].capitalize()} {annee}</div>",
-                        unsafe_allow_html=True)
-        with h3:
-            if st.button("▶", key="cal_next"):
-                st.session_state["cal_ym"] = (annee + 1, 1) if mois == 12 else (annee, mois + 1)
-                st.rerun()
-
-        st.markdown(grille_mois(annee, mois, par_jour, ajd), unsafe_allow_html=True)
-
-        if (annee, mois) != (ajd.year, ajd.month):
-            if st.button("↩️ Revenir à ce mois-ci", key="cal_today"):
-                st.session_state["cal_ym"] = (ajd.year, ajd.month)
-                st.rerun()
-
-        du_mois = [e for e in evenements if e[0].year == annee and e[0].month == mois]
-        if du_mois:
-            jour_courant = None
-            for jd, h, ti, desc, idx in du_mois:
-                if jd != jour_courant:
-                    jour_courant = jd
-                    marque = " · aujourd'hui" if jd == ajd else ""
-                    st.markdown(
-                        f"<div class='day-head'>{JOURS[jd.weekday()]} {jd.day} {MOIS[jd.month - 1]}{marque}</div>",
-                        unsafe_allow_html=True)
-                c1, c2 = st.columns([4, 1])
-                with c1:
-                    detail = f"<br><span class='q'>{desc}</span>" if desc else ""
-                    ligne(f"<span class='tag'>{h or '—'}</span> {ti}{detail}")
-                with c2:
-                    if st.button("🗑️", key=f"ag_{idx}"):
-                        delete_row("Agenda", idx)
-                        st.rerun()
-        else:
-            vide("Aucun événement ce mois-ci.")
+        titre(f"{JOURS[jour_sel.weekday()]} {jour_sel.day} {MOIS[jour_sel.month - 1]}")
+        du_jour = par_jour.get(jour_sel, [])
+        for jd, h, ti, desc, idx in du_jour:
+            with st.expander(f"{h or '—'} · {ti}"):
+                if desc:
+                    st.write(desc)
+                if st.button("🗑️ Supprimer", key=f"agx_{idx}"):
+                    delete_row("Agenda", idx, libelle=f"« {ti} » supprimé")
+                    st.rerun()
+        if not du_jour:
+            vide("Rien de prévu ce jour-là.")
 
         st.divider()
         with st.form("form_agenda", clear_on_submit=True):
             titre("Nouvel événement")
             fa, fb = st.columns(2)
             with fa:
-                e_date = st.date_input("Date", value=date(annee, mois, 1) if
-                                       (annee, mois) != (ajd.year, ajd.month) else ajd)
+                e_date = st.date_input("Date", value=jour_sel)
             with fb:
                 e_heure = st.time_input("Heure", value=datetime.now().time())
             e_titre = st.text_input("Titre")
             e_desc = st.text_area("Détails", height=80)
             if st.form_submit_button("Enregistrer", type="primary") and e_titre.strip():
                 add_row("Agenda", [str(e_date), e_heure.strftime("%H:%M"), e_titre.strip(), e_desc])
-                st.session_state["cal_ym"] = (e_date.year, e_date.month)
+                st.session_state["agenda_ym"] = (e_date.year, e_date.month)
+                st.session_state["agenda_jour"] = e_date
                 st.rerun()
 
     # ---------- REPAS ----------
     with t4:
         repas = rows("Repas")
+        recettes = rows("Recettes")
         jour = pills("repas_jour", JOURS, cols=4)
-        du_jour = [(i, r) for i, r in repas if pad(r, 3)[0] == jour]
+        du_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == jour]
         if du_jour:
-            for idx, r in du_jour:
-                _, typ, plat = pad(r, 3)
-                c1, c2 = st.columns([4, 1])
-                with c1:
-                    ligne(f"<span class='tag'>{typ}</span> {plat}")
-                with c2:
-                    if st.button("🗑️", key=f"rp_{idx}"):
-                        delete_row("Repas", idx)
-                        st.rerun()
+            for idx, (_, typ, plat) in du_jour:
+                if ligne_action(f"<span class='tag'>{typ}</span> {plat}", [("🗑️", f"rp_{idx}")]):
+                    delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
+                    st.rerun()
         else:
             vide(f"Rien de prévu pour {jour.lower()}.")
 
         st.divider()
         titre(f"Ajouter un repas · {jour}")
         r_type = pills("repas_type", ["Midi", "Soir"], cols=2)
+        titres_recettes = [pad(r, 3)[0] for _, r in recettes]
+        if titres_recettes:
+            choix = st.selectbox("Depuis une recette", ["— saisie libre —"] + titres_recettes,
+                                 key="repas_recette")
+        else:
+            choix = "— saisie libre —"
         r_plat = st.text_input("Plat", key="new_repas_plat", placeholder="Tortellini crème & épinards…")
-        if st.button("Ajouter au planning", type="primary") and r_plat.strip():
-            add_row("Repas", [jour, r_type, r_plat.strip()])
+        plat_final = r_plat.strip() or (choix if choix != "— saisie libre —" else "")
+        if st.button("Ajouter au planning", type="primary", key="add_repas") and plat_final:
+            add_row("Repas", [jour, r_type, plat_final])
             reset_after(new_repas_plat="")
             st.rerun()
 
-# ==========================================
-# 3. BUDGET
-# ==========================================
-elif page == "📊 Budget":
+# ==========================================================
+# 8c. BUDGET
+# ==========================================================
+elif page_cle == "budget":
     budget = rows("Budget")
 
     if budget:
-        df = pd.DataFrame([{
-            "Date": pad(r, 5)[0], "Payeur": pad(r, 5)[1], "Intitulé": pad(r, 5)[2],
-            "Montant": to_float(pad(r, 5)[3]), "Catégorie": pad(r, 5)[4] or "Alimentation",
-        } for _, r in budget])
+        lignes = []
+        for idx, r in budget:
+            d, pyr, lbl, mnt, cat = pad(r, 5)
+            jour = parse_date(d)
+            lignes.append({"idx": idx, "Date": jour, "Payeur": pyr, "Intitulé": lbl,
+                           "Montant": to_float(mnt), "Catégorie": cat or "Alimentation"})
+        df = pd.DataFrame(lignes)
 
         total_l = df[df["Payeur"] == "Lucas"]["Montant"].sum()
         total_a = df[df["Payeur"] == "Alex"]["Montant"].sum()
-        diff = (total_l - total_a) / 2
+        ecart = (total_l - total_a) / 2
 
         m1, m2 = st.columns(2)
         m1.metric("Payé par Lucas", f"{total_l:.2f} €")
         m2.metric("Payé par Alex", f"{total_a:.2f} €")
 
-        if diff > 0.005:
-            st.success(f"👉 Alex doit **{diff:.2f} €** à Lucas")
-        elif diff < -0.005:
-            st.success(f"👉 Lucas doit **{abs(diff):.2f} €** à Alex")
+        if ecart > 0.005:
+            st.success(f"👉 Alex doit **{ecart:.2f} €** à Lucas")
+        elif ecart < -0.005:
+            st.success(f"👉 Lucas doit **{abs(ecart):.2f} €** à Alex")
         else:
             st.info("💖 Comptes parfaitement équilibrés")
 
-        titre("Répartition par catégorie")
-        st.bar_chart(df.groupby("Catégorie")["Montant"].sum(), color="#ec4899", height=200)
+        periode = pills("f_periode", ["Ce mois-ci", "Tout"], cols=2)
+        if periode == "Ce mois-ci":
+            masque = df["Date"].apply(lambda d: bool(d) and (d.year, d.month) == (ajd.year, ajd.month))
+            filtre_df = df[masque]
+            st.caption(f"Total de {MOIS[ajd.month - 1]} : {filtre_df['Montant'].sum():.2f} €")
+        else:
+            filtre_df = df
+
+        if not filtre_df.empty:
+            titre("Répartition par catégorie")
+            st.bar_chart(filtre_df.groupby("Catégorie")["Montant"].sum(), color="#ec4899", height=200)
 
         titre("Dépenses")
-        filtre_b = pills("f_budget", ["Toutes"] + CAT_BUDGET, cols=3)
-        visibles = [(i, r) for i, r in budget
-                    if filtre_b == "Toutes" or (pad(r, 5)[4] or "Alimentation") == filtre_b]
-        for idx, r in reversed(visibles):
-            d, pyr, lbl, mnt, cat = pad(r, 5)
-            c1, c2 = st.columns([4, 1])
-            with c1:
-                ligne(f"{lbl} <span class='tag'>{cat or 'Alimentation'}</span>"
-                      f"<br><span class='q'>{to_float(mnt):.2f} € · {pyr} · {d}</span>")
-            with c2:
-                if st.button("🗑️", key=f"bu_{idx}"):
-                    delete_row("Budget", idx)
-                    st.rerun()
-        if not visibles:
-            vide("Aucune dépense dans cette catégorie.")
+        cat_filtre = pills("f_budget", ["Toutes"] + CAT_BUDGET, cols=3)
+        visibles = filtre_df if cat_filtre == "Toutes" else filtre_df[filtre_df["Catégorie"] == cat_filtre]
+
+        for _, r in visibles.iloc[::-1].iterrows():
+            quand = r["Date"].strftime("%d/%m") if r["Date"] else "—"
+            if ligne_action(f"{r['Intitulé']} <span class='tag'>{r['Catégorie']}</span>"
+                            f"<br><span class='q'>{r['Montant']:.2f} € · {r['Payeur']} · {quand}</span>",
+                            [("🗑️", f"bu_{r['idx']}")]):
+                delete_row("Budget", int(r["idx"]), libelle=f"« {r['Intitulé']} » supprimée")
+                st.rerun()
+        if visibles.empty:
+            vide("Aucune dépense sur cette sélection.")
+        else:
+            export = visibles.drop(columns=["idx"]).to_csv(index=False).encode("utf-8")
+            st.download_button("📤 Exporter en CSV", export, file_name="depenses.csv",
+                               mime="text/csv", key="dl_budget")
     else:
         vide("Aucune dépense enregistrée pour l'instant.")
 
@@ -1181,24 +1256,25 @@ elif page == "📊 Budget":
     with bc1:
         b_montant = st.number_input("Montant (€)", min_value=0.0, step=0.5, key="new_bud_montant")
     with bc2:
-        b_date = st.date_input("Date", value=datetime.today(), key="new_bud_date")
-    if st.button("Enregistrer la dépense", type="primary") and b_label.strip() and b_montant > 0:
+        b_date = st.date_input("Date", value=ajd, key="new_bud_date")
+    if st.button("Enregistrer la dépense", type="primary", key="add_budget") \
+            and b_label.strip() and b_montant > 0:
         add_row("Budget", [str(b_date), b_payeur, b_label.strip(), f"{b_montant:.2f}", b_cat])
         reset_after(new_bud_label="", new_bud_montant=0.0)
+        st.toast("Dépense enregistrée 💶", icon="✅")
         st.rerun()
 
-# ==========================================
-# 4. MAISON & LOISIRS
-# ==========================================
-elif page == "🐾 Maison":
+# ==========================================================
+# 8d. MAISON & LOISIRS
+# ==========================================================
+elif page_cle == "maison":
     t1, t2, t3 = st.tabs(["🍲 Recettes", "📝 Notes", "🧳 Listes"])
 
     with t1:
         recettes = rows("Recettes")
-        recherche = st.text_input("Rechercher une recette", key="rec_search",
-                                  placeholder="🔎 Chercher…", label_visibility="collapsed")
-        trouvees = [(i, r) for i, r in recettes
-                    if recherche.lower() in " ".join(pad(r, 3)).lower()]
+        recherche = st.text_input("Rechercher", key="rec_search", placeholder="🔎 Chercher une recette…",
+                                  label_visibility="collapsed")
+        trouvees = [(i, r) for i, r in recettes if recherche.lower() in " ".join(pad(r, 3)).lower()]
         for idx, r in trouvees:
             t, ing, inst = pad(r, 3)
             with st.expander(f"🍲 {t}"):
@@ -1206,17 +1282,30 @@ elif page == "🐾 Maison":
                     st.markdown(f"**Ingrédients**\n\n{ing}")
                 if inst:
                     st.markdown(f"**Préparation**\n\n{inst}")
-                if st.button("🗑️ Supprimer", key=f"re_{idx}"):
-                    delete_row("Recettes", idx)
-                    st.rerun()
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button("🛒 Au panier", key=f"rec_panier_{idx}") and ing:
+                        ajoutes = 0
+                        for brut in ing.splitlines():
+                            if brut.strip():
+                                article, qte = separer_quantite(brut)
+                                add_course(article, qte)
+                                ajoutes += 1
+                        st.toast(f"{ajoutes} ingrédient(s) ajouté(s) 🛒", icon="✅")
+                        st.rerun()
+                with b2:
+                    if st.button("🗑️ Supprimer", key=f"re_{idx}"):
+                        delete_row("Recettes", idx, libelle=f"Recette « {t} » supprimée")
+                        st.rerun()
         if not trouvees:
             vide("Aucune recette pour l'instant.")
 
         st.divider()
         with st.form("form_recette", clear_on_submit=True):
             titre("Nouvelle recette")
+            st.caption("Un ingrédient par ligne : « 200 g de farine ». Le panier saura les relire.")
             r_titre = st.text_input("Nom")
-            r_ing = st.text_area("Ingrédients (un par ligne)", height=90)
+            r_ing = st.text_area("Ingrédients", height=90)
             r_inst = st.text_area("Préparation", height=110)
             if st.form_submit_button("Enregistrer la recette", type="primary") and r_titre.strip():
                 add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
@@ -1225,48 +1314,56 @@ elif page == "🐾 Maison":
     with t2:
         notes = rows("Notes")
         for idx, r in reversed(notes):
-            t, c = pad(r, 2)
-            epingle = "important" in t.lower()
-            with st.expander(f"{'📌' if epingle else '📝'} {t}"):
+            t, c, ep = pad(r, 3)
+            est_epinglee = ep == "1" or "important" in t.lower()
+            with st.expander(f"{'📌' if est_epinglee else '📝'} {t}"):
                 st.write(c or "_Vide_")
-                if st.button("🗑️ Supprimer", key=f"no_{idx}"):
-                    delete_row("Notes", idx)
-                    st.rerun()
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button("📌 Détacher" if est_epinglee else "📌 Épingler", key=f"np_{idx}"):
+                        set_cell("Notes", idx, 3, "" if est_epinglee else "1")
+                        st.rerun()
+                with b2:
+                    if st.button("🗑️ Supprimer", key=f"no_{idx}"):
+                        delete_row("Notes", idx, libelle=f"Note « {t} » supprimée")
+                        st.rerun()
         if not notes:
             vide("Aucune note partagée.")
 
         st.divider()
         with st.form("form_note", clear_on_submit=True):
             titre("Nouvelle note")
-            st.caption("Un titre contenant « Important » épingle la note sur l'accueil.")
+            st.caption("Une note épinglée s'affiche sur l'accueil.")
             n_titre = st.text_input("Titre")
             n_contenu = st.text_area("Contenu", height=110)
+            n_pin = st.toggle("Épingler sur l'accueil")
             if st.form_submit_button("Enregistrer la note", type="primary") and n_titre.strip():
-                add_row("Notes", [n_titre.strip(), n_contenu])
+                add_row("Notes", [n_titre.strip(), n_contenu, "1" if n_pin else ""])
                 st.rerun()
 
     with t3:
         listes = rows("Listes")
         cat_l = pills("f_listes", CAT_LISTES, cols=3)
         visibles = [(i, r) for i, r in listes if pad(r, 3)[0] == cat_l]
-        if visibles:
-            for idx, r in visibles:
-                _, elm, nts = pad(r, 3)
-                c1, c2 = st.columns([4, 1])
-                with c1:
-                    ligne(f"{elm}" + (f"<br><span class='q'>{nts}</span>" if nts else ""))
-                with c2:
-                    if st.button("🗑️", key=f"li_{idx}"):
-                        delete_row("Listes", idx)
-                        st.rerun()
-        else:
+        for idx, r in visibles:
+            _, elm, nts = pad(r, 3)
+            clique = ligne_action(f"{elm}" + (f"<br><span class='q'>{nts}</span>" if nts else ""),
+                                  [("🛒", f"li_p_{idx}"), ("🗑️", f"li_{idx}")])
+            if clique == f"li_p_{idx}":
+                add_course(elm, "1")
+                st.toast(f"{elm} ajouté au panier", icon="🛒")
+                st.rerun()
+            elif clique == f"li_{idx}":
+                delete_row("Listes", idx, libelle=f"« {elm} » supprimé")
+                st.rerun()
+        if not visibles:
             vide(f"Rien dans « {cat_l} » pour le moment.")
 
         st.divider()
         titre(f"Ajouter à « {cat_l} »")
         l_elem = st.text_input("Élément", key="new_liste_elem")
         l_notes = st.text_input("Note (facultatif)", key="new_liste_notes")
-        if st.button("Ajouter", type="primary") and l_elem.strip():
+        if st.button("Ajouter", type="primary", key="add_liste") and l_elem.strip():
             add_row("Listes", [cat_l, l_elem.strip(), l_notes])
             reset_after(new_liste_elem="", new_liste_notes="")
             st.rerun()
