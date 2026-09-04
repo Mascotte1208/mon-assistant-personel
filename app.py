@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.12"
+VERSION = "2.13"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -116,7 +116,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Grosses bulles / cartes flottantes marquées)
+# 2. STYLE (Forçage absolu des grosses bulles sur mobile)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -182,8 +182,10 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
-/* Vraies grosses bulles bien nettes et prononcées pour TOUTES les cartes du dashboard */
-[data-testid="stVerticalBlockBorderWrapper"], div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
+/* 💡 FORÇAGE MOBILE UNIVERSEL DES CONTENEURS (Streamlit border=True) */
+[data-testid="stVerticalBlockBorderWrapper"], 
+div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
+[data-baseweb="block"] {
   background: #ffffff !important;
   border: 2.5px solid #f472b6 !important;
   border-radius: 30px !important;
@@ -784,7 +786,7 @@ if page_cle == "accueil":
         entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
             for idx, nom in actives[:6]:
-                clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
+                clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx})"])
                 if clique == f"acc_tk_{idx}":
                     set_cell("Taches", idx, 2, "Fait", annulable=True, libelle=f"« {nom} » cochée")
                     st.rerun()
