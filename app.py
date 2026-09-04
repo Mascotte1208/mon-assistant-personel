@@ -22,14 +22,13 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.10"
+VERSION = "2.11"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
     "Taches":   ["Tache", "Statut"],
     "Agenda":   ["Date", "Heure", "Titre", "Description"],
     "Courses":  ["Article", "Quantite", "Categorie"],
-    "Notes":    ["Titre", "Contenu", "Epingle"],
     "Recettes": ["Titre", "Ingredients", "Instructions"],
     "Budget":   ["Date", "Paye Par", "Intitule", "Montant", "Categorie"],
     "Repas":    ["Jour", "Repas", "Plat"],
@@ -53,7 +52,7 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
         "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 PERSONNES = ["Lucas", "Alex"]
 
-ONGLETS_M = ["🛒 Courses", "🍲 Recettes", "📝 Notes"]
+ONGLETS_M = ["🛒 Courses", "🍲 Recettes"]
 
 PAGES = {
     "accueil": "🏠 Accueil",
@@ -117,7 +116,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Forçage brut des bulles et cartes sur mobile)
+# 2. STYLE (Grosses bulles / cartes flottantes marquées)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -192,7 +191,7 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 
-/* CORRECTION MOBILE : Force Streamlit à afficher les bordures et fonds blancs sur téléphone */
+/* Vraies grosses bulles bien nettes et prononcées pour TOUTES les cartes du dashboard */
 [data-testid="stVerticalBlockBorderWrapper"], div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"] {
   background: #ffffff !important;
   border: 2.5px solid #f472b6 !important;
@@ -234,11 +233,6 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 .empty{text-align:center; padding:24px 16px; border-radius:22px; background:#fff;
        border:2px dashed var(--bord); color:#9d174d; font-weight:600; font-size:14px;}
 .today-none{font-size:14px; color:#9d174d; font-weight:600; opacity:.75; padding:10px 0;}
-
-.note-box{background:linear-gradient(135deg,#fdf4ff 0%,#fae8ff 100%); border:2.5px dashed #e879f9;
-          border-radius:26px; padding:18px 24px; margin-bottom:18px; box-shadow:0 12px 26px rgba(168,85,247,.08);}
-.note-box .t{font-size:14.5px; font-weight:700; color:#9333ea; margin-bottom:6px;}
-.note-box .c{font-size:15px; color:#581c87; font-weight:600;}
 
 .solde{border-radius:24px; padding:18px 22px; margin:16px 0; font-weight:700; font-size:15.5px;
        background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:2.5px solid #f0abfc; color:#701a75;
@@ -682,7 +676,7 @@ def bandeaux():
         c1, c2 = st.columns([3, 1])
         with c1:
             st.markdown(f"<div class='bandeau warn'>⏳ {en_attente} modification(s) en attente "
-                        f"d'envoi προς Google</div>", unsafe_allow_html=True)
+                        f"d'envoi vers Google</div>", unsafe_allow_html=True)
         with c2:
             if st.button("Réessayer", key="retry_sync"):
                 vider_file()
@@ -770,7 +764,6 @@ for ev in evenements:
 if page_cle == "accueil":
     courses = rows("Courses")
     budget = rows("Budget")
-    notes = rows("Notes")
     repas = rows("Repas")
     actives = taches_actives()
 
@@ -858,17 +851,7 @@ if page_cle == "accueil":
                 delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
 
-    # ================= 4. NOTE ÉPINGLÉE =================
-    epingle = next((pad(r, 3) for _, r in notes
-                    if pad(r, 3)[2] == "1" or "important" in pad(r, 3)[0].lower()), None)
-    if epingle:
-        st.markdown(f"""
-        <div class="note-box">
-          <div class="t">📌 {epingle[0]}</div>
-          <div class="c">{epingle[1]}</div>
-        </div>""", unsafe_allow_html=True)
-
-    # ================= 5. LE MOIS =================
+    # ================= 4. LE MOIS =================
     if "dash_jour" not in st.session_state:
         st.session_state["dash_jour"] = ajd
     jour_sel = st.session_state["dash_jour"]
@@ -913,7 +896,7 @@ if page_cle == "accueil":
                 st.toast("Événement ajouté 💖", icon="📅")
                 st.rerun()
 
-    # ================= 6. BUDGET PARTAGÉ =================
+    # ================= 5. BUDGET PARTAGÉ =================
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
     ecart = (total_l - total_a) / 2
@@ -1037,11 +1020,11 @@ elif page_cle == "budget":
         st.rerun()
 
 # ==========================================================
-# 8c. MAISON (Regroupe Courses, Recettes, Notes)
+# 8c. MAISON (Regroupe Courses, Recettes)
 # ==========================================================
 elif page_cle == "maison":
     with conteneur("mtabs"):
-        onglet_m = pills("m_tab", ONGLETS_M, cols=3)
+        onglet_m = pills("m_tab", ONGLETS_M, cols=2)
 
     # ---------- COURSES ----------
     if onglet_m == ONGLETS_M[0]:
@@ -1151,35 +1134,4 @@ elif page_cle == "maison":
             r_inst = st.text_area("Préparation", height=110)
             if st.form_submit_button("Enregistrer la recette", type="primary") and r_titre.strip():
                 add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
-                st.rerun()
-
-    # ---------- NOTES ----------
-    elif onglet_m == ONGLETS_M[2]:
-        notes = rows("Notes")
-        for idx, r in reversed(notes):
-            t, c, ep = pad(r, 3)
-            est_epinglee = ep == "1" or "important" in t.lower()
-            with st.expander(f"{'📌' if est_epinglee else '📝'} {t}"):
-                st.write(c or "_Vide_")
-                b1, b2 = st.columns(2)
-                with b1:
-                    if st.button("📌 Détacher" if est_epinglee else "📌 Épingler", key=f"np_{idx}"):
-                        set_cell("Notes", idx, 3, "" if est_epinglee else "1")
-                        st.rerun()
-                with b2:
-                    if st.button("🗑️ Supprimer", key=f"no_{idx}"):
-                        delete_row("Notes", idx, libelle=f"Note « {t} » supprimée")
-                        st.rerun()
-        if not notes:
-            vide("Aucune note partagée.")
-
-        st.divider()
-        with st.form("form_note", clear_on_submit=True):
-            titre("Nouvelle note")
-            st.caption("Une note épinglée s'affiche sur l'accueil.")
-            n_titre = st.text_input("Titre")
-            n_contenu = st.text_area("Contenu", height=110)
-            n_pin = st.toggle("Épingler sur l'accueil")
-            if st.form_submit_button("Enregistrer la note", type="primary") and n_titre.strip():
-                add_row("Notes", [n_titre.strip(), n_contenu, "1" if n_pin else ""])
                 st.rerun()
