@@ -542,7 +542,20 @@ with tab_quotidien:
         with sub_tab2:
             st.subheader("📅 Agenda & Vue Mois")
             
-            # --- VUE CALENDRIER DU MOIS ---
+            # --- INDEXATION DES ÉVÉNEMENTS DE L'AGENDA PAR DATE (YYYY-MM-DD) ---
+            all_agenda_vals = get_data("Agenda")
+            agenda_events_data = all_agenda_vals[1:] if len(all_agenda_vals) > 1 else []
+            
+            events_by_date = {}
+            for ev in agenda_events_data:
+                if len(ev) > 0 and ev[0]:
+                    d_key = ev[0].strip()
+                    titre_ev = ev[2] if len(ev) > 2 else "Événement"
+                    if d_key not in events_by_date:
+                        events_by_date[d_key] = []
+                    events_by_date[d_key].append(titre_ev)
+
+            # --- VUE CALENDRIER DU MOIS AVEC ÉVÉNEMENTS ---
             st.markdown(f"#### 🗓️ Calendrier - {mois_fr[today.month - 1]} {today.year}")
             cal = calendar.monthcalendar(today.year, today.month)
             cols = st.columns(7)
@@ -554,19 +567,29 @@ with tab_quotidien:
                 cols_w = st.columns(7)
                 for i, day_num in enumerate(week):
                     if day_num != 0:
+                        # Construire la date au format YYYY-MM-DD pour la correspondance
+                        current_date_str = f"{today.year}-{today.month:02d}-{day_num:02d}"
+                        has_events = current_date_str in events_by_date
+                        
                         if day_num == today.day:
-                            cols_w[i].markdown(f"🔵 **{day_num}**")
+                            cell_text = f"🔵 **{day_num}**"
+                        elif has_events:
+                            cell_text = f"🟠 **{day_num}**"
                         else:
-                            cols_w[i].write(f"{day_num}")
+                            cell_text = f"{day_num}"
+                            
+                        # Affichage dans la case
+                        if has_events:
+                            ev_list_str = "<br>".join([f"<small style='color:#4338ca; font-weight:700;'>• {t}</small>" for t in events_by_date[current_date_str]])
+                            cols_w[i].markdown(f"{cell_text}<br>{ev_list_str}", unsafe_allow_html=True)
+                        else:
+                            cols_w[i].write(cell_text)
                     else:
                         cols_w[i].write(" ")
             st.divider()
 
-            all_vals = get_data("Agenda")
-            events_data = all_vals[1:] if len(all_vals) > 1 else []
-
-            if events_data:
-                for idx, row in enumerate(events_data):
+            if agenda_events_data:
+                for idx, row in enumerate(agenda_events_data):
                     date_ev, heure_ev, titre_ev, desc_ev = (row + ["", "", "", ""])[:4]
                     real_idx = idx + 1
                     with st.expander(f"🗓️ {date_ev} {f'à {heure_ev}' if heure_ev else ''} — {titre_ev}"):
