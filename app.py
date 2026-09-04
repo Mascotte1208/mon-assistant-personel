@@ -19,20 +19,21 @@ st.markdown("""
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="theme-color" content="#4f46e5" />
+        <meta name="theme-color" content="#4338ca" />
         <link rel="apple-touch-icon" href="https://img.icons8.com/emoji/192/sparkles-emoji.png" />
     </head>
 """, unsafe_allow_html=True)
 
-# --- STYLE CSS APPLI HIGH-END / GLASSMORPHISM ---
+# --- STYLE CSS DESIGN SUR-MESURE ("WARM MINERAL & SAGE") ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
+    /* Fond principal couleur sable / lin très doux */
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
-        background: linear-gradient(180deg, #f1f5f9 0%, #f8fafc 100%) !important;
-        color: #0f172a;
+        background: linear-gradient(180deg, #f8f8f6 0%, #f1f1ed 100%) !important;
+        color: #1c1917;
         -webkit-tap-highlight-color: transparent;
     }
     
@@ -46,14 +47,14 @@ st.markdown("""
         max-width: 550px !important;
     }
 
-    /* Hero Banner Premium Glassmorphism */
+    /* Hero Banner Gradient Indigo & Violet Royal */
     .hero-banner {
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #d946ef 100%);
+        background: linear-gradient(135deg, #3730a3 0%, #5b21b6 50%, #831843 100%);
         border-radius: 28px;
         padding: 24px 22px;
         color: white;
         margin-bottom: 22px;
-        box-shadow: 0 18px 35px -10px rgba(124, 58, 237, 0.35);
+        box-shadow: 0 16px 32px -8px rgba(55, 48, 163, 0.28);
         position: relative;
         overflow: hidden;
     }
@@ -63,7 +64,7 @@ st.markdown("""
         right: -10px;
         bottom: -15px;
         font-size: 85px;
-        opacity: 0.15;
+        opacity: 0.12;
     }
     .hero-title {
         font-size: 24px;
@@ -81,20 +82,20 @@ st.markdown("""
     /* Navigation Onglets Flottante */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
-        background-color: rgba(226, 232, 240, 0.8);
+        background-color: rgba(229, 229, 224, 0.8);
         backdrop-filter: blur(10px);
         padding: 6px;
         border-radius: 24px;
         overflow-x: auto;
         margin-bottom: 20px;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
     }
     .stTabs [data-baseweb="tab"] {
         border-radius: 18px;
         padding: 10px 16px;
         font-weight: 700;
         font-size: 13px;
-        color: #64748b;
+        color: #78716c;
         background-color: transparent;
         border: none;
         white-space: nowrap;
@@ -102,36 +103,36 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] {
         background-color: #ffffff !important;
-        color: #4f46e5 !important;
-        box-shadow: 0 6px 20px rgba(79, 70, 229, 0.2);
+        color: #3730a3 !important;
+        box-shadow: 0 6px 18px rgba(55, 48, 163, 0.15);
     }
 
-    /* Cartes Glassmorphism Multi-couleurs */
+    /* Cartes Glassmorphism avec tons minéraux */
     .glass-card-purple {
         background: #ffffff;
         border: 1px solid #e0e7ff;
-        border-top: 4px solid #6366f1;
+        border-top: 4px solid #4338ca;
         border-radius: 22px;
         padding: 18px;
-        box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.08);
+        box-shadow: 0 10px 25px -5px rgba(28, 25, 23, 0.04);
         margin-bottom: 12px;
     }
     .glass-card-emerald {
         background: #ffffff;
         border: 1px solid #d1fae5;
-        border-top: 4px solid #10b981;
+        border-top: 4px solid #059669;
         border-radius: 22px;
         padding: 18px;
-        box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.08);
+        box-shadow: 0 10px 25px -5px rgba(28, 25, 23, 0.04);
         margin-bottom: 12px;
     }
     .glass-card-amber {
         background: #ffffff;
         border: 1px solid #fef3c7;
-        border-top: 4px solid #f59e0b;
+        border-top: 4px solid #d97706;
         border-radius: 22px;
         padding: 18px;
-        box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.08);
+        box-shadow: 0 10px 25px -5px rgba(28, 25, 23, 0.04);
         margin-bottom: 12px;
     }
     .glass-card-sky {
@@ -140,27 +141,27 @@ st.markdown("""
         border-top: 4px solid #0284c7;
         border-radius: 22px;
         padding: 18px;
-        box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.08);
+        box-shadow: 0 10px 25px -5px rgba(28, 25, 23, 0.04);
         margin-bottom: 12px;
     }
 
     .card-head {
         font-size: 11px;
         font-weight: 800;
-        color: #64748b;
+        color: #78716c;
         text-transform: uppercase;
         letter-spacing: 0.9px;
     }
     .card-num {
         font-size: 28px;
         font-weight: 800;
-        color: #0f172a;
+        color: #1c1917;
         margin-top: 2px;
     }
     .card-foot {
         font-size: 12px;
         font-weight: 600;
-        color: #4f46e5;
+        color: #4338ca;
         margin-top: 4px;
     }
 
@@ -171,7 +172,7 @@ st.markdown("""
         font-size: 11px;
         font-weight: 700;
         background-color: #e0e7ff;
-        color: #4338ca;
+        color: #3730a3;
     }
 
     /* Boutons Gradient Pill */
@@ -179,11 +180,11 @@ st.markdown("""
         border-radius: 18px;
         font-weight: 800;
         font-size: 14px;
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
         color: white;
         border: none;
         padding: 14px 22px;
-        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+        box-shadow: 0 6px 18px rgba(67, 56, 202, 0.25);
         transition: all 0.2s ease;
     }
     .stButton button:active {
@@ -192,26 +193,26 @@ st.markdown("""
 
     /* Inputs Visibilité & Focus */
     .stTextInput input, .stTextArea textarea, .stSelectbox select {
-        color: #0f172a !important;
+        color: #1c1917 !important;
         background-color: #ffffff !important;
-        -webkit-text-fill-color: #0f172a !important;
+        -webkit-text-fill-color: #1c1917 !important;
         border-radius: 18px !important;
-        border: 1.5px solid #cbd5e1 !important;
+        border: 1.5px solid #d6d3d1 !important;
         padding: 12px 16px !important;
         font-size: 16px !important;
     }
     .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: #6366f1 !important;
-        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15) !important;
+        border-color: #4338ca !important;
+        box-shadow: 0 0 0 4px rgba(67, 56, 202, 0.12) !important;
     }
 
     .streamlit-expanderHeader {
         background-color: #ffffff !important;
         border-radius: 20px !important;
-        border: 1px solid #f1f5f9 !important;
+        border: 1px solid #e7e5e4 !important;
         font-weight: 700 !important;
-        color: #1e293b !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+        color: #1c1917 !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02) !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -352,14 +353,14 @@ with tab_dash:
             elif payer == "Alex": total_alex += amt
         diff = (total_lucas - total_alex) / 2
 
-        st.markdown("<h4 style='font-weight: 800; color: #0f172a; margin-bottom: 14px;'>📊 Métriques de l'assistant</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='font-weight: 800; color: #1c1917; margin-bottom: 14px;'>📊 Métriques de l'assistant</h4>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
             st.markdown(f'''
                 <div class="glass-card-purple">
                     <div class="card-head">✅ Tâches accomplies</div>
-                    <div class="card-num">{taches_faites} <span style="font-size:15px; color:#94a3b8;">/ {total_taches}</span></div>
+                    <div class="card-num">{taches_faites} <span style="font-size:15px; color:#a8a29e;">/ {total_taches}</span></div>
                     <div class="card-foot">{"🎉 Tout est à jour !" if total_taches == taches_faites and total_taches > 0 else "Actions en cours"}</div>
                 </div>
             ''', unsafe_allow_html=True)
@@ -390,7 +391,7 @@ with tab_dash:
             ''', unsafe_allow_html=True)
 
         st.divider()
-        st.markdown("<h4 style='font-weight: 800; color: #0f172a; margin-bottom: 10px;'>🗓️ Prochains Événements</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='font-weight: 800; color: #1c1917; margin-bottom: 10px;'>🗓️ Prochains Événements</h4>", unsafe_allow_html=True)
         agenda_data = agenda_vals[1:] if len(agenda_vals) > 1 else []
         if agenda_data:
             for ev in agenda_data[:3]:
