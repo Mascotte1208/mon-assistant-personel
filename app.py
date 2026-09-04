@@ -22,11 +22,11 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.3"
+VERSION = "2.4"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
-    "Taches":   ["Tache", "Statut", "Echeance"],
+    "Taches":   ["Tache", "Statut"],
     "Agenda":   ["Date", "Heure", "Titre", "Description"],
     "Courses":  ["Article", "Quantite", "Categorie"],
     "Notes":    ["Titre", "Contenu", "Epingle"],
@@ -201,10 +201,6 @@ button:focus-visible{outline:3px solid #f9a8d4 !important; outline-offset:2px;}
 .line{font-size:15px; font-weight:600; color:var(--prune); padding:9px 0;}
 .line.done{color:#a3a3a3; text-decoration:line-through;}
 .line .q{font-weight:600; color:#a21caf; font-size:12.5px;}
-.tag{display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;
-     background:#fce7f3; color:var(--rose-fonce); margin-left:6px; vertical-align:middle;}
-.tag.retard{background:#fee2e2; color:#b91c1c;}
-.tag.jour{background:#dcfce7; color:#15803d;}
 .rayon{font-size:12px; font-weight:800; color:#a21caf; background:#fae8ff;
        display:inline-block; padding:5px 12px; border-radius:12px; margin:12px 0 2px;}
 .empty{text-align:center; padding:20px 16px; border-radius:20px; background:#fff;
@@ -296,7 +292,6 @@ label p{font-weight:700 !important; font-size:13px !important; color:var(--prune
 .rayon{background:transparent; padding:0 0 2px; margin:0; font-size:12.5px; letter-spacing:-.1px;}
 .rayon .c{opacity:.55; font-weight:700;}
 
-.tag{font-variant-numeric:tabular-nums;}
 .today-none{padding:10px 0;}
 .empty{padding:24px 16px;}
 </style>
@@ -546,22 +541,11 @@ def evenements_tries():
 def taches_actives():
     resultat = []
     for idx, r in rows("Taches"):
-        nom, statut, ech = pad(r, 3)
+        nom, statut = pad(r, 2)
         if statut == "Fait":
             continue
-        resultat.append((idx, nom, parse_date(ech)))
-    return sorted(resultat, key=lambda t: t[2] or date.max)
-
-def badge_echeance(echeance, aujourd):
-    if not echeance:
-        return ""
-    if echeance < aujourd:
-        return "<span class='tag retard'>En retard</span>"
-    if echeance == aujourd:
-        return "<span class='tag jour'>Aujourd'hui</span>"
-    if echeance == aujourd + timedelta(days=1):
-        return "<span class='tag'>Demain</span>"
-    return f"<span class='tag'>{echeance.day}/{echeance.month}</span>"
+        resultat.append((idx, nom))
+    return resultat
 
 def depuis(instant):
     if not instant:
@@ -764,7 +748,6 @@ if page_cle == "accueil":
     evts_jour = par_jour.get(ajd, [])
     a_venir = [e for e in evenements if e[0] > ajd]
     repas_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
-    en_retard = len([t for t in actives if t[2] and t[2] < ajd])
 
     # ================= 1. COURSES =================
     with conteneur(bordure=True):
@@ -789,15 +772,12 @@ if page_cle == "accueil":
         else:
             st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
 
-    # ================= 2. À FAIRE (Tâches simplifiées) =================
+    # ================= 2. À FAIRE (Tâches sans date) =================
     with conteneur(bordure=True):
         entete_bloc("🌸 À faire", len(actives) or None)
-        if en_retard:
-            st.markdown(f"<div class='today-none'>⚠️ {en_retard} en retard</div>", unsafe_allow_html=True)
         if actives:
-            for idx, nom, ech in actives[:6]:
-                clique = ligne_action(f"{nom}{badge_echeance(ech, ajd)}",
-                                     [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
+            for idx, nom in actives[:6]:
+                clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
                 if clique == f"acc_tk_{idx}":
                     set_cell("Taches", idx, 2, "Fait", annulable=True, libelle=f"« {nom} » cochée")
                     st.rerun()
@@ -809,15 +789,13 @@ if page_cle == "accueil":
         else:
             st.markdown("<div class='today-none'>🎉 Tout est fait.</div>", unsafe_allow_html=True)
 
-        # Ajout rapide de tâche
-        na_t, nb_t, nc_t = st.columns([2.5, 1.2, 1])
+        # Ajout rapide de tâche (sans date)
+        na_t, nc_t = st.columns([3, 1])
         with na_t:
             dash_t_txt = st.text_input("Tâche", key="dash_t_txt", placeholder="Nouvelle tâche…", label_visibility="collapsed")
-        with nb_t:
-            dash_t_ech = st.date_input("Échéance", value=None, key="dash_t_ech", label_visibility="collapsed")
         with nc_t:
             if st.button("＋", key="dash_add_t", type="primary") and dash_t_txt.strip():
-                add_row("Taches", [dash_t_txt.strip(), "À faire", str(dash_t_ech) if dash_t_ech else ""])
+                add_row("Taches", [dash_t_txt.strip(), "À faire"])
                 reset_after(dash_t_txt="")
                 st.toast("Tâche ajoutée 🌸", icon="✅")
                 st.rerun()
