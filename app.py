@@ -63,6 +63,9 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
         "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 PERSONNES = ["Lucas", "Alex"]
 
+ONGLETS_Q = ["✅ Tâches", "🛒 Courses", "📅 Agenda", "🍽️ Repas"]
+ONGLETS_M = ["🍲 Recettes", "📝 Notes", "🧳 Listes"]
+
 PAGES = {
     "accueil": "🏠 Accueil",
     "quotidien": "📋 Quotidien",
@@ -296,6 +299,24 @@ label p{font-weight:700 !important; font-size:13px !important; color:var(--prune
   background:#fff !important; overflow:hidden;}
 hr{margin:12px 0 !important; border-color:#fbcfe8 !important;}
 [data-testid="stMetricValue"]{color:#701a75; font-weight:800;}
+/* --- Titres de bloc cliquables --- */
+[class*="st-key-goto-"] button{
+  background:transparent !important; border:none !important; box-shadow:none !important;
+  border-bottom:1px solid #fce7f3 !important; border-radius:0 !important;
+  color:var(--prune-clair) !important; font-size:15px !important; font-weight:800 !important;
+  padding:2px 0 9px !important; display:flex !important; align-items:center !important;
+  justify-content:flex-start !important; text-align:left !important;
+}
+[class*="st-key-goto-"] button p{font-size:15px !important; font-weight:800 !important;}
+[class*="st-key-goto-"] button::after{content:"›"; margin-left:auto; font-size:20px; opacity:.45;}
+[class*="st-key-goto-"] button:hover::after{opacity:.9;}
+
+/* --- Onglets de la page Quotidien --- */
+.st-key-qtabs{margin-bottom:6px;}
+.st-key-qtabs [data-testid="stHorizontalBlock"]{gap:5px !important;}
+.st-key-qtabs button{font-size:12px !important; padding:9px 2px !important; border-radius:14px !important;}
+.st-key-qtabs button p{font-size:12px !important; font-weight:800 !important;}
+
 .pied{text-align:center; font-size:11px; color:#c084fc; font-weight:600; padding:18px 0 4px;}
 
 /* --- Finitions : rythme, séparateurs, boutons d'action discrets --- */
@@ -779,6 +800,15 @@ def entete_bloc(texte, compteur=None):
     st.markdown(f"<div class='bloc-head'><span>{texte}</span>{pastille}</div>", unsafe_allow_html=True)
 
 
+def entete_lien(cle, texte, compteur, onglet):
+    """Titre de bloc cliquable : ouvre l'onglet correspondant de Quotidien."""
+    with conteneur(f"goto-{cle}"):
+        if st.button(f"{texte}   ·   {compteur}", key=f"goto_{cle}"):
+            st.session_state["q_tab"] = onglet
+            st.query_params["p"] = "quotidien"
+            st.rerun()
+
+
 # ==========================================================
 # 6. EN-TÊTE ET CONNEXION
 # ==========================================================
@@ -853,7 +883,7 @@ if page_cle == "accueil":
 
     # ================= 1. À FAIRE =================
     with conteneur(bordure=True):
-        entete_bloc("🌸 À faire", len(actives))
+        entete_lien("taches", "🌸 À faire", len(actives), ONGLETS_Q[0])
         if en_retard:
             st.markdown(f"<div class='today-none'>⚠️ {en_retard} en retard</div>", unsafe_allow_html=True)
         if actives:
@@ -868,23 +898,13 @@ if page_cle == "accueil":
                     delete_row("Taches", idx, libelle=f"« {nom} » supprimée")
                     st.rerun()
             if len(actives) > 6:
-                st.caption(f"+ {len(actives) - 6} autres")
+                st.caption(f"+ {len(actives) - 6} autres · touchez le titre pour tout voir")
         else:
             st.markdown("<div class='today-none'>🎉 Tout est fait.</div>", unsafe_allow_html=True)
 
-        ta, tb = st.columns([4, 1])
-        with ta:
-            d_tache = st.text_input("Tâche", key="dash_tache", placeholder="Ajouter une tâche…",
-                                    label_visibility="collapsed")
-        with tb:
-            if st.button("＋", key="dash_add_tache", type="primary") and d_tache.strip():
-                add_row("Taches", [d_tache.strip(), "Autre", "À faire", ""])
-                reset_after(dash_tache="")
-                st.rerun()
-
     # ================= 2. COURSES =================
     with conteneur(bordure=True):
-        entete_bloc("🛒 Courses", len(courses))
+        entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_Q[1])
         if courses:
             montre = 0
             for rayon in RAYONS:
@@ -901,21 +921,9 @@ if page_cle == "accueil":
                             st.rerun()
                 montre += len(du_rayon[:10 - montre])
             if len(courses) > montre:
-                st.caption(f"+ {len(courses) - montre} autres articles")
+                st.caption(f"+ {len(courses) - montre} autres articles · touchez le titre pour tout voir")
         else:
             st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
-
-        ca, cb, cc = st.columns([3, 1, 1])
-        with ca:
-            d_course = st.text_input("Article", key="dash_course", placeholder="Ajouter un article…",
-                                     label_visibility="collapsed")
-        with cb:
-            d_qte = st.text_input("Qté", key="dash_qte", value="1", label_visibility="collapsed")
-        with cc:
-            if st.button("＋", key="dash_add_course", type="primary") and d_course.strip():
-                add_course(d_course, d_qte or "1")
-                reset_after(dash_course="", dash_qte="1")
-                st.rerun()
 
     # ================= 3. AUJOURD'HUI =================
     with conteneur(bordure=True):
@@ -1046,10 +1054,11 @@ if page_cle == "accueil":
 # 8b. QUOTIDIEN
 # ==========================================================
 elif page_cle == "quotidien":
-    t1, t2, t3, t4 = st.tabs(["✅ Tâches", "🛒 Courses", "📅 Agenda", "🍽️ Repas"])
+    with conteneur("qtabs"):
+        onglet = pills("q_tab", ONGLETS_Q, cols=4)
 
     # ---------- TÂCHES ----------
-    with t1:
+    if onglet == ONGLETS_Q[0]:
         toutes = rows("Taches")
         actives = taches_actives()
         faites = len(toutes) - len(actives)
@@ -1103,7 +1112,7 @@ elif page_cle == "quotidien":
             st.rerun()
 
     # ---------- COURSES ----------
-    with t2:
+    elif onglet == ONGLETS_Q[1]:
         courses = rows("Courses")
 
         titre("💖 Nos articles habituels")
@@ -1171,7 +1180,7 @@ elif page_cle == "quotidien":
             st.rerun()
 
     # ---------- AGENDA ----------
-    with t3:
+    elif onglet == ONGLETS_Q[2]:
         if "agenda_jour" not in st.session_state:
             st.session_state["agenda_jour"] = ajd
         jour_sel = st.session_state["agenda_jour"]
@@ -1211,7 +1220,7 @@ elif page_cle == "quotidien":
                 st.rerun()
 
     # ---------- REPAS ----------
-    with t4:
+    elif onglet == ONGLETS_Q[3]:
         repas = rows("Repas")
         recettes = rows("Recettes")
         jour = pills("repas_jour", JOURS, cols=4)
@@ -1323,9 +1332,10 @@ elif page_cle == "budget":
 # 8d. MAISON & LOISIRS
 # ==========================================================
 elif page_cle == "maison":
-    t1, t2, t3 = st.tabs(["🍲 Recettes", "📝 Notes", "🧳 Listes"])
+    with conteneur("qtabs"):
+        onglet_m = pills("m_tab", ONGLETS_M, cols=3)
 
-    with t1:
+    if onglet_m == ONGLETS_M[0]:
         recettes = rows("Recettes")
         recherche = st.text_input("Rechercher", key="rec_search", placeholder="🔎 Chercher une recette…",
                                   label_visibility="collapsed")
@@ -1366,7 +1376,7 @@ elif page_cle == "maison":
                 add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
                 st.rerun()
 
-    with t2:
+    elif onglet_m == ONGLETS_M[1]:
         notes = rows("Notes")
         for idx, r in reversed(notes):
             t, c, ep = pad(r, 3)
@@ -1396,7 +1406,7 @@ elif page_cle == "maison":
                 add_row("Notes", [n_titre.strip(), n_contenu, "1" if n_pin else ""])
                 st.rerun()
 
-    with t3:
+    elif onglet_m == ONGLETS_M[2]:
         listes = rows("Listes")
         cat_l = pills("f_listes", CAT_LISTES, cols=3)
         visibles = [(i, r) for i, r in listes if pad(r, 3)[0] == cat_l]
@@ -1422,4 +1432,4 @@ elif page_cle == "maison":
             add_row("Listes", [cat_l, l_elem.strip(), l_notes])
             reset_after(new_liste_elem="", new_liste_notes="")
             st.rerun()
-              
+  
