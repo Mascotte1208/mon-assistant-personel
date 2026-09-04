@@ -278,7 +278,9 @@ def get_data(sheet_name):
             try:
                 client = get_gspread_client(st.session_state["json_credentials_str"])
                 ws = client.open("MonAssistantData").worksheet(sheet_name)
-                st.session_state[f"data_{sheet_name}"] = ws.get_all_values()
+                all_vals = ws.get_all_values()
+                # Si la feuille est vide ou ne contient que l'en-tête
+                st.session_state[f"data_{sheet_name}"] = all_vals
             except Exception:
                 st.session_state[f"data_{sheet_name}"] = []
         else:
@@ -609,12 +611,18 @@ with tab_quotidien:
             st.subheader("🛒 Liste de Courses")
             
             all_vals = get_data("Courses")
-            courses_data = all_vals[1:] if len(all_vals) > 1 else []
+            # Afficher directement toutes les lignes présentes (ou ignorer l'en-tête s'il s'appelle exactement "Article")
+            courses_data = []
+            if len(all_vals) > 0:
+                if all_vals[0][0].lower() in ["article", "tache", "produit"]:
+                    courses_data = all_vals[1:]
+                else:
+                    courses_data = all_vals
 
             if courses_data:
                 for idx, row in enumerate(courses_data):
                     art, qte, cat = (row + ["Article", "1", "Général"])[:3]
-                    real_idx = idx + 1
+                    real_idx = all_vals.index(row)
                     c1, c2 = st.columns([3, 1])
                     with c1: st.markdown(f"- **{art}** *(Qté: {qte} | {cat})*")
                     with c2:
