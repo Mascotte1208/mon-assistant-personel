@@ -631,7 +631,33 @@ if page == "🏠 Accueil":
                 delete_row("Repas", idx)
                 st.rerun()
 
-    # ---------- 2. Note épinglée ----------
+    # ---------- 2. Le mois, toujours visible ----------
+    if "dash_ym" not in st.session_state:
+        st.session_state["dash_ym"] = (ajd.year, ajd.month)
+    d_annee, d_mois = st.session_state["dash_ym"]
+
+    with conteneur("dash-cal", bordure=True):
+        m1, m2, m3 = st.columns([1, 3, 1])
+        with m1:
+            if st.button("◀", key="dash_prev"):
+                st.session_state["dash_ym"] = (d_annee - 1, 12) if d_mois == 1 else (d_annee, d_mois - 1)
+                st.rerun()
+        with m2:
+            st.markdown(f"<div class='cal-title'>{MOIS[d_mois - 1].capitalize()} {d_annee}</div>",
+                        unsafe_allow_html=True)
+        with m3:
+            if st.button("▶", key="dash_next"):
+                st.session_state["dash_ym"] = (d_annee + 1, 1) if d_mois == 12 else (d_annee, d_mois + 1)
+                st.rerun()
+
+        st.markdown(grille_mois(d_annee, d_mois, par_jour, ajd), unsafe_allow_html=True)
+
+        if (d_annee, d_mois) != (ajd.year, ajd.month):
+            if st.button("↩️ Revenir à ce mois-ci", key="dash_cal_today"):
+                st.session_state["dash_ym"] = (ajd.year, ajd.month)
+                st.rerun()
+
+    # ---------- 3. Note épinglée ----------
     epingle = next((pad(r, 2) for _, r in notes if "important" in pad(r, 2)[0].lower()), None)
     if epingle:
         st.markdown(f"""
@@ -722,24 +748,7 @@ if page == "🏠 Accueil":
     # --- Cadre : agenda ---
     if focus == "agenda":
         with conteneur(bordure=True):
-            if "dash_ym" not in st.session_state:
-                st.session_state["dash_ym"] = (ajd.year, ajd.month)
-            d_annee, d_mois = st.session_state["dash_ym"]
-
-            m1, m2, m3 = st.columns([1, 3, 1])
-            with m1:
-                if st.button("◀", key="dash_prev"):
-                    st.session_state["dash_ym"] = (d_annee - 1, 12) if d_mois == 1 else (d_annee, d_mois - 1)
-                    st.rerun()
-            with m2:
-                st.markdown(f"<div class='cal-title'>{MOIS[d_mois - 1].capitalize()} {d_annee}</div>",
-                            unsafe_allow_html=True)
-            with m3:
-                if st.button("▶", key="dash_next"):
-                    st.session_state["dash_ym"] = (d_annee + 1, 1) if d_mois == 12 else (d_annee, d_mois + 1)
-                    st.rerun()
-
-            st.markdown(grille_mois(d_annee, d_mois, par_jour, ajd), unsafe_allow_html=True)
+            st.caption(f"Rendez-vous de {MOIS[d_mois - 1]} — utilisez ◀ ▶ ci-dessus pour changer de mois")
 
             du_mois = [e for e in evenements if (e[0].year, e[0].month) == (d_annee, d_mois) and e[0] >= ajd]
             for jd, h, ti, desc, idx in du_mois[:6]:
