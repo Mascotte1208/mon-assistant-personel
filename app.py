@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.24"
+VERSION = "2.26"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Lignes de texte ultra-contrastées et encadrées individuellement)
+# 2. STYLE
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -186,7 +186,6 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:2px solid #831843 !important; outline-offset:2px;}
 
-/* CADRES DES BLOCS GÉNÉRAUX */
 [data-testid="stVerticalBlockBorderWrapper"], 
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
 [data-baseweb="block"] {
@@ -208,15 +207,6 @@ div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapp
 .jour-titre{font-size:13.5px; font-weight:800; color:var(--rose-vif); padding:8px 0 4px;}
 .section{font-weight:800; font-size:16px; color:var(--rose-fonce); margin:18px 0 6px;}
 
-/* LIGNES INDIVIDUELLES ENCADRÉES (POUR COURSES, TÂCHES, AGENDA) */
-.ligne-cadre {
-  background: #fff5f8 !important;
-  border: 2px solid #f472b6 !important;
-  border-radius: 14px !important;
-  padding: 10px 14px !important;
-  margin-bottom: 8px !important;
-  box-shadow: 0 3px 10px rgba(157, 23, 77, 0.08) !important;
-}
 .line{font-size:14.5px; font-weight:700; color:#311026;}
 .line.done{color:#a3a3a3; text-decoration:line-through;}
 .line .q{font-weight:700; color:var(--rose-vif); font-size:13px;}
@@ -291,7 +281,6 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--ros
 .st-key-mtabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
 .st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
 
-/* Espacement et style propre des lignes alignées */
 [data-testid="stHorizontalBlock"]:has(.line){
   background: #fff5f8 !important;
   border: 2px solid #f472b6 !important;
@@ -740,27 +729,7 @@ if page_cle == "accueil":
     a_venir = [e for e in evenements if e[0] > ajd]
     repas_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
 
-    # 1. COURSES
-    with conteneur("carte-courses"):
-        entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
-        if courses:
-            montre = 0
-            for rayon in RAYONS:
-                du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
-                if not du_rayon or montre >= 10:
-                    continue
-                with conteneur(f"grp-{slug(rayon)}"):
-                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>", unsafe_allow_html=True)
-                    for idx, r in du_rayon[:10 - montre]:
-                        art, qte, _ = pad(r, 3)
-                        if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
-                            delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
-                            st.rerun()
-                montre += len(du_rayon[:10 - montre])
-        else:
-            st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
-
-    # 2. À FAIRE
+    # 1. À FAIRE
     with conteneur("carte-taches"):
         entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
@@ -793,7 +762,7 @@ if page_cle == "accueil":
                     st.session_state["show_add_tache"] = False
                     st.rerun()
 
-    # 3. AUJOURD'HUI
+    # 2. AUJOURD'HUI (Passé avant courses)
     with conteneur("carte-aujourdhui"):
         entete_bloc("📅 Aujourd'hui", len(evts_jour) + len(repas_jour) or None)
         if not evts_jour and not repas_jour:
@@ -807,6 +776,26 @@ if page_cle == "accueil":
             if ligne_action(f"<span class='tag'>{typ}</span> 🍽️ {plat}", [("🗑️", f"acc_rp_{idx}")]):
                 delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
+
+    # 3. COURSES
+    with conteneur("carte-courses"):
+        entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
+        if courses:
+            montre = 0
+            for rayon in RAYONS:
+                du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
+                if not du_rayon or montre >= 10:
+                    continue
+                with conteneur(f"grp-{slug(rayon)}"):
+                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>", unsafe_allow_html=True)
+                    for idx, r in du_rayon[:10 - montre]:
+                        art, qte, _ = pad(r, 3)
+                        if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"acc_co_{idx}")]):
+                            delete_row("Courses", idx, libelle=f"« {art} » retiré du panier")
+                            st.rerun()
+                montre += len(du_rayon[:10 - montre])
+        else:
+            st.markdown("<div class='today-none'>Le panier est vide.</div>", unsafe_allow_html=True)
 
     # 4. LE MOIS
     if "dash_jour" not in st.session_state:
