@@ -503,13 +503,13 @@ elif active_page == "📋 Quotidien" and json_str:
                 articles_du_rayon = [r for r in courses_data if (r[2] if len(r) > 2 else "Autre") == rayon]
                 if articles_du_rayon:
                     st.markdown(f"**🏷️ {rayon}**")
-                    for row in articles_du_rayon:
+                    for idx_c, row in enumerate(articles_du_rayon):
                         art, qte = (row + ["Article", "1"])[:2]
                         real_idx = all_vals.index(row)
                         c1, c2 = st.columns([3, 1])
                         with c1: st.markdown(f"- {art} *(Qté: {qte})*")
                         with c2:
-                            if st.button("✔️", key=f"c_del_{real_idx}"):
+                            if st.button("✔️", key=f"c_del_{rayon}_{idx_c}_{real_idx}"):
                                 delete_row_fast("Courses", real_idx)
                                 st.rerun()
             st.divider()
@@ -533,13 +533,13 @@ elif active_page == "📋 Quotidien" and json_str:
             st.markdown(f"##### 📅 {jour}")
             repas_j = [r for r in repas_data if len(r) > 0 and r[0] == jour]
             if repas_j:
-                for r in repas_j:
+                for idx_r, r in enumerate(repas_j):
                     typ, plt = (r[1:] + ["", ""])[:2]
                     real_idx = all_vals.index(r)
                     c1, c2 = st.columns([4, 1])
                     with c1: st.write(f"- **{typ}** : {plt}")
                     with c2:
-                        if st.button("🗑️", key=f"rep_del_{real_idx}"):
+                        if st.button("🗑️", key=f"rep_del_{jour}_{idx_r}_{real_idx}"):
                             delete_row_fast("Repas", real_idx)
                             st.rerun()
             else: st.caption("Rien de prévu")
@@ -592,7 +592,7 @@ elif active_page == "📊 Budget" and json_str:
             c1, c2 = st.columns([4, 1])
             with c1: st.markdown(f"- **{lbl}** <span class='badge-tag'>{cat}</span> : {val} € *(par {pyr} le {dt})*", unsafe_allow_html=True)
             with c2:
-                if st.button("🗑️", key=f"adv_b_del_{real_idx}"):
+                if st.button("🗑️", key=f"adv_b_del_{idx}_{real_idx}"):
                     delete_row_fast("Budget", real_idx)
                     st.rerun()
     else: st.info("Aucune dépense enregistrée.")
@@ -626,7 +626,7 @@ elif active_page == "🐾 Maison & Loisirs" and json_str:
                 with st.expander(f"🍲 {titre}"):
                     st.markdown(f"**🛒 Ingrédients :**\n{ing}")
                     st.markdown(f"**👨‍🍳 Instructions :**\n{inst}")
-                    if st.button("🗑️ Supprimer", key=f"r_del_{real_idx}"):
+                    if st.button("🗑️ Supprimer", key=f"r_del_{idx}_{real_idx}"):
                         delete_row_fast("Recettes", real_idx)
                         st.rerun()
         else: st.info("Aucune recette.")
@@ -651,7 +651,7 @@ elif active_page == "🐾 Maison & Loisirs" and json_str:
                 real_idx = all_vals.index(row)
                 with st.expander(f"📌 {titre}"):
                     st.write(contenu)
-                    if st.button("🗑️ Supprimer", key=f"n_del_{real_idx}"):
+                    if st.button("🗑️ Supprimer", key=f"n_del_{idx}_{real_idx}"):
                         delete_row_fast("Notes", real_idx)
                         st.rerun()
         else: st.info("Aucune note.")
@@ -678,7 +678,7 @@ elif active_page == "🐾 Maison & Loisirs" and json_str:
                 c1, c2 = st.columns([4, 1])
                 with c1: st.markdown(f"- **{elm}** {f'(*{nts}*)' if nts else ''}")
                 with c2:
-                    if st.button("🗑️", key=f"lst_del_{real_idx}"):
+                    if st.button("🗑️", key=f"lst_del_{cat_l}_{idx}_{real_idx}"):
                         delete_row_fast("Listes", real_idx)
                         st.rerun()
         else: st.info("Rien dans cette liste.")
