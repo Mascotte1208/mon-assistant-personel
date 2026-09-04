@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.21"
+VERSION = "2.22"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -117,7 +117,7 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE (Rose & Prune avec des cadres ultra-visibles et propres)
+# 2. STYLE (Cadres ultra-marqués et contrastés)
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
@@ -125,7 +125,7 @@ def slug(texte):
 
 
 CSS_CATEGORIES = "".join(
-    f".st-key-grp-{slug(rayon)}{{border-left:4px solid {couleur};"
+    f".st-key-grp-{slug(rayon)}{{border-left:5px solid {couleur};"
     f"padding-left:14px; margin:14px 0 4px;}}"
     f".st-key-grp-{slug(rayon)} .rayon{{color:{couleur};}}"
     for rayon, couleur in RAYON_COULEURS.items()
@@ -137,16 +137,15 @@ st.markdown("""
 
 :root{
   --rose:#ec4899; --rose-fonce:#db2777; --violet:#a855f7;
-  --prune:#4a044e; --prune-clair:#831843; --bord-cadre:#f472b6;
+  --prune:#4a044e; --prune-clair:#831843; --bord-marque:#db2777;
 }
 
 html, body, [class*="css"], .stApp{
   font-family:'Plus Jakarta Sans', sans-serif !important;
   color:var(--prune); -webkit-tap-highlight-color:transparent;
 }
-/* Fond rose poudré très doux */
 .stApp{
-  background:linear-gradient(180deg,#fff1f2 0%,#fdf2f8 50%,#faf5ff 100%) fixed !important;
+  background:linear-gradient(180deg,#fce7f3 0%,#fdf2f8 50%,#fae8ff 100%) fixed !important;
 }
 #MainMenu, footer, header{visibility:hidden;}
 .block-container{padding-top:1.2rem !important; padding-bottom:5rem !important; max-width:540px !important;}
@@ -162,14 +161,14 @@ html, body, [class*="css"], .stApp{
 .bloc-head{
   display:flex; justify-content:space-between; align-items:center; gap:8px;
   padding:2px 0 8px; font-size:16.5px; font-weight:800; color:var(--prune-clair);
-  border-bottom:1.5px solid #fce7f3; margin-bottom:10px;
+  border-bottom:2px solid #fbcfe8; margin-bottom:10px;
 }
 .bloc-head .n{background:#fce7f3; color:var(--rose-fonce); border-radius:10px;
   padding:2px 10px; font-size:11.5px; font-weight:800;}
 
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
   border-radius:14px !important; font-weight:700 !important; font-size:14px !important;
-  padding:11px 15px !important; width:100%; border:1.5px solid #f472b6 !important;
+  padding:11px 15px !important; width:100%; border:2px solid #f472b6 !important;
   transition:transform .1s ease;
 }
 .stButton>button:active, .stFormSubmitButton>button:active{transform:scale(.98);}
@@ -177,33 +176,33 @@ button[kind="secondary"], button[data-testid="stBaseButton-secondary"],
 button[kind="secondaryFormSubmit"], button[data-testid="stBaseButton-secondaryFormSubmit"],
 .stDownloadButton>button{
   background:#ffffff !important; color:var(--rose-fonce) !important;
-  box-shadow:0 3px 10px rgba(236,72,153,.08) !important;
+  box-shadow:0 4px 12px rgba(219,39,119,.12) !important;
 }
 button[kind="primary"], button[data-testid="stBaseButton-primary"],
 button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSubmit"]{
   background:linear-gradient(135deg,#ec4899 0%,#db2777 100%) !important;
   color:#fff !important; border:none !important;
-  box-shadow:0 6px 16px -4px rgba(219,39,119,.4) !important;
+  box-shadow:0 6px 18px -4px rgba(219,39,119,.5) !important;
 }
-button:focus-visible{outline:2px solid #f9a8d4 !important; outline-offset:2px;}
+button:focus-visible{outline:2px solid #db2777 !important; outline-offset:2px;}
 
-/* CADRES BIEN VISIBLES SUR FOND BLANC (style cartes nettes) */
+/* CADRES ULTRA MARQUÉS AVEC OMBRE PRONONCÉE */
 [data-testid="stVerticalBlockBorderWrapper"], 
 div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
 [data-baseweb="block"] {
   background: #ffffff !important;
-  border: 2px solid var(--bord-cadre) !important;
+  border: 3px solid var(--bord-marque) !important;
   border-radius: 22px !important;
   padding: 16px 20px 14px !important;
-  box-shadow: 0 10px 30px rgba(236, 72, 153, 0.12) !important;
-  margin-bottom: 16px !important;
+  box-shadow: 0 12px 35px rgba(131, 24, 67, 0.18) !important;
+  margin-bottom: 18px !important;
 }
 
 [data-testid="stMetricValue"] {color: var(--prune) !important; font-weight: 800 !important;}
 [data-testid="stMetricLabel"] {color: var(--prune-clair) !important; font-weight: 700 !important;}
 [data-testid="stMetric"] {
-  background: #ffffff; border: 2px solid var(--bord-cadre) !important;
-  border-radius: 18px; padding: 14px 18px; box-shadow: 0 6px 16px rgba(236,72,153,.1);
+  background: #ffffff; border: 3px solid var(--bord-marque) !important;
+  border-radius: 18px; padding: 14px 18px; box-shadow: 0 6px 18px rgba(131,24,67,.12);
 }
 
 .jour-titre{font-size:13.5px; font-weight:800; color:#a21caf; padding:8px 0 4px;}
@@ -218,29 +217,29 @@ div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapp
 .rayon{font-size:13px; font-weight:800; color:#a21caf; background:#fae8ff;
        display:inline-block; padding:4px 10px; border-radius:12px; margin:12px 0 4px;}
 .empty{text-align:center; padding:22px 14px; border-radius:18px; background:#fff;
-       border:2px dashed #f472b6; color:#9d174d; font-weight:600; font-size:13.5px;}
+       border:3px dashed var(--bord-marque); color:#9d174d; font-weight:600; font-size:13.5px;}
 .today-none{font-size:13.5px; color:#9d174d; font-weight:600; opacity:.85; padding:8px 0;}
 
 .solde{border-radius:18px; padding:16px 20px; margin:14px 0; font-weight:700; font-size:15px;
-       background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:2px solid #f472b6; color:#701a75;
+       background:linear-gradient(135deg,#fdf4ff,#fae8ff); border:3px solid var(--bord-marque); color:#701a75;
        display:flex; justify-content:space-between; align-items:center; gap:10px;
-       box-shadow:0 8px 20px rgba(168,85,247,.1);}
+       box-shadow:0 8px 22px rgba(131,24,67,.15);}
 .solde .m{font-size:17.5px; font-weight:800; color:var(--rose-fonce); white-space:nowrap;}
 
 .bandeau{border-radius:14px; padding:10px 14px; font-size:13.5px; font-weight:700; margin-bottom:10px;}
-.bandeau.info{background:#f5f3ff; border:1.5px solid #ddd6fe; color:#5b21b6;}
-.bandeau.warn{background:#fff7ed; border:1.5px solid #fed7aa; color:#c2410c;}
+.bandeau.info{background:#f5f3ff; border:2px solid #c4b5fd; color:#5b21b6;}
+.bandeau.warn{background:#fff7ed; border:2px solid #fed7aa; color:#c2410c;}
 
 .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input, .stTimeInput input{
   color:var(--prune) !important; background:#fff !important; -webkit-text-fill-color:var(--prune) !important;
-  border-radius:14px !important; border:2px solid #f9a8d4 !important;
+  border-radius:14px !important; border:2.5px solid #f472b6 !important;
   padding:11px 15px !important; font-size:14.5px !important;
 }
-[data-baseweb="select"]>div{border-radius:14px !important; border:2px solid #f9a8d4 !important; background:#fff !important;}
+[data-baseweb="select"]>div{border-radius:14px !important; border:2.5px solid #f472b6 !important; background:#fff !important;}
 label p{font-weight:700 !important; font-size:13.5px !important; color:var(--prune-clair) !important;}
 
 .stTabs [data-baseweb="tab-list"]{gap:6px; background:#fff; padding:6px;
-  border-radius:18px; border:2px solid #f472b6;}
+  border-radius:18px; border:2.5px solid var(--bord-marque);}
 .stTabs [data-baseweb="tab"]{border-radius:12px; padding:8px 14px; font-weight:700; font-size:13.5px; color:var(--rose-fonce);}
 .stTabs [aria-selected="true"]{background:linear-gradient(135deg,#ec4899,#db2777); color:#fff !important;}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
@@ -258,18 +257,18 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--pru
 [class*="st-key-cal_"] button{
   min-height:0 !important; padding:9px 0 !important; border-radius:12px !important;
   font-size:12.5px !important; font-weight:700 !important; background:#fdf2f8 !important;
-  color:var(--prune) !important; border:1.5px solid transparent !important; box-shadow:none !important;
+  color:var(--prune) !important; border:2px solid #fbcfe8 !important; box-shadow:none !important;
 }
 [class*="st-key-cal_"] button p{font-size:12.5px !important; font-weight:700 !important; line-height:1.1 !important;}
-[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#ecd9f5 !important; opacity:1 !important;}
+[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#ecd9f5 !important; opacity:1 !important; border:none !important;}
 [class*="st-key-cal_"] button[kind="primary"], [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
   background:linear-gradient(135deg,#ec4899,#a855f7) !important; color:#fff !important;
-  box-shadow:0 4px 12px -2px rgba(219,39,119,.4) !important;
+  box-shadow:0 4px 12px -2px rgba(219,39,119,.4) !important; border:none !important;
 }
 
 [class*="st-key-goto-"] button{
   background:transparent !important; border:none !important; box-shadow:none !important;
-  border-bottom:1.5px solid #fce7f3 !important; border-radius:0 !important;
+  border-bottom:2px solid #fbcfe8 !important; border-radius:0 !important;
   color:var(--prune-clair) !important; font-size:16px !important; font-weight:800 !important;
   padding:4px 0 10px !important; display:flex !important; align-items:center !important;
   justify-content:flex-start !important; text-align:left !important;
@@ -284,7 +283,7 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--pru
 .st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
 
 [data-testid="stHorizontalBlock"]:has(.line){
-  border-bottom:1px solid #fef2f8; align-items:center !important; gap:6px !important;
+  border-bottom:1.5px solid #fef2f8; align-items:center !important; gap:6px !important;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button{
   background:transparent !important; border:none !important; box-shadow:none !important;
@@ -611,7 +610,7 @@ def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
                         styles.append(f".st-key-{cle} button{{background:linear-gradient("
                                       f"135deg,#fce7f3,#fae8ff) !important;color:#9d174d !important;}}")
                     if jour == aujourd:
-                        styles.append(f".st-key-{cle} button{{border:1.5px solid #db2777 !important;"
+                        styles.append(f".st-key-{cle} button{{border:2px solid #db2777 !important;"
                                       f"color:#db2777 !important;}}")
     if styles:
         st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
