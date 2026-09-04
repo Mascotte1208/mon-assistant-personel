@@ -29,7 +29,6 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     
-    /* Configuration Écran Mobile */
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
         background-color: #f8fafc;
@@ -41,14 +40,12 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* Centrage et marges tactiles */
     .block-container {
         padding-top: 1.2rem !important;
         padding-bottom: 4rem !important;
         max-width: 550px !important;
     }
 
-    /* Barre d'Onglets Tactiles (PWA Style) */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
         background-color: #e2e8f0;
@@ -75,7 +72,6 @@ st.markdown("""
         box-shadow: 0 4px 16px rgba(79, 70, 229, 0.18);
     }
 
-    /* Cartes Tactiles */
     .widget-card {
         background: #ffffff;
         border: 1px solid #f1f5f9;
@@ -104,7 +100,6 @@ st.markdown("""
         margin-top: 2px;
     }
 
-    /* Badges */
     .badge-tag {
         display: inline-block;
         padding: 3px 10px;
@@ -115,7 +110,6 @@ st.markdown("""
         color: #4338ca;
     }
 
-    /* Boutons Tactiles */
     .stButton button {
         border-radius: 16px;
         font-weight: 700;
@@ -127,7 +121,6 @@ st.markdown("""
         box-shadow: 0 4px 16px rgba(99, 102, 241, 0.28);
     }
 
-    /* CORRECTIF DE VISIBILITÉ DE LA SAISIE SUR MOBILE */
     .stTextInput input, .stTextArea textarea, .stSelectbox select {
         color: #0f172a !important;
         background-color: #ffffff !important;
@@ -153,25 +146,64 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CACHE DONNÉES GOOGLE SHEETS (30 SECONDES) ---
-@st.cache_data(ttl=30, show_spinner=False)
-def fetch_sheet_data(json_str, sheet_name):
-    try:
-        creds_dict = json.loads(json_str)
-        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-        client = gspread.authorize(creds)
-        sheet = client.open("MonAssistantData")
-        ws = sheet.worksheet(sheet_name)
-        return ws.get_all_values()
-    except Exception:
-        return []
-
+# --- FONCTIONS DE CONNEXION ET DE GESTION DU CACHE MÉMOIRE ---
 def get_gspread_client(json_str):
     creds_dict = json.loads(json_str)
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     return gspread.authorize(creds)
+
+def sync_sheet_to_state(sheet_name, data):
+    st.session_state[f"data_{sheet_name}"] = data
+
+def get_data(sheet_name):
+    if f"data_{sheet_name}" not in st.session_state:
+        if st.session_state.get("json_credentials_str"):
+            try:
+                client = get_gspread_client(st.session_state["json_credentials_str"])
+                ws = client.open("MonAssistantData").worksheet(sheet_name)
+                st.session_state[f"data_{sheet_name}"] = ws.get_all_values()
+            except Exception:
+                st.session_state[f"data_{sheet_name}"] = []
+        else:
+            st.session_state[f"data_{sheet_name}"] = []
+    return st.session_state[f"data_{sheet_name}"]
+
+def append_row_fast(sheet_name, row):
+    data = get_data(sheet_name)
+    data.append(row)
+    sync_sheet_to_state(sheet_name, data)
+    if st.session_state.get("json_credentials_str"):
+        try:
+            client = get_gspread_client(st.session_state["json_credentials_str"])
+            client.open("MonAssistantData").worksheet(sheet_name).append_row(row)
+        except Exception:
+            pass
+
+def delete_row_fast(sheet_name, index):
+    data = get_data(sheet_name)
+    if 0 <= index < len(data):
+        data.pop(index)
+        sync_sheet_to_state(sheet_name, data)
+        if st.session_state.get("json_credentials_str"):
+            try:
+                client = get_gspread_client(st.session_state["json_credentials_str"])
+                # +1 car gspread commence à 1 (les entêtes sont à la ligne 1)
+                client.open("MonAssistantData").worksheet(sheet_name).delete_rows(index + 1)
+            except Exception:
+                pass
+
+def update_cell_fast(sheet_name, row_idx, col_idx, value):
+    data = get_data(sheet_name)
+    if 0 <= row_idx < len(data):
+        data[row_idx][col_idx - 1] = value
+        sync_sheet_to_state(sheet_name, data)
+        if st.session_state.get("json_credentials_str"):
+            try:
+                client = get_gspread_client(st.session_state["json_credentials_str"])
+                client.open("MonAssistantData").worksheet(sheet_name).update_cell(row_idx + 1, col_idx, value)
+            except Exception:
+                pass
 
 # --- SESSION CONFIGURATION ---
 if "json_credentials_str" not in st.session_state:
@@ -181,13 +213,13 @@ if "json_credentials_str" not in st.session_state:
 st.markdown("<h1 style='text-align: center; font-weight: 800; color: #0f172a; margin-bottom: 0px;'>✨ Notre Espace</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; font-size: 13px; font-weight: 600; color: #64748b; margin-top: 4px; margin-bottom: 20px;'>Tableau de bord partagé — <b>Lucas & Alex</b></p>", unsafe_allow_html=True)
 
-# --- NAVIGATION RESTRUCTURÉE (5 SUPER-ONGLETS) ---
+# --- NAVIGATION RESTRUCTURÉE ---
 tab_dash, tab_quotidien, tab_budget_adv, tab_pro, tab_loisirs = st.tabs([
     "🏠 Dashboard", "📋 Quotidien", "📊 Budget", "🎓 Espace Pro", "🐾 Saiko & Cuisine"
 ])
 
 # ==========================================
-# SUPER-ONGLET 1 : DASHBOARD VISUEL & PWA
+# SUPER-ONGLET 1 : DASHBOARD VISUEL
 # ==========================================
 with tab_dash:
     if not st.session_state["json_credentials_str"]:
@@ -224,18 +256,17 @@ with tab_dash:
     else:
         json_str = st.session_state["json_credentials_str"]
         
-        taches_vals = fetch_sheet_data(json_str, "Taches")
-        agenda_vals = fetch_sheet_data(json_str, "Agenda")
-        courses_vals = fetch_sheet_data(json_str, "Courses")
-        budget_vals = fetch_sheet_data(json_str, "Budget")
-        cand_vals = fetch_sheet_data(json_str, "Candidatures")
+        taches_vals = get_data("Taches")
+        agenda_vals = get_data("Agenda")
+        courses_vals = get_data("Courses")
+        budget_vals = get_data("Budget")
+        cand_vals = get_data("Candidatures")
         
         taches_data = taches_vals[1:] if len(taches_vals) > 1 else []
         taches_faites = len([t for t in taches_data if len(t) > 2 and t[2] == "Fait"])
         total_taches = len(taches_data)
         
         nb_courses = max(0, len(courses_vals) - 1)
-        nb_agenda = max(0, len(agenda_vals) - 1)
         nb_cand = max(0, len(cand_vals) - 1)
 
         st.markdown("<h4 style='font-weight: 800; color: #1e293b; margin-bottom: 12px;'>⚡ Aperçu Rapide</h4>", unsafe_allow_html=True)
@@ -287,13 +318,17 @@ with tab_dash:
         st.divider()
         col_act1, col_act2 = st.columns(2)
         with col_act1:
-            if st.button("🔄 Actualiser"):
-                st.cache_data.clear()
+            if st.button("🔄 Forcer la re-synchronisation"):
+                for key in list(st.session_state.keys()):
+                    if key.startswith("data_"):
+                        del st.session_state[key]
                 st.rerun()
         with col_act2:
             if st.button("🔴 Déconnexion"):
                 st.session_state["json_credentials_str"] = None
-                st.cache_data.clear()
+                for key in list(st.session_state.keys()):
+                    if key.startswith("data_"):
+                        del st.session_state[key]
                 st.rerun()
 
 json_str = st.session_state["json_credentials_str"]
@@ -305,9 +340,10 @@ with tab_quotidien:
     if json_str:
         sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs(["✅ Tâches", "📅 Agenda", "🛒 Courses", "🍽️ Repas"])
         
+        # --- TÂCHES ---
         with sub_tab1:
             st.subheader("✅ Tâches à faire")
-            all_vals = fetch_sheet_data(json_str, "Taches")
+            all_vals = get_data("Taches")
             taches_data = all_vals[1:] if len(all_vals) > 1 else []
             
             total_taches = len(taches_data)
@@ -324,7 +360,7 @@ with tab_quotidien:
                     nom_t = row[0] if len(row) > 0 else "Sans nom"
                     cat_t = row[1] if len(row) > 1 else "Général"
                     statut_t = row[2] if len(row) > 2 else "À faire"
-                    real_idx = all_vals.index(row) + 1
+                    real_idx = all_vals.index(row)
                     
                     c1, c2 = st.columns([3, 1])
                     with c1:
@@ -334,14 +370,12 @@ with tab_quotidien:
                             st.markdown(f"- **{nom_t}** <span class='badge-tag'>{cat_t}</span>", unsafe_allow_html=True)
                     with c2:
                         if statut_t != "Fait":
-                            if st.button("✔️", key=f"t_fait_{idx}"):
-                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Taches").update_cell(real_idx, 3, "Fait")
-                                st.cache_data.clear()
+                            if st.button("✔️", key=f"t_fait_{real_idx}"):
+                                update_cell_fast("Taches", real_idx, 3, "Fait")
                                 st.rerun()
                         else:
-                            if st.button("🗑️", key=f"t_del_{idx}"):
-                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Taches").delete_rows(real_idx)
-                                st.cache_data.clear()
+                            if st.button("🗑️", key=f"t_del_{real_idx}"):
+                                delete_row_fast("Taches", real_idx)
                                 st.rerun()
             else:
                 st.info("Aucune tâche.")
@@ -352,24 +386,23 @@ with tab_quotidien:
                 n_tache = st.text_input("Intitulé")
                 n_cat = st.selectbox("Catégorie", ["Maison", "Admin", "Saiko", "Urgent", "Autre"])
                 if st.form_submit_button("Ajouter") and n_tache:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Taches").append_row([n_tache, n_cat, "À faire"])
-                    st.cache_data.clear()
+                    append_row_fast("Taches", [n_tache, n_cat, "À faire"])
                     st.rerun()
 
+        # --- AGENDA ---
         with sub_tab2:
             st.subheader("📅 Agenda")
-            all_vals = fetch_sheet_data(json_str, "Agenda")
+            all_vals = get_data("Agenda")
             events_data = all_vals[1:] if len(all_vals) > 1 else []
 
             if events_data:
                 for idx, row in enumerate(events_data):
                     date_ev, heure_ev, titre_ev, desc_ev = (row + ["", "", "", ""])[:4]
-                    real_idx = idx + 2
+                    real_idx = idx + 1
                     with st.expander(f"🗓️ {date_ev} {f'à {heure_ev}' if heure_ev else ''} — {titre_ev}"):
                         if desc_ev: st.write(f"**Détails :** {desc_ev}")
-                        if st.button("🗑️ Supprimer", key=f"ev_del_{idx}"):
-                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Agenda").delete_rows(real_idx)
-                            st.cache_data.clear()
+                        if st.button("🗑️ Supprimer", key=f"ev_del_{real_idx}"):
+                            delete_row_fast("Agenda", real_idx)
                             st.rerun()
             else: st.info("Aucun événement.")
 
@@ -381,25 +414,24 @@ with tab_quotidien:
                 e_titre = st.text_input("Titre")
                 e_desc = st.text_area("Description")
                 if st.form_submit_button("Enregistrer") and e_titre:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Agenda").append_row([str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
-                    st.cache_data.clear()
+                    append_row_fast("Agenda", [str(e_date), str(e_heure.strftime("%H:%M")), e_titre, e_desc])
                     st.rerun()
 
+        # --- COURSES ---
         with sub_tab3:
             st.subheader("🛒 Liste de Courses")
-            all_vals = fetch_sheet_data(json_str, "Courses")
+            all_vals = get_data("Courses")
             courses_data = all_vals[1:] if len(all_vals) > 1 else []
 
             if courses_data:
                 for idx, row in enumerate(courses_data):
                     art, qte, cat = (row + ["Article", "1", "Général"])[:3]
-                    real_idx = idx + 2
+                    real_idx = idx + 1
                     c1, c2 = st.columns([3, 1])
                     with c1: st.markdown(f"- **{art}** *(Qté: {qte} | {cat})*")
                     with c2:
-                        if st.button("✔️ Acquis", key=f"c_del_{idx}"):
-                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Courses").delete_rows(real_idx)
-                            st.cache_data.clear()
+                        if st.button("✔️ Acquis", key=f"c_del_{real_idx}"):
+                            delete_row_fast("Courses", real_idx)
                             st.rerun()
             else: st.info("Liste de courses vide.")
 
@@ -409,13 +441,13 @@ with tab_quotidien:
                 c_qte = st.text_input("Quantité", value="1")
                 c_cat = st.selectbox("Rayon", ["Supermarché", "Frais", "Fruits & Légumes", "Boissons", "Entretien", "Autre"])
                 if st.form_submit_button("Ajouter") and c_art:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Courses").append_row([c_art, c_qte, c_cat])
-                    st.cache_data.clear()
+                    append_row_fast("Courses", [c_art, c_qte, c_cat])
                     st.rerun()
 
+        # --- REPAS ---
         with sub_tab4:
             st.subheader("🍽️ Planning des Repas")
-            all_vals = fetch_sheet_data(json_str, "Repas")
+            all_vals = get_data("Repas")
             repas_data = all_vals[1:] if len(all_vals) > 1 else []
             jours = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
@@ -425,13 +457,12 @@ with tab_quotidien:
                 if repas_j:
                     for r in repas_j:
                         typ, plt = (r[1:] + ["", ""])[:2]
-                        real_idx = all_vals.index(r) + 1
+                        real_idx = all_vals.index(r)
                         c1, c2 = st.columns([4, 1])
                         with c1: st.write(f"- **{typ}** : {plt}")
                         with c2:
                             if st.button("🗑️", key=f"rep_del_{real_idx}"):
-                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Repas").delete_rows(real_idx)
-                                st.cache_data.clear()
+                                delete_row_fast("Repas", real_idx)
                                 st.rerun()
                 else: st.caption("Rien de prévu")
 
@@ -441,8 +472,7 @@ with tab_quotidien:
                 r_type = st.radio("Repas", ["Midi", "Soir"], horizontal=True)
                 r_plat = st.text_input("Plat")
                 if st.form_submit_button("Ajouter au planning") and r_plat:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Repas").append_row([r_jour, r_type, r_plat])
-                    st.cache_data.clear()
+                    append_row_fast("Repas", [r_jour, r_type, r_plat])
                     st.rerun()
 
 # ==========================================
@@ -451,7 +481,7 @@ with tab_quotidien:
 with tab_budget_adv:
     if json_str:
         st.subheader("📊 Tableau de Bord Financier")
-        all_vals = fetch_sheet_data(json_str, "Budget")
+        all_vals = get_data("Budget")
         budget_data = all_vals[1:] if len(all_vals) > 1 else []
 
         if budget_data:
@@ -505,13 +535,12 @@ with tab_budget_adv:
                 dt, pyr, lbl = (row + ["", "", ""])[:3]
                 val = row[3] if len(row) > 3 else "0"
                 cat = row[4] if len(row) > 4 else "Alimentation"
-                real_idx = idx + 2
+                real_idx = idx + 1
                 c1, c2 = st.columns([4, 1])
                 with c1: st.markdown(f"- **{lbl}** <span class='badge-tag'>{cat}</span> : {val} € *(par {pyr} le {dt})*", unsafe_allow_html=True)
                 with c2:
-                    if st.button("🗑️", key=f"adv_b_del_{idx}"):
-                        get_gspread_client(json_str).open("MonAssistantData").worksheet("Budget").delete_rows(real_idx)
-                        st.cache_data.clear()
+                    if st.button("🗑️", key=f"adv_b_del_{real_idx}"):
+                        delete_row_fast("Budget", real_idx)
                         st.rerun()
         else:
             st.info("Aucune dépense enregistrée.")
@@ -525,8 +554,7 @@ with tab_budget_adv:
             b_cat = st.selectbox("Catégorie", ["Alimentation", "Saiko", "Maison/Bricolage", "Sorties", "Fixe/Admin"])
             b_amount = st.number_input("Montant (€)", min_value=0.0, step=0.5)
             if st.form_submit_button("Enregistrer la dépense") and b_label and b_amount > 0:
-                get_gspread_client(json_str).open("MonAssistantData").worksheet("Budget").append_row([str(b_date), b_payer, b_label, str(b_amount), b_cat])
-                st.cache_data.clear()
+                append_row_fast("Budget", [str(b_date), b_payer, b_label, str(b_amount), b_cat])
                 st.rerun()
 
 # ==========================================
@@ -538,13 +566,13 @@ with tab_pro:
 
         with sub_tab_c1:
             st.subheader("🎓 Candidatures & Formations")
-            all_vals = fetch_sheet_data(json_str, "Candidatures")
+            all_vals = get_data("Candidatures")
             cand_data = all_vals[1:] if len(all_vals) > 1 else []
 
             if cand_data:
                 for idx, row in enumerate(cand_data):
                     org, intit, stat, ech, nts = (row + ["Organisme", "Formation", "Dossier envoyé", "", ""])[:5]
-                    real_idx = idx + 2
+                    real_idx = idx + 1
                     
                     with st.expander(f"🏢 [{stat}] {org} — {intit}"):
                         if ech: st.write(f"**📅 Échéance :** {ech}")
@@ -556,16 +584,14 @@ with tab_pro:
                                 "Modifier le statut", 
                                 ["Dossier envoyé", "Relance à faire", "Entretien prévu", "Confirmé / Admis", "Refusé"],
                                 index=["Dossier envoyé", "Relance à faire", "Entretien prévu", "Confirmé / Admis", "Refusé"].index(stat) if stat in ["Dossier envoyé", "Relance à faire", "Entretien prévu", "Confirmé / Admis", "Refusé"] else 0,
-                                key=f"stat_sel_{idx}"
+                                key=f"stat_sel_{real_idx}"
                             )
-                            if st.button("Mettre à jour", key=f"btn_up_{idx}"):
-                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Candidatures").update_cell(real_idx, 3, new_stat)
-                                st.cache_data.clear()
+                            if st.button("Mettre à jour", key=f"btn_up_{real_idx}"):
+                                update_cell_fast("Candidatures", real_idx, 3, new_stat)
                                 st.rerun()
                         with col_del:
-                            if st.button("🗑️ Supprimer", key=f"cand_del_{idx}"):
-                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Candidatures").delete_rows(real_idx)
-                                st.cache_data.clear()
+                            if st.button("🗑️ Supprimer", key=f"cand_del_{real_idx}"):
+                                delete_row_fast("Candidatures", real_idx)
                                 st.rerun()
             else:
                 st.info("Aucun dossier enregistré.")
@@ -579,8 +605,7 @@ with tab_pro:
                 c_ech = st.text_input("Échéance / RDV")
                 c_nts = st.text_area("Notes & pièces à fournir")
                 if st.form_submit_button("Enregistrer") and c_org:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Candidatures").append_row([c_org, c_intit, c_stat, c_ech, c_nts])
-                    st.cache_data.clear()
+                    append_row_fast("Candidatures", [c_org, c_intit, c_stat, c_ech, c_nts])
                     st.rerun()
 
         with sub_tab_c2:
@@ -599,20 +624,20 @@ with tab_loisirs:
     if json_str:
         sub_tab_s, sub_tab_r, sub_tab_n, sub_tab_a, sub_tab_l = st.tabs(["🐶 Saiko", "🍲 Recettes", "📝 Notes", "🏡 Admin", "🧳 Listes"])
 
+        # --- SAIKO ---
         with sub_tab_s:
             st.subheader("🐶 Espace Saiko")
-            all_vals = fetch_sheet_data(json_str, "Saiko")
+            all_vals = get_data("Saiko")
             saiko_data = all_vals[1:] if len(all_vals) > 1 else []
 
             if saiko_data:
                 for idx, row in enumerate(saiko_data):
                     dt, tp, sj, nt = (row + ["", "Soin", "Remarque", ""])[:4]
-                    real_idx = idx + 2
+                    real_idx = idx + 1
                     with st.expander(f"🐾 [{tp}] {sj} ({dt})"):
                         if nt: st.write(nt)
-                        if st.button("🗑️ Supprimer", key=f"sk_del_{idx}"):
-                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Saiko").delete_rows(real_idx)
-                            st.cache_data.clear()
+                        if st.button("🗑️ Supprimer", key=f"sk_del_{real_idx}"):
+                            delete_row_fast("Saiko", real_idx)
                             st.rerun()
 
             st.divider()
@@ -622,13 +647,13 @@ with tab_loisirs:
                 s_sujet = st.text_input("Titre")
                 s_notes = st.text_area("Notes")
                 if st.form_submit_button("Enregistrer") and s_sujet:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Saiko").append_row([str(s_date), s_type, s_sujet, s_notes])
-                    st.cache_data.clear()
+                    append_row_fast("Saiko", [str(s_date), s_type, s_sujet, s_notes])
                     st.rerun()
 
+        # --- RECETTES ---
         with sub_tab_r:
             st.subheader("🍲 Recettes de Cuisine")
-            all_vals = fetch_sheet_data(json_str, "Recettes")
+            all_vals = get_data("Recettes")
             recettes_data = all_vals[1:] if len(all_vals) > 1 else []
 
             search_recette = st.text_input("🔍 Rechercher une recette...", placeholder="Nom ou ingrédient...")
@@ -637,25 +662,21 @@ with tab_loisirs:
             if filtered:
                 for idx, row in enumerate(filtered):
                     titre, ing, inst = (row + ["Sans titre", "", ""])[:3]
-                    real_idx = all_vals.index(row) + 1
+                    real_idx = all_vals.index(row)
                     with st.expander(f"🍲 {titre}"):
                         st.markdown(f"**🛒 Ingrédients :**\n{ing}")
                         st.markdown(f"**👨‍🍳 Instructions :**\n{inst}")
                         
                         col1, col2 = st.columns(2)
                         with col1:
-                            if st.button("🛒 Envoyer aux courses", key=f"r_send_{idx}"):
-                                client = get_gspread_client(json_str)
-                                courses_ws = client.open("MonAssistantData").worksheet("Courses")
+                            if st.button("🛒 Envoyer aux courses", key=f"r_send_{real_idx}"):
                                 for line in [l.strip() for l in ing.split('\n') if l.strip()]:
-                                    courses_ws.append_row([line, "1", f"Recette: {titre}"])
-                                st.cache_data.clear()
+                                    append_row_fast("Courses", [line, "1", f"Recette: {titre}"])
                                 st.success("Ingrédients ajoutés aux courses !")
                                 st.rerun()
                         with col2:
-                            if st.button("🗑️ Supprimer", key=f"r_del_{idx}"):
-                                get_gspread_client(json_str).open("MonAssistantData").worksheet("Recettes").delete_rows(real_idx)
-                                st.cache_data.clear()
+                            if st.button("🗑️ Supprimer", key=f"r_del_{real_idx}"):
+                                delete_row_fast("Recettes", real_idx)
                                 st.rerun()
 
             st.divider()
@@ -664,13 +685,13 @@ with tab_loisirs:
                 r_ing = st.text_area("Ingrédients (un par ligne)")
                 r_inst = st.text_area("Instructions")
                 if st.form_submit_button("Enregistrer la recette") and r_titre:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Recettes").append_row([r_titre, r_ing, r_inst])
-                    st.cache_data.clear()
+                    append_row_fast("Recettes", [r_titre, r_ing, r_inst])
                     st.rerun()
 
+        # --- NOTES ---
         with sub_tab_n:
             st.subheader("📝 Notes Partagées")
-            all_vals = fetch_sheet_data(json_str, "Notes")
+            all_vals = get_data("Notes")
             notes_data = all_vals[1:] if len(all_vals) > 1 else []
 
             search_note = st.text_input("🔍 Rechercher...", placeholder="Mot-clé...")
@@ -679,12 +700,11 @@ with tab_loisirs:
             if filtered:
                 for idx, row in enumerate(filtered):
                     titre, contenu = (row + ["Sans titre", ""])[:2]
-                    real_idx = all_vals.index(row) + 1
+                    real_idx = all_vals.index(row)
                     with st.expander(f"📌 {titre}"):
                         st.write(contenu)
-                        if st.button("🗑️ Supprimer", key=f"n_del_{idx}"):
-                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Notes").delete_rows(real_idx)
-                            st.cache_data.clear()
+                        if st.button("🗑️ Supprimer", key=f"n_del_{real_idx}"):
+                            delete_row_fast("Notes", real_idx)
                             st.rerun()
 
             st.divider()
@@ -692,24 +712,23 @@ with tab_loisirs:
                 n_titre = st.text_input("Titre")
                 n_contenu = st.text_area("Contenu")
                 if st.form_submit_button("Enregistrer la note") and n_titre:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Notes").append_row([n_titre, n_contenu])
-                    st.cache_data.clear()
+                    append_row_fast("Notes", [n_titre, n_contenu])
                     st.rerun()
 
+        # --- ADMIN ---
         with sub_tab_a:
             st.subheader("🏡 Logement & Admin")
-            all_vals = fetch_sheet_data(json_str, "Admin")
+            all_vals = get_data("Admin")
             admin_data = all_vals[1:] if len(all_vals) > 1 else []
 
             if admin_data:
                 for idx, row in enumerate(admin_data):
                     sj, ec, dt = (row + ["Sujet", "", ""])[:3]
-                    real_idx = idx + 2
+                    real_idx = idx + 1
                     with st.expander(f"📋 {sj} {f'(Échéance : {ec})' if ec else ''}"):
                         if dt: st.write(dt)
-                        if st.button("🗑️ Supprimer", key=f"adm_del_{idx}"):
-                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Admin").delete_rows(real_idx)
-                            st.cache_data.clear()
+                        if st.button("🗑️ Supprimer", key=f"adm_del_{real_idx}"):
+                            delete_row_fast("Admin", real_idx)
                             st.rerun()
 
             st.divider()
@@ -718,13 +737,13 @@ with tab_loisirs:
                 a_echeance = st.text_input("Échéance / Date")
                 a_details = st.text_area("Détails")
                 if st.form_submit_button("Enregistrer") and a_sujet:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Admin").append_row([a_sujet, a_echeance, a_details])
-                    st.cache_data.clear()
+                    append_row_fast("Admin", [a_sujet, a_echeance, a_details])
                     st.rerun()
 
+        # --- LISTES ---
         with sub_tab_l:
             st.subheader("🧳 Listes & Cadeaux")
-            all_vals = fetch_sheet_data(json_str, "Listes")
+            all_vals = get_data("Listes")
             listes_data = all_vals[1:] if len(all_vals) > 1 else []
             cat_l = st.radio("Type", ["Idées Cadeaux", "Valise / Voyage", "Choses à acheter (Maison)"], horizontal=True)
 
@@ -732,13 +751,12 @@ with tab_loisirs:
             if filtered:
                 for idx, row in enumerate(filtered):
                     elm, nts = (row[1:] + ["", ""])[:2]
-                    real_idx = all_vals.index(row) + 1
+                    real_idx = all_vals.index(row)
                     c1, c2 = st.columns([4, 1])
                     with c1: st.markdown(f"- **{elm}** {f'(*{nts}*)' if nts else ''}")
                     with c2:
-                        if st.button("🗑️", key=f"lst_del_{idx}"):
-                            get_gspread_client(json_str).open("MonAssistantData").worksheet("Listes").delete_rows(real_idx)
-                            st.cache_data.clear()
+                        if st.button("🗑️", key=f"lst_del_{real_idx}"):
+                            delete_row_fast("Listes", real_idx)
                             st.rerun()
 
             st.divider()
@@ -747,6 +765,5 @@ with tab_loisirs:
                 l_elem = st.text_input("Élément")
                 l_notes = st.text_input("Notes (optionnel)")
                 if st.form_submit_button("Ajouter") and l_elem:
-                    get_gspread_client(json_str).open("MonAssistantData").worksheet("Listes").append_row([l_cat, l_elem, l_notes])
-                    st.cache_data.clear()
+                    append_row_fast("Listes", [l_cat, l_elem, l_notes])
                     st.rerun()
