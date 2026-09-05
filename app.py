@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "3.4"
+VERSION = "3.6"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -56,11 +56,12 @@ PERSONNES = ["Lucas", "Alex"]
 
 ONGLETS_M = ["🛒 Courses", "🍲 Recettes"]
 
+# Uniquement des sigles/émojis pour un design épuré
 PAGES = {
-    "accueil": "🏠 Accueil",
-    "budget": "📊 Budget",
-    "maison": "🐾 Maison",
-    "transport": "🚋 Transports",
+    "accueil": "🏠",
+    "budget": "📊",
+    "maison": "🐾",
+    "transport": "🚋",
 }
 
 st.set_page_config(page_title="Notre Assistant", page_icon="🌸",
@@ -195,7 +196,7 @@ html, body, [class*="css"], .stApp{
 .jour-titre{font-size:13px; font-weight:700; color:var(--encre-2); padding:10px 0 6px;}
 
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
-  border-radius:12px !important; font-weight:600 !important; font-size:14px !important;
+  border-radius:12px !important; font-weight:600 !important; font-size:16px !important;
   padding:10px 14px !important; width:100%;
   border:1.5px solid var(--trait) !important; box-shadow:none !important;
   transition:background .12s ease, border-color .12s ease;
@@ -695,7 +696,7 @@ if st.session_state["ops"]:
     vider_file()
 
 # ==========================================================
-# 7. NAVIGATION & MODE IA (Visibles en haut de l'écran)
+# 7. NAVIGATION & MODE IA (Uniquement des sigles/émojis)
 # ==========================================================
 params = st.query_params
 page_cle = params.get("p", "accueil")
@@ -704,7 +705,7 @@ if page_cle not in PAGES and page_cle != "ialab":
 
 pages_dispo = PAGES.copy()
 if st.session_state.get("mode_ia"):
-    pages_dispo["ialab"] = "🧠 Labo IA"
+    pages_dispo["ialab"] = "🧠"
 
 cols_nav = st.columns(len(pages_dispo))
 for col, (cle, libelle) in zip(cols_nav, pages_dispo.items()):
