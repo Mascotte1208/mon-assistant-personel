@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.46"
+VERSION = "3.0"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -39,13 +39,13 @@ SHEETS = {
 
 RAYONS = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
 RAYON_COULEURS = {
-    "Fruits & Légumes": "#16a34a",
-    "Frais": "#0891b2",
-    "Boulangerie": "#d97706",
-    "Supermarché": "#7c3aed",
-    "Boissons": "#2563eb",
-    "Entretien": "#be185d",
-    "Autre": "#6b7280",
+    "Fruits & Légumes": "#17683D",
+    "Frais": "#0E7490",
+    "Boulangerie": "#A65B12",
+    "Supermarché": "#6D3BAF",
+    "Boissons": "#164C9E",
+    "Entretien": "#B0184F",
+    "Autre": "#8A7C82",
 }
 CAT_BUDGET = ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"]
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
@@ -127,8 +127,8 @@ def slug(texte):
 
 
 CSS_CATEGORIES = "".join(
-    f".st-key-grp-{slug(rayon)}{{border-left:6px solid {couleur};"
-    f"padding-left:14px; margin:14px 0 4px;}}"
+    f".st-key-grp-{slug(rayon)} [data-testid=\"stVerticalBlockBorderWrapper\"]"
+    f"{{border-left:3px solid {couleur} !important;}}"
     f".st-key-grp-{slug(rayon)} .rayon{{color:{couleur};}}"
     for rayon, couleur in RAYON_COULEURS.items()
 )
@@ -137,183 +137,213 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
+/* ---------------------------------------------------------------
+   Jetons de style. Une seule source pour les couleurs, les rayons
+   et les ombres : les modules externes reprennent ces variables.
+   --------------------------------------------------------------- */
 :root{
-  --rose-vif:#be185d; --rose-fonce:#9d174d; --prune:#581c87;
-  --prune-clair:#701a75; --bord-cadre:#be185d;
+  --encre:#241B22;      /* texte principal */
+  --encre-2:#5C4F55;    /* texte secondaire */
+  --gris:#8A7C82;       /* texte tertiaire, unites */
+  --papier:#FBF7F8;     /* fond de page */
+  --surface:#FFFFFF;    /* fond des blocs */
+  --trait:#ECE0E5;      /* filets et bordures */
+  --accent:#B0184F;     /* action, valeur mise en avant */
+  --accent-doux:#FDF1F5;
+  --accent-bord:#F3C9D8;
+  --vert:#17683D; --ambre:#A65B12; --rouge:#B3261E;
+  --r:16px; --r-s:11px;
+  --ombre:0 1px 2px rgba(36,27,34,.04), 0 10px 28px -20px rgba(36,27,34,.35);
 }
 
 html, body, [class*="css"], .stApp{
-  font-family:'Plus Jakarta Sans', sans-serif !important;
-  color:var(--prune); -webkit-tap-highlight-color:transparent;
+  font-family:'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color:var(--encre); -webkit-tap-highlight-color:transparent;
 }
-.stApp{
-  background:linear-gradient(180deg,#fbcfe8 0%,#f472b6 40%,#e879f9 100%) fixed !important;
-}
+.stApp{background:var(--papier) !important;}
 #MainMenu, footer, header{visibility:hidden;}
-.block-container{padding-top:1.2rem !important; padding-bottom:5rem !important; max-width:540px !important;}
+.block-container{padding-top:1rem !important; padding-bottom:5rem !important;
+  max-width:560px !important;}
 
-[data-testid="stHorizontalBlock"]{flex-wrap:nowrap !important; gap:8px !important;}
+/* Rangees de colonnes : elles peuvent se replier sur telephone. */
+[data-testid="stHorizontalBlock"]{gap:8px !important;}
 [data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
 
-.st-key-navrow{margin-bottom:12px;}
-.st-key-navrow [data-testid="stHorizontalBlock"]{gap:8px !important; flex-wrap:wrap !important;}
-.st-key-navrow [data-testid="stHorizontalBlock"] > div{min-width:88px !important; flex:1 1 88px !important;}
-.st-key-navrow button{font-size:13px !important; padding:11px 6px !important; border-radius:14px !important;}
-.st-key-navrow button p{font-size:13px !important; font-weight:800 !important;}
+/* ---------------------------------------------------------------
+   Blocs. Un seul niveau de surface, un filet, presque pas d'ombre.
+   Le selecteur reste volontairement etroit : viser data-baseweb
+   habillait aussi les menus et les depliants.
+   --------------------------------------------------------------- */
+[data-testid="stVerticalBlockBorderWrapper"]{
+  background:var(--surface) !important;
+  border:1px solid var(--trait) !important;
+  border-radius:var(--r) !important;
+  padding:16px 18px 14px !important;
+  box-shadow:var(--ombre) !important;
+  margin-bottom:14px !important;
+}
 
+/* ---------------------------------------------------------------
+   Titres
+   --------------------------------------------------------------- */
 .bloc-head{
-  display:flex; justify-content:space-between; align-items:center; gap:8px;
-  padding:2px 0 8px; font-size:16.5px; font-weight:800; color:var(--rose-fonce);
-  border-bottom:2.5px solid #f472b6; margin-bottom:10px;
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+  padding-bottom:10px; margin-bottom:10px;
+  font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--encre);
+  border-bottom:1px solid var(--trait);
 }
-.bloc-head .n{background:#fce7f3; color:var(--rose-vif); border-radius:10px;
-  padding:2px 10px; font-size:11.5px; font-weight:800;}
+.bloc-head .n{
+  background:var(--accent-doux); color:var(--accent); border:1px solid var(--accent-bord);
+  border-radius:999px; padding:1px 9px; font-size:11.5px; font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
+.section{font-size:15px; font-weight:700; color:var(--encre); margin:20px 0 8px;
+  letter-spacing:-.01em;}
+.jour-titre{font-size:13px; font-weight:700; color:var(--encre-2); padding:10px 0 6px;}
 
+/* ---------------------------------------------------------------
+   Boutons
+   --------------------------------------------------------------- */
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
-  border-radius:14px !important; font-weight:700 !important; font-size:14px !important;
-  padding:11px 15px !important; width:100%; border:2.5px solid var(--bord-cadre) !important;
-  transition:transform .1s ease;
+  border-radius:12px !important; font-weight:600 !important; font-size:14px !important;
+  padding:10px 14px !important; width:100%;
+  border:1px solid var(--trait) !important; box-shadow:none !important;
+  transition:background .12s ease, border-color .12s ease;
 }
-.stButton>button:active, .stFormSubmitButton>button:active{transform:scale(.98);}
 button[kind="secondary"], button[data-testid="stBaseButton-secondary"],
 button[kind="secondaryFormSubmit"], button[data-testid="stBaseButton-secondaryFormSubmit"],
 .stDownloadButton>button{
-  background:#ffffff !important; color:var(--rose-vif) !important;
-  box-shadow:0 4px 14px rgba(157,23,77,.2) !important;
+  background:var(--surface) !important; color:var(--encre) !important;
+}
+button[kind="secondary"]:hover, button[data-testid="stBaseButton-secondary"]:hover{
+  border-color:var(--accent-bord) !important; background:var(--accent-doux) !important;
 }
 button[kind="primary"], button[data-testid="stBaseButton-primary"],
 button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSubmit"]{
-  background:linear-gradient(135deg,#be185d 0%,#9d174d 100%) !important;
-  color:#fff !important; border:none !important;
-  box-shadow:0 6px 20px -4px rgba(157,23,77,.6) !important;
+  background:var(--accent) !important; color:#fff !important;
+  border-color:var(--accent) !important;
 }
-button:focus-visible{outline:2px solid #831843 !important; outline-offset:2px;}
+button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:2px;}
+@media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important;} }
 
-[data-testid="stVerticalBlockBorderWrapper"], 
-div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
-[data-baseweb="block"] {
-  background: #ffffff !important;
-  border: 3.5px solid var(--bord-cadre) !important;
-  border-radius: 22px !important;
-  padding: 16px 20px 14px !important;
-  box-shadow: 0 14px 40px rgba(131, 24, 67, 0.3) !important;
-  margin-bottom: 18px !important;
+/* Navigation : une rangee d'onglets, celui en cours est plein. */
+.st-key-navrow{margin-bottom:14px;}
+.st-key-navrow [data-testid="stVerticalBlockBorderWrapper"]{
+  padding:6px !important; background:var(--surface) !important; margin-bottom:14px !important;}
+.st-key-navrow [data-testid="stHorizontalBlock"]{gap:4px !important; flex-wrap:wrap !important;}
+.st-key-navrow [data-testid="stHorizontalBlock"] > div{min-width:84px !important; flex:1 1 84px !important;}
+.st-key-navrow button{font-size:12.5px !important; padding:9px 4px !important;
+  border-radius:10px !important; border-color:transparent !important;}
+.st-key-navrow button p{font-size:12.5px !important; font-weight:600 !important;}
+
+/* Onglets internes : meme logique, plus discrets. */
+.st-key-mtabs [data-testid="stHorizontalBlock"],
+.st-key-labtabs [data-testid="stHorizontalBlock"]{gap:4px !important; flex-wrap:wrap !important;}
+.st-key-mtabs button, .st-key-labtabs button{font-size:12.5px !important;
+  padding:9px 6px !important; border-radius:10px !important;}
+.st-key-mtabs button p, .st-key-labtabs button p{font-size:12.5px !important; font-weight:600 !important;}
+
+/* ---------------------------------------------------------------
+   Lignes de liste. Un filet suffit : plus de cadre par element.
+   --------------------------------------------------------------- */
+.line{font-size:14.5px; font-weight:600; color:var(--encre); line-height:1.45; padding:2px 0;}
+.line.done{color:var(--gris); text-decoration:line-through;}
+.line .q{font-weight:600; color:var(--gris); font-size:12.5px;
+  font-variant-numeric:tabular-nums;}
+[data-testid="stHorizontalBlock"]:has(.line){
+  align-items:center !important; gap:6px !important;
+  padding:7px 0 !important; border-bottom:1px solid var(--trait) !important;
 }
-
-[data-testid="stMetricValue"] {color: var(--rose-fonce) !important; font-weight: 800 !important;}
-[data-testid="stMetricLabel"] {color: var(--prune-clair) !important; font-weight: 700 !important;}
-[data-testid="stMetric"] {
-  background: #ffffff; border: 3.5px solid var(--bord-cadre) !important;
-  border-radius: 18px; padding: 14px 18px; box-shadow: 0 6px 20px rgba(131,24,67,.2);
+[data-testid="stHorizontalBlock"]:has(.line) button{
+  background:transparent !important; border:none !important; box-shadow:none !important;
+  color:var(--gris) !important; padding:6px !important; font-size:14px !important;
 }
+[data-testid="stHorizontalBlock"]:has(.line) button:hover{
+  background:var(--accent-doux) !important; color:var(--accent) !important;}
 
-.jour-titre{font-size:13.5px; font-weight:800; color:var(--rose-vif); padding:8px 0 4px;}
-.section{font-weight:800; font-size:16px; color:var(--rose-fonce); margin:18px 0 6px;}
+.tag{display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px;
+  font-weight:700; background:var(--accent-doux); color:var(--accent);
+  border:1px solid var(--accent-bord); margin-right:6px; vertical-align:middle;
+  font-variant-numeric:tabular-nums;}
+.rayon{font-size:12px; font-weight:700; color:var(--encre-2); display:block;
+  margin:4px 0 6px; letter-spacing:.01em;}
+.empty{text-align:center; padding:26px 16px; border-radius:var(--r);
+  border:1px dashed var(--trait); color:var(--gris); font-weight:500; font-size:13.5px;}
+.today-none{font-size:13.5px; color:var(--gris); font-weight:500; padding:10px 0;}
 
-.line{font-size:14.5px; font-weight:700; color:#311026;}
-.line.done{color:#a3a3a3; text-decoration:line-through;}
-.line .q{font-weight:700; color:var(--rose-vif); font-size:13px;}
+/* Le solde est le seul chiffre qui merite du volume. */
+.solde{display:flex; justify-content:space-between; align-items:center; gap:12px;
+  border:1px solid var(--trait); border-left:3px solid var(--accent);
+  border-radius:var(--r); background:var(--surface); box-shadow:var(--ombre);
+  padding:16px 18px; margin:16px 0;
+  font-size:12.5px; font-weight:600; color:var(--gris);}
+.solde .m{font-size:17px; font-weight:700; color:var(--encre); text-align:right;
+  font-variant-numeric:tabular-nums;}
 
-.tag{display:inline-block; padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:800;
-     background:#fce7f3; color:var(--rose-vif); margin-left:6px; vertical-align:middle; border:1px solid #f472b6;}
-.rayon{font-size:13px; font-weight:800; color:var(--rose-vif); background:#fdf2f8;
-       display:inline-block; padding:4px 10px; border-radius:12px; margin:12px 0 6px; border:1.5px solid #f472b6;}
-.empty{text-align:center; padding:22px 14px; border-radius:18px; background:#fff5f8;
-       border:3px dashed var(--bord-cadre); color:var(--rose-fonce); font-weight:600; font-size:13.5px;}
-.today-none{font-size:13.5px; color:var(--rose-fonce); font-weight:600; opacity:.85; padding:8px 0;}
+.bandeau{border-radius:12px; padding:10px 13px; font-size:13px; font-weight:600;
+  margin-bottom:10px;}
+.bandeau.info{background:var(--accent-doux); border:1px solid var(--accent-bord);
+  color:var(--accent);}
+.bandeau.warn{background:#FDF4EA; border:1px solid #EBD3B4; color:var(--ambre);}
 
-.solde{border-radius:18px; padding:16px 20px; margin:14px 0; font-weight:700; font-size:15px;
-       background:linear-gradient(135deg,#fdf2f8,#fce7f3); border:3.5px solid var(--bord-cadre); color:var(--rose-fonce);
-       display:flex; justify-content:space-between; align-items:center; gap:10px;
-       box-shadow:0 8px 25px rgba(157,23,77,.25);}
-.solde .m{font-size:17.5px; font-weight:800; color:var(--rose-vif); white-space:nowrap;}
-
-.bandeau{border-radius:14px; padding:10px 14px; font-size:13.5px; font-weight:700; margin-bottom:10px;}
-.bandeau.info{background:#fdf2f8; border:2.5px solid #f472b6; color:var(--rose-vif);}
-.bandeau.warn{background:#fff7ed; border:2.5px solid #fb923c; color:#c2410c;}
-
-.stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input, .stTimeInput input{
-  color:#311026 !important; background:#fff !important; -webkit-text-fill-color:#311026 !important;
-  border-radius:14px !important; border:3px solid var(--bord-cadre) !important;
-  padding:11px 15px !important; font-size:14.5px !important;
+/* ---------------------------------------------------------------
+   Champs
+   --------------------------------------------------------------- */
+.stTextInput input, .stTextArea textarea, .stNumberInput input,
+.stDateInput input, .stTimeInput input{
+  color:var(--encre) !important; background:var(--surface) !important;
+  -webkit-text-fill-color:var(--encre) !important;
+  border-radius:12px !important; border:1px solid var(--trait) !important;
+  padding:11px 13px !important; font-size:14.5px !important; font-weight:500 !important;
 }
-[data-baseweb="select"]>div{border-radius:14px !important; border:3px solid var(--bord-cadre) !important; background:#fff !important;}
-label p{font-weight:700 !important; font-size:13.5px !important; color:var(--rose-fonce) !important;}
+.stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus{
+  border-color:var(--accent) !important; box-shadow:0 0 0 3px var(--accent-doux) !important;}
+[data-baseweb="select"]>div{border-radius:12px !important;
+  border:1px solid var(--trait) !important; background:var(--surface) !important;}
+label p{font-weight:600 !important; font-size:12.5px !important; color:var(--encre-2) !important;}
+[data-testid="stMetric"]{background:var(--surface); border:1px solid var(--trait) !important;
+  border-radius:var(--r); padding:14px 16px; box-shadow:none;}
+[data-testid="stMetricValue"]{color:var(--encre) !important; font-weight:700 !important;
+  font-variant-numeric:tabular-nums;}
+[data-testid="stMetricLabel"]{color:var(--gris) !important; font-weight:600 !important;}
 
-.stTabs [data-baseweb="tab-list"]{gap:6px; background:#fff; padding:6px;
-  border-radius:18px; border:3px solid var(--bord-cadre);}
-.stTabs [data-baseweb="tab"]{border-radius:12px; padding:8px 14px; font-weight:700; font-size:13.5px; color:var(--rose-vif);}
-.stTabs [aria-selected="true"]{background:linear-gradient(135deg,#be185d,#9d174d); color:#fff !important;}
-.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
-
-.cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:0 -2px 8px;}
-.cal-week span{text-align:center; font-size:11.5px; font-weight:800; color:var(--rose-vif);}
-.cal-title{text-align:center; font-size:16px; font-weight:800; color:var(--rose-fonce); padding-top:8px;}
-.st-key-cal-grid{margin:0 -2px;}
+/* ---------------------------------------------------------------
+   Calendrier
+   --------------------------------------------------------------- */
+.cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:0 0 6px;}
+.cal-week span{text-align:center; font-size:11px; font-weight:700; color:var(--gris);}
+.cal-title{text-align:center; font-size:15px; font-weight:700; color:var(--encre);
+  padding-top:8px;}
+.st-key-cal-grid [data-testid="stVerticalBlockBorderWrapper"]{
+  border:none !important; box-shadow:none !important; padding:0 !important;
+  background:transparent !important; margin-bottom:0 !important;}
 .st-key-cal-grid [data-testid="stHorizontalBlock"],
 [data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]){gap:4px !important;}
 .st-key-cal-grid [data-testid="stHorizontalBlock"] > div,
 [data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]) > div{
-  flex:1 1 0 !important; width:auto !important; min-width:0 !important; padding:0 !important;
-}
+  flex:1 1 0 !important; width:auto !important; min-width:0 !important; padding:0 !important;}
 [class*="st-key-cal_"] button{
-  min-height:0 !important; padding:9px 0 !important; border-radius:12px !important;
-  font-size:12.5px !important; font-weight:700 !important; background:#fdf2f8 !important;
-  color:#311026 !important; border:2px solid #f472b6 !important; box-shadow:none !important;
-}
-[class*="st-key-cal_"] button p{font-size:12.5px !important; font-weight:700 !important; line-height:1.1 !important;}
-[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#fbcfe8 !important; opacity:1 !important; border:none !important;}
-[class*="st-key-cal_"] button[kind="primary"], [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
-  background:linear-gradient(135deg,#be185d,#9d174d) !important; color:#fff !important;
-  box-shadow:0 4px 12px -2px rgba(157,23,77,.5) !important; border:none !important;
-}
+  min-height:0 !important; padding:9px 0 !important; border-radius:10px !important;
+  font-size:12.5px !important; font-weight:600 !important; background:var(--surface) !important;
+  color:var(--encre-2) !important; border:1px solid transparent !important;}
+[class*="st-key-cal_"] button p{font-size:12.5px !important; font-weight:600 !important;
+  line-height:1.1 !important;}
+[class*="st-key-cal_"] button:disabled{background:transparent !important;
+  color:#DDD2D7 !important; opacity:1 !important; border:none !important;}
+[class*="st-key-cal_"] button[kind="primary"],
+[class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
+  background:var(--accent) !important; color:#fff !important; border-color:var(--accent) !important;}
 
+/* Lien vers une autre page : une rangee, pas un bouton. */
+[class*="st-key-goto-"] [data-testid="stVerticalBlockBorderWrapper"]{
+  padding:0 !important; border:none !important; box-shadow:none !important;
+  background:transparent !important; margin-bottom:14px !important;}
 [class*="st-key-goto-"] button{
-  background:transparent !important; border:none !important; box-shadow:none !important;
-  border-bottom:2.5px solid #f472b6 !important; border-radius:0 !important;
-  color:var(--rose-fonce) !important; font-size:16px !important; font-weight:800 !important;
-  padding:4px 0 10px !important; display:flex !important; align-items:center !important;
-  justify-content:flex-start !important; text-align:left !important;
-}
-[class*="st-key-goto-"] button p{font-size:16px !important; font-weight:800 !important;}
-[class*="st-key-goto-"] button:hover::after{opacity:.9;}
-
-.st-key-labtabs{margin-bottom:8px;}
-.st-key-labtabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
-.st-key-labtabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
-.st-key-labtabs button p{font-size:12.5px !important; font-weight:800 !important;}
-
-.st-key-mtabs{margin-bottom:8px;}
-.st-key-mtabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
-.st-key-mtabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
-.st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
-
-[data-testid="stHorizontalBlock"]:has(.line){
-  background: #fff5f8 !important;
-  border: 2px solid #f472b6 !important;
-  border-radius: 14px !important;
-  padding: 6px 12px !important;
-  margin-bottom: 8px !important;
-  align-items:center !important; 
-  gap: 8px !important;
-  box-shadow: 0 3px 10px rgba(157, 23, 77, 0.08) !important;
-}
-[data-testid="stHorizontalBlock"]:has(.line) button{
-  background:#ffffff !important; border:1.5px solid #f472b6 !important; box-shadow:0 2px 6px rgba(157,23,77,0.15) !important;
-  color:var(--rose-vif) !important; padding:6px 10px !important; font-size:13.5px !important;
-  border-radius:10px !important; transition:transform .1s ease;
-}
-[data-testid="stHorizontalBlock"]:has(.line) button:active{transform:scale(.95);}
-
-.line{padding:6px 0; line-height:1.4;}
-.line .q{font-variant-numeric:tabular-nums; opacity:.9;}
-.solde .m{font-variant-numeric:tabular-nums;}
-
-.rayon{background:#fdf2f8; padding:4px 10px; border-radius:10px; margin:8px 0 6px; font-size:13px; font-weight:800; border:1.5px solid #f472b6;}
-.rayon .c{opacity:.7; font-weight:700;}
-
-.today-none{padding:12px 0;}
-.empty{padding:24px 14px;}
+  background:var(--surface) !important; border:1px solid var(--trait) !important;
+  border-radius:var(--r) !important; box-shadow:var(--ombre) !important;
+  color:var(--encre) !important; font-size:15px !important; font-weight:700 !important;
+  padding:16px 18px !important; text-align:left !important; justify-content:flex-start !important;}
+[class*="st-key-goto-"] button p{font-size:15px !important; font-weight:700 !important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -622,11 +652,11 @@ def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
                     if jour == selection:
                         continue
                     if nb:
-                        styles.append(f".st-key-{cle} button{{background:linear-gradient("
-                                      f"135deg,#fce7f3,#f472b6) !important;color:#831843 !important;}}")
+                        styles.append(f".st-key-{cle} button{{background:#FDF1F5 !important;"
+                                      f"color:#B0184F !important;}}")
                     if jour == aujourd:
-                        styles.append(f".st-key-{cle} button{{border:2.5px solid #be185d !important;"
-                                      f"color:#be185d !important;}}")
+                        styles.append(f".st-key-{cle} button{{border:1px solid #B0184F !important;"
+                                      f"color:#B0184F !important;}}")
     if styles:
         st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
     return choisi
