@@ -35,12 +35,13 @@ from datetime import datetime, timezone
 import requests
 import streamlit as st
 
-VERSION_TRANSPORTS = "3.3"
+VERSION_TRANSPORTS = "3.4"
 
 BASE = "https://api-management-opendata-production.azure-api.net/api/datasets/stibmivb"
-URL_ATTENTE = f"{BASE}/rt/WaitingTimes/"
-# Le portail peut nommer ce jeu autrement : on essaie plusieurs pistes.
-URLS_ARRETS = [f"{BASE}/rt/StopDetails/", f"{BASE}/StopDetails/", f"{BASE}/rt/StopsByLine/"]
+URL_ATTENTE = f"{BASE}/rt/WaitingTimes"
+# Adresses relevees sur le portail : les arrets sont dans "static", pas "rt",
+# et la casse compte (stopDetails, pas StopDetails).
+URLS_ARRETS = [f"{BASE}/static/stopDetails", f"{BASE}/static/stopsByLine"]
 ENTETE_CLE = "bmc-partner-key"
 
 CATEGORIE = "Arrêt STIB"        # colonne 1 de la feuille Listes
@@ -71,7 +72,8 @@ CANDIDATS = {
     "destination": ["destination", "destination_fr", "direction", "headsign", "terminus"],
     "heure":       ["expectedarrivaltime", "expected_arrival_time", "arrivaltime",
                     "arrival_time", "expectedtime", "time", "passingtime"],
-    "nom":         ["name", "stop_name", "stopname", "descr_fr", "nom", "label"],
+    "nom":         ["name", "stop_name", "stopname", "descr_fr", "descr_nl", "nom",
+                    "label", "stopname_fr", "namefr", "name_fr", "title"],
 }
 
 CSS = """
@@ -493,7 +495,9 @@ def _diagnostic(champs, temoin, err, c_arret):
             st.json(temoin)
         tous, url, err_cat = catalogue_arrets(cle())
         st.write("**Catalogue des arrêts**")
-        st.code(f"{len(tous)} arrêts chargés" + (f"\nsource : {url}" if url else "")
+        st.code(f"{len(tous)} arrêts chargés"
+                + (f"\nsource : {url}" if url else "\nadresses tentées :\n  "
+                   + "\n  ".join(URLS_ARRETS))
                 + (f"\n{err_cat}" if err_cat else ""))
         if not c_arret:
             st.caption("Envoyez-moi le contenu de ces trois blocs et j'ajuste le module.")
