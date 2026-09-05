@@ -3,7 +3,7 @@ Notre Assistant — l'appli partagée du quotidien de Lucas & Alex.
 
 Streamlit + Google Sheets, un seul fichier organisé en sections :
   1. Configuration      5. Composants d'interface
-  2. Style              6. Connexion
+  2. Style & Thèmes     6. Connexion
   3. État de session    7. Navigation
   4. Couche données     8. Pages
 """
@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "3.1"
+VERSION = "3.2"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -119,64 +119,52 @@ UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pinc
          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
 
 # ==========================================================
-# 2. STYLE
+# 2. STYLE & THÈMES
 # ==========================================================
 def slug(texte):
     plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", "-", plat.lower()).strip("-")
 
-
-CSS_CATEGORIES = "".join(
-    f".st-key-grp-{slug(rayon)} [data-testid=\"stVerticalBlockBorderWrapper\"]"
-    f"{{border-left:3px solid {couleur} !important;}}"
-    f".st-key-grp-{slug(rayon)} .rayon{{color:{couleur};}}"
-    for rayon, couleur in RAYON_COULEURS.items()
-)
-
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
-/* ---------------------------------------------------------------
-   Jetons de style. Une seule source pour les couleurs, les rayons
-   et les ombres : les modules externes reprennent ces variables.
-   --------------------------------------------------------------- */
+CSS_ROSE = """
 :root{
-  --encre:#3A1A28;      /* texte principal, prune sombre */
-  --encre-2:#6E4A5B;    /* texte secondaire */
-  --gris:#9B7F8C;       /* texte tertiaire, unites */
-  --papier:#FDE9F1;     /* fond de page, rose clair */
-  --papier-2:#FAD9E7;   /* bas du fond */
-  --surface:#FFFFFF;    /* fond des blocs */
-  --trait:#F3C7DA;      /* bordures des blocs */
-  --trait-doux:#FBE7F0; /* filets a l'interieur des listes */
-  --accent:#C2185B;     /* action, valeur mise en avant */
-  --accent-fonce:#8C1444;
-  --accent-doux:#FDF0F6;
-  --accent-bord:#F3C7DA;
+  --encre:#3A1A28; --encre-2:#6E4A5B; --gris:#9B7F8C;
+  --papier:#FDE9F1; --papier-2:#FAD9E7; --surface:#FFFFFF;
+  --trait:#F3C7DA; --trait-doux:#FBE7F0; --accent:#C2185B;
+  --accent-fonce:#8C1444; --accent-doux:#FDF0F6; --accent-bord:#F3C7DA;
   --vert:#17683D; --ambre:#A65B12; --rouge:#B3261E;
   --r:16px; --r-s:11px;
   --ombre:0 1px 2px rgba(140,20,68,.05), 0 12px 30px -22px rgba(140,20,68,.55);
 }
+.stApp{background:linear-gradient(180deg,var(--papier) 0%,var(--papier-2) 100%) fixed !important;}
+"""
+
+CSS_NOIR_BLEU = """
+:root{
+  --encre:#F0F6FC; --encre-2:#8B949E; --gris:#6E7681;
+  --papier:#0D1117; --papier-2:#161B22; --surface:#21262D;
+  --trait:#30363D; --trait-doux:#30363D; --accent:#38BDF8;
+  --accent-fonce:#0284C7; --accent-doux:#0369A133; --accent-bord:#0284C7;
+  --vert:#34D399; --ambre:#FBBF24; --rouge:#F87171;
+  --r:16px; --r-s:11px;
+  --ombre:0 4px 12px rgba(0,0,0,0.5);
+}
+.stApp{background:var(--papier) !important;}
+"""
+
+CSS_COMMUN = """
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 html, body, [class*="css"], .stApp{
   font-family:'Plus Jakarta Sans', system-ui, sans-serif !important;
   color:var(--encre); -webkit-tap-highlight-color:transparent;
 }
-.stApp{background:linear-gradient(180deg,var(--papier) 0%,var(--papier-2) 100%) fixed !important;}
 #MainMenu, footer, header{visibility:hidden;}
 .block-container{padding-top:1rem !important; padding-bottom:5rem !important;
   max-width:560px !important;}
 
-/* Rangees de colonnes : elles peuvent se replier sur telephone. */
 [data-testid="stHorizontalBlock"]{gap:8px !important;}
 [data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
 
-/* ---------------------------------------------------------------
-   Blocs. Un seul niveau de surface, un filet, presque pas d'ombre.
-   Le selecteur reste volontairement etroit : viser data-baseweb
-   habillait aussi les menus et les depliants.
-   --------------------------------------------------------------- */
 [data-testid="stVerticalBlockBorderWrapper"]{
   background:var(--surface) !important;
   border:1.5px solid var(--trait) !important;
@@ -186,9 +174,6 @@ html, body, [class*="css"], .stApp{
   margin-bottom:14px !important;
 }
 
-/* ---------------------------------------------------------------
-   Titres
-   --------------------------------------------------------------- */
 .bloc-head{
   display:flex; justify-content:space-between; align-items:center; gap:10px;
   padding-bottom:10px; margin-bottom:10px;
@@ -204,9 +189,6 @@ html, body, [class*="css"], .stApp{
   letter-spacing:-.01em;}
 .jour-titre{font-size:13px; font-weight:700; color:var(--encre-2); padding:10px 0 6px;}
 
-/* ---------------------------------------------------------------
-   Boutons
-   --------------------------------------------------------------- */
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
   border-radius:12px !important; font-weight:600 !important; font-size:14px !important;
   padding:10px 14px !important; width:100%;
@@ -230,7 +212,6 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:2px;}
 @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important;} }
 
-/* Navigation : une rangee d'onglets, celui en cours est plein. */
 .st-key-navrow{margin-bottom:14px;}
 .st-key-navrow [data-testid="stVerticalBlockBorderWrapper"]{
   padding:6px !important; background:var(--surface) !important; margin-bottom:14px !important;}
@@ -241,16 +222,12 @@ button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:
   color:var(--encre-2) !important;}
 .st-key-navrow button p{font-size:12.5px !important; font-weight:600 !important;}
 
-/* Onglets internes : meme logique, plus discrets. */
 .st-key-mtabs [data-testid="stHorizontalBlock"],
 .st-key-labtabs [data-testid="stHorizontalBlock"]{gap:4px !important; flex-wrap:wrap !important;}
 .st-key-mtabs button, .st-key-labtabs button{font-size:12.5px !important;
   padding:9px 6px !important; border-radius:10px !important;}
 .st-key-mtabs button p, .st-key-labtabs button p{font-size:12.5px !important; font-weight:600 !important;}
 
-/* ---------------------------------------------------------------
-   Lignes de liste. Un filet suffit : plus de cadre par element.
-   --------------------------------------------------------------- */
 .line{font-size:14.5px; font-weight:600; color:var(--encre); line-height:1.45; padding:2px 0;}
 .line.done{color:var(--gris); text-decoration:line-through;}
 .line .q{font-weight:600; color:var(--gris); font-size:12.5px;
@@ -276,7 +253,6 @@ button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:
   border:1.5px dashed var(--trait); background:var(--accent-doux); color:var(--gris); font-weight:500; font-size:13.5px;}
 .today-none{font-size:13.5px; color:var(--gris); font-weight:500; padding:10px 0;}
 
-/* Le solde est le seul chiffre qui merite du volume. */
 .solde{display:flex; justify-content:space-between; align-items:center; gap:12px;
   border:1.5px solid var(--trait); border-left:4px solid var(--accent);
   border-radius:var(--r); background:var(--surface); box-shadow:var(--ombre);
@@ -291,9 +267,6 @@ button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:
   color:var(--accent);}
 .bandeau.warn{background:#FDF4EA; border:1px solid #EBD3B4; color:var(--ambre);}
 
-/* ---------------------------------------------------------------
-   Champs
-   --------------------------------------------------------------- */
 .stTextInput input, .stTextArea textarea, .stNumberInput input,
 .stDateInput input, .stTimeInput input{
   color:var(--encre) !important; background:var(--surface) !important;
@@ -312,9 +285,6 @@ label p{font-weight:600 !important; font-size:12.5px !important; color:var(--enc
   font-variant-numeric:tabular-nums;}
 [data-testid="stMetricLabel"]{color:var(--gris) !important; font-weight:600 !important;}
 
-/* ---------------------------------------------------------------
-   Calendrier
-   --------------------------------------------------------------- */
 .cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:0 0 6px;}
 .cal-week span{text-align:center; font-size:11px; font-weight:700; color:var(--gris);}
 .cal-title{text-align:center; font-size:15px; font-weight:700; color:var(--accent-fonce);
@@ -340,7 +310,6 @@ label p{font-weight:600 !important; font-size:12.5px !important; color:var(--enc
   background:linear-gradient(180deg,var(--accent) 0%,var(--accent-fonce) 100%) !important;
   color:#fff !important; border-color:var(--accent-fonce) !important;}
 
-/* Lien vers une autre page : une rangee, pas un bouton. */
 [class*="st-key-goto-"] [data-testid="stVerticalBlockBorderWrapper"]{
   padding:0 !important; border:none !important; box-shadow:none !important;
   background:transparent !important; margin-bottom:14px !important;}
@@ -351,9 +320,7 @@ label p{font-weight:600 !important; font-size:12.5px !important; color:var(--enc
   padding:16px 18px !important; text-align:left !important; justify-content:flex-start !important;}
 [class*="st-key-goto-"] button p{font-size:15px !important; font-weight:700 !important;}
 </style>
-""", unsafe_allow_html=True)
-
-st.markdown(f"<style>{CSS_CATEGORIES}</style>", unsafe_allow_html=True)
+"""
 
 # ==========================================================
 # 3. ÉTAT DE SESSION
@@ -367,6 +334,7 @@ DEFAULTS = {
     "show_add_tache": False,
     "mode_ia": False,
     "m_tab": ONGLETS_M[0],
+    "theme_mode": "🌸 Rose",
     "_reset": {},
 }
 for cle, val in DEFAULTS.items():
@@ -386,6 +354,10 @@ if not st.session_state["creds_json"]:
             st.session_state["creds_json"] = json.dumps(dict(st.secrets["gcp_service_account"]))
     except Exception:
         pass
+
+# Injection dynamique du thème actif
+palette_active = CSS_ROSE if st.session_state["theme_mode"] == "🌸 Rose" else CSS_NOIR_BLEU
+st.markdown(palette_active + CSS_COMMUN, unsafe_allow_html=True)
 
 # ==========================================================
 # 4. COUCHE DONNÉES
@@ -653,16 +625,16 @@ def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
                         continue
                     nb = len(par_jour.get(jour, []))
                     if st.button(f"{jour.day}•" if nb else str(jour.day), key=cle,
-                                 type="primary" if jour == selection else "secondary"):
+                                   type="primary" if jour == selection else "secondary"):
                         choisi = jour
                     if jour == selection:
                         continue
                     if nb:
                         styles.append(f".st-key-{cle} button{{background:#FBE0EC !important;"
-                                      f"color:#C2185B !important;}}")
+                                     f"color:#C2185B !important;}}")
                     if jour == aujourd:
                         styles.append(f".st-key-{cle} button{{border:1.5px solid #C2185B !important;"
-                                      f"color:#C2185B !important;}}")
+                                     f"color:#C2185B !important;}}")
     if styles:
         st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
     return choisi
@@ -702,7 +674,7 @@ def entete_bloc(texte, compteur=None):
 
 def entete_lien(cle, texte, compteur, onglet):
     with conteneur(f"goto-{cle}"):
-        if st.button(f"{texte}   ·   {compteur}", key=f"goto_{cle}"):
+        if st.button(f"{texte}    ·    {compteur}", key=f"goto_{cle}"):
             st.session_state["m_tab"] = onglet
             st.query_params["p"] = "maison"
             st.rerun()
@@ -874,7 +846,15 @@ if page_cle == "accueil":
     st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>", unsafe_allow_html=True)
 
     # 7. RÉGLAGES & ACCÈS DIRECT LABO IA
-    with st.expander("⚙️ Réglages"):
+    with st.expander("⚙️ Réglages & Apparence"):
+        nouveau_theme = st.radio("Thème visuel", ["🌸 Rose", "🌙 Noir & Bleu"],
+                                 index=0 if st.session_state["theme_mode"] == "🌸 Rose" else 1,
+                                 horizontal=True)
+        if nouveau_theme != st.session_state["theme_mode"]:
+            st.session_state["theme_mode"] = nouveau_theme
+            st.rerun()
+
+        st.divider()
         d1, d2 = st.columns(2)
         with d1:
             if st.button("🔄 Actualiser", key="refresh"):
@@ -885,7 +865,7 @@ if page_cle == "accueil":
             if st.button("🚪 Déconnexion", key="logout"):
                 st.cache_data.clear()
                 st.cache_resource.clear()
-                for k in ["creds_json", "db", "ops", "annulation", "mode_ia"]:
+                for k in ["creds_json", "db", "ops", "annulation", "mode_ia", "theme_mode"]:
                     st.session_state.pop(k, None)
                 st.rerun()
         
