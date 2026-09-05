@@ -1,28 +1,15 @@
 # ==========================================================
-# Meteo - module autonome pour "Notre Assistant"
+# Meteo - module autonome pour "Notre Assistant" (Bruxelles)
 # ==========================================================
-# Affiche la meteo du jour et les trois jours suivants, dans une
-# carte posee sur la page d'accueil.
-#
-# Source : Open-Meteo (open-meteo.com), gratuit, sans cle d'API.
-# ==========================================================
-
 from datetime import datetime
 import requests
 import streamlit as st
 
-VERSION_METEO = "2.4"
+VERSION_METEO = "2.5"
 
-VILLES = {
-    "Bruxelles": (50.8503, 4.3517),
-    "Anvers":    (51.2194, 4.4025),
-    "Gand":      (51.0543, 3.7174),
-    "Liège":     (50.6326, 5.5797),
-    "Namur":     (50.4674, 4.8720),
-    "Lille":     (50.6292, 3.0573),
-    "Paris":     (48.8566, 2.3522),
-}
-VILLE_DEFAUT = "Bruxelles"
+# Fixé directement sur Bruxelles
+LATITUDE, LONGITUDE = 50.8503, 4.3517
+VILLE_NOM = "Bruxelles"
 
 CODES = {
     0:  ("Ciel dégagé", "☀️"),
@@ -59,30 +46,33 @@ JOURS_COURTS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "di
 
 CSS_METEO = """
 <style>
-/* Réduction des marges au-dessus du bloc météo pour le faire remonter */
+/* Réduction drastique de l'espace tout en haut de la page et du bloc météo */
+.block-container {
+  padding-top: 0.5rem !important;
+}
 [data-testid="stVerticalBlock"]:has(.meteo-now) {
-  margin-top: -10px !important;
+  margin-top: -20px !important;
 }
 
-.meteo-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;}
-.meteo-now{display:flex; align-items:center; gap:16px; padding:2px 0 10px;}
-.meteo-now .ic{font-size:42px; line-height:1;}
-.meteo-now .t{font-size:30px; font-weight:800; color:var(--accent-fonce,#8C1444); line-height:1;
+.meteo-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;}
+.meteo-now{display:flex; align-items:center; gap:16px; padding:0 0 8px;}
+.meteo-now .ic{font-size:40px; line-height:1;}
+.meteo-now .t{font-size:28px; font-weight:800; color:var(--accent-fonce,#8C1444); line-height:1;
   font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
-.meteo-now .d{font-size:14px; font-weight:700; color:var(--encre-2,#6E4A5B); margin-top:4px;}
-.meteo-now .s{font-size:12px; font-weight:600; color:var(--gris,#9B7F8C); margin-top:2px;}
+.meteo-now .d{font-size:13.5px; font-weight:700; color:var(--encre-2,#6E4A5B); margin-top:3px;}
+.meteo-now .s{font-size:11.5px; font-weight:600; color:var(--gris,#9B7F8C); margin-top:2px;}
 
 .meteo-jours{display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
-  padding-top:10px; border-top:1.5px solid var(--trait,#F3C7DA);}
-.meteo-jour{text-align:center; padding:6px 4px; background:var(--papier-2, #FAD9E7); border-radius:12px; border:1px solid var(--trait,#F3C7DA);}
-.meteo-jour .j{font-size:11px; font-weight:700; color:var(--encre-2); text-transform:uppercase;}
-.meteo-jour .e{font-size:18px; line-height:1.3;}
-.meteo-jour .m{font-size:12px; font-weight:700; color:var(--encre,#3A1A28);
+  padding-top:8px; border-top:1.5px solid var(--trait,#F3C7DA);}
+.meteo-jour{text-align:center; padding:5px 4px; background:var(--papier-2, #FAD9E7); border-radius:10px; border:1px solid var(--trait,#F3C7DA);}
+.meteo-jour .j{font-size:10.5px; font-weight:700; color:var(--encre-2); text-transform:uppercase;}
+.meteo-jour .e{font-size:16px; line-height:1.2;}
+.meteo-jour .m{font-size:11.5px; font-weight:700; color:var(--encre,#3A1A28);
   font-variant-numeric:tabular-nums; white-space:nowrap;}
 .meteo-jour .m .min{color:var(--gris,#9B7F8C); font-weight:500;}
 
 .meteo-conseil{background:#FDF4EA; border:1px solid #EBD3B4; color:var(--ambre,#A65B12);
-  border-radius:10px; padding:6px 10px; font-size:12px; font-weight:600; margin-top:8px;}
+  border-radius:8px; padding:5px 8px; font-size:11.5px; font-weight:600; margin-top:6px;}
 </style>
 """
 
@@ -96,13 +86,13 @@ def _t(valeur):
         return "—"
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def previsions(latitude, longitude):
+def previsions():
     try:
         reponse = requests.get(
             "https://api.open-meteo.com/v1/forecast",
             params={
-                "latitude": latitude,
-                "longitude": longitude,
+                "latitude": LATITUDE,
+                "longitude": LONGITUDE,
                 "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
                 "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
                 "timezone": "auto",
@@ -118,22 +108,11 @@ def previsions(latitude, longitude):
 def carte(conteneur, entete_bloc):
     st.markdown(CSS_METEO, unsafe_allow_html=True)
 
-    if "meteo_ville" not in st.session_state:
-        st.session_state["meteo_ville"] = VILLE_DEFAUT
-    
-    ville = st.session_state["meteo_ville"]
-    if ville not in VILLES:
-        ville = VILLE_DEFAUT
-
     with conteneur("carte-meteo"):
-        col_h1, col_h2 = st.columns([2, 1.2])
-        with col_h1:
-            entete_bloc("🌤️ Météo")
-        with col_h2:
-            st.selectbox("Ville", list(VILLES), key="meteo_ville", label_visibility="collapsed")
+        # On garde uniquement l'en-tête sans le sélecteur de ville
+        entete_bloc("🌤️ Météo")
 
-        latitude, longitude = VILLES[ville]
-        donnees, err = previsions(latitude, longitude)
+        donnees, err = previsions()
         if err or not donnees:
             st.markdown("<div class='today-none'>Météo indisponible pour le moment.</div>", unsafe_allow_html=True)
             if st.button("Réessayer", key="meteo_retry"):
@@ -150,7 +129,7 @@ def carte(conteneur, entete_bloc):
         st.markdown(
             f"<div class='meteo-now'><div class='ic'>{emoji}</div><div>"
             f"<div class='t'>{_t(actuel.get('temperature_2m'))}</div>"
-            f"<div class='d'>{ville} · {texte}</div>"
+            f"<div class='d'>{VILLE_NOM} · {texte}</div>"
             f"<div class='s'>ressenti {ressenti}{vent_txt}</div>"
             f"</div></div>",
             unsafe_allow_html=True,
