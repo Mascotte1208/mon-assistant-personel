@@ -43,7 +43,7 @@ import streamlit as st
 # ==========================================================
 # 1. CONSTANTES
 # ==========================================================
-VERSION_LABO = "3.1"
+VERSION_LABO = "3.2"
 CFG_SUJET = "Paramètres du labo"
 
 ONGLETS = ["🧭 Cockpit", "📈 Marchés", "🔬 Analyse", "🎯 Journal", "🧮 DCA", "📚 Notes"]
@@ -140,7 +140,9 @@ def rows(feuille):
 
 
 def add_row(feuille, ligne, flush=True):
-    return _f("add_row")(feuille, ligne, flush)
+    # L'app hôte expose add_row(feuille, ligne) : deux arguments, pas trois.
+    # Le paramètre flush est conservé pour la lisibilité des appels du labo.
+    return _f("add_row")(feuille, ligne)
 
 
 def delete_row(feuille, index, libelle="Élément supprimé"):
@@ -148,7 +150,9 @@ def delete_row(feuille, index, libelle="Élément supprimé"):
 
 
 def set_cell(feuille, index, colonne, valeur, flush=True):
-    return _f("set_cell")(feuille, index, colonne, valeur, flush)
+    # L'app hôte expose set_cell(feuille, index, colonne, valeur, annulable, libelle).
+    # On s'en tient aux quatre premiers : chaque écriture est déjà poussée.
+    return _f("set_cell")(feuille, index, colonne, valeur)
 
 
 def pad(ligne, n):
@@ -184,7 +188,8 @@ def pills(cle, options, defaut=None, cols=3):
 
 
 def flush():
-    return _f("vider_file")()
+    fonction = _CTX.get("vider_file")
+    return fonction() if fonction else True
 
 
 def reset_after(**champs):
@@ -1189,9 +1194,9 @@ def onglet_journal(cfg):
                     with colonne_b:
                         if st.button("Clôturer", type="primary", key=f"lab_close_{t['idx']}"):
                             if prix_sortie > 0:
-                                set_cell("Trades", t["idx"], 7, "Clôturé", flush=False)
-                                set_cell("Trades", t["idx"], 10, f"{prix_sortie}", flush=False)
-                                set_cell("Trades", t["idx"], 11, str(date.today()), flush=False)
+                                set_cell("Trades", t["idx"], 7, "Clôturé")
+                                set_cell("Trades", t["idx"], 10, f"{prix_sortie}")
+                                set_cell("Trades", t["idx"], 11, str(date.today()))
                                 flush()
                                 st.rerun()
                             else:
@@ -1575,9 +1580,20 @@ ROUTES = {
 }
 
 
+REQUIS = ["rows", "add_row", "delete_row", "set_cell", "pad", "to_float",
+          "parse_date", "conteneur", "titre", "vide", "pills"]
+
+
 def render(ctx):
     global _CTX
     _CTX = ctx
+
+    absents = [nom for nom in REQUIS if nom not in ctx]
+    if absents:
+        st.error("Le labo n'a pas reçu toutes les fonctions de l'application : "
+                 + ", ".join(absents))
+        return
+
     st.markdown(CSS, unsafe_allow_html=True)
 
     titre("🧠 Labo IA & marchés")
