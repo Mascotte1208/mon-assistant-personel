@@ -4,7 +4,7 @@ Notre Assistant — l'appli partagée du quotidien de Lucas & Alex.
 Streamlit + Google Sheets, un seul fichier organisé en sections :
   1. Configuration      5. Composants d'interface
   2. Style & Thèmes     6. Connexion
-  3. État de session    7. Navigation
+  3. État de session    7. Navigation (Sidebar)
   4. Couche données     8. Pages
 """
 
@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "3.2"
+VERSION = "3.3"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -216,22 +216,6 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:2px;}
 @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important;} }
-
-.st-key-navrow{margin-bottom:14px;}
-.st-key-navrow [data-testid="stVerticalBlockBorderWrapper"]{
-  padding:6px !important; background:var(--surface) !important; margin-bottom:14px !important;}
-.st-key-navrow [data-testid="stHorizontalBlock"]{gap:4px !important; flex-wrap:wrap !important;}
-.st-key-navrow [data-testid="stHorizontalBlock"] > div{min-width:84px !important; flex:1 1 84px !important;}
-.st-key-navrow button{font-size:12.5px !important; padding:9px 4px !important;
-  border-radius:10px !important; border-color:transparent !important;
-  color:var(--encre-2) !important;}
-.st-key-navrow button p{font-size:12.5px !important; font-weight:600 !important;}
-
-.st-key-mtabs [data-testid="stHorizontalBlock"],
-.st-key-labtabs [data-testid="stHorizontalBlock"]{gap:4px !important; flex-wrap:wrap !important;}
-.st-key-mtabs button, .st-key-labtabs button{font-size:12.5px !important;
-  padding:9px 6px !important; border-radius:10px !important;}
-.st-key-mtabs button p, .st-key-labtabs button p{font-size:12.5px !important; font-weight:600 !important;}
 
 .line{font-size:14.5px; font-weight:600; color:var(--encre); line-height:1.45; padding:2px 0;}
 .line.done{color:var(--gris); text-decoration:line-through;}
@@ -711,7 +695,7 @@ if st.session_state["ops"]:
     vider_file()
 
 # ==========================================================
-# 7. NAVIGATION & MODE IA
+# 7. NAVIGATION & MODE IA (Dans la barre latérale)
 # ==========================================================
 params = st.query_params
 page_cle = params.get("p", "accueil")
@@ -722,13 +706,13 @@ pages_dispo = PAGES.copy()
 if st.session_state.get("mode_ia"):
     pages_dispo["ialab"] = "🧠 Labo IA"
 
-with conteneur("navrow"):
-    cols = st.columns(len(pages_dispo))
-    for col, (cle, libelle) in zip(cols, pages_dispo.items()):
-        with col:
-            if st.button(libelle, key=f"nav_{cle}", type="primary" if page_cle == cle else "secondary"):
-                st.query_params["p"] = cle
-                st.rerun()
+with st.sidebar:
+    st.markdown("### 🌸 Notre Assistant")
+    st.divider()
+    for cle, libelle in pages_dispo.items():
+        if st.button(libelle, key=f"nav_{cle}", type="primary" if page_cle == cle else "secondary", use_container_width=True):
+            st.query_params["p"] = cle
+            st.rerun()
 
 bandeaux()
 
@@ -750,7 +734,14 @@ if page_cle == "accueil":
     a_venir = [e for e in evenements if e[0] > ajd]
     repas_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
 
-    # 1. À FAIRE
+    # 1. MÉTÉO TOUT EN HAUT (module externe meteo.py)
+    try:
+        import meteo
+        meteo.carte(conteneur, entete_bloc)
+    except Exception as err:
+        st.caption(f"Météo indisponible : {str(err)[:90]}")
+
+    # 2. À FAIRE
     with conteneur("carte-taches"):
         entete_bloc("🌸 À faire", len(actives) or None)
         if actives:
@@ -783,7 +774,7 @@ if page_cle == "accueil":
                     st.session_state["show_add_tache"] = False
                     st.rerun()
 
-    # 2. AUJOURD'HUI
+    # 3. AUJOURD'HUI
     with conteneur("carte-aujourdhui"):
         entete_bloc("📅 Aujourd'hui", len(evts_jour) + len(repas_jour) or None)
         if not evts_jour and not repas_jour:
@@ -797,13 +788,6 @@ if page_cle == "accueil":
             if ligne_action(f"<span class='tag'>{typ}</span> 🍽️ {plat}", [("🗑️", f"acc_rp_{idx}")]):
                 delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
-
-    # 3. MÉTÉO (module externe meteo.py)
-    try:
-        import meteo
-        meteo.carte(conteneur, entete_bloc)
-    except Exception as err:
-        st.caption(f"Météo indisponible : {str(err)[:90]}")
 
     # 4. COURSES (Redirection épurée)
     entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
