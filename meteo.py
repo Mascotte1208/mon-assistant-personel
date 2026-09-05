@@ -11,7 +11,7 @@ from datetime import datetime
 import requests
 import streamlit as st
 
-VERSION_METEO = "2.2"
+VERSION_METEO = "2.3"
 
 VILLES = {
     "Bruxelles": (50.8503, 4.3517),
@@ -121,10 +121,9 @@ def carte(conteneur, entete_bloc):
         ville = VILLE_DEFAUT
 
     with conteneur("carte-meteo"):
-        # En-tête propre avec sélecteur discret intégré sur la droite
-        col_ h1, col_h2 = st.columns([2, 1.2])
+        col_h1, col_h2 = st.columns([2, 1.2])
         with col_h1:
-            entete_bloc(f"🌤️ Météo")
+            entete_bloc("🌤️ Météo")
         with col_h2:
             st.selectbox("Ville", list(VILLES), key="meteo_ville", label_visibility="collapsed")
 
