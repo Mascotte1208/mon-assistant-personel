@@ -5,24 +5,14 @@
 # carte posee sur la page d'accueil.
 #
 # Source : Open-Meteo (open-meteo.com), gratuit, sans cle d'API.
-#
-# Branchement dans l'application principale, page d'accueil :
-#
-#     import meteo
-#     meteo.carte(conteneur, entete_bloc)
-#
-# N'ecrit rien dans Google Sheets. Si le reseau ne repond pas,
-# la carte affiche un message et le reste de la page continue.
 # ==========================================================
 
 from datetime import datetime
-
 import requests
 import streamlit as st
 
-VERSION_METEO = "2.1"
+VERSION_METEO = "2.2"
 
-# Ajoutez vos villes ici : "Nom": (latitude, longitude)
 VILLES = {
     "Bruxelles": (50.8503, 4.3517),
     "Anvers":    (51.2194, 4.4025),
@@ -34,7 +24,6 @@ VILLES = {
 }
 VILLE_DEFAUT = "Bruxelles"
 
-# Codes météo de l'organisation météorologique mondiale.
 CODES = {
     0:  ("Ciel dégagé", "☀️"),
     1:  ("Peu nuageux", "🌤️"),
@@ -68,43 +57,41 @@ CODES = {
 
 JOURS_COURTS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 
-CSS = """
+CSS_METEO = """
 <style>
-.meteo-now{display:flex; align-items:center; gap:16px; padding:2px 0 14px;}
-.meteo-now .ic{font-size:40px; line-height:1;}
-.meteo-now .t{font-size:32px; font-weight:700; color:var(--accent-fonce,#8C1444); line-height:1;
+.meteo-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+.meteo-now{display:flex; align-items:center; gap:16px; padding:6px 0 14px;}
+.meteo-now .ic{font-size:42px; line-height:1;}
+.meteo-now .t{font-size:30px; font-weight:800; color:var(--accent-fonce,#8C1444); line-height:1;
   font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
-.meteo-now .d{font-size:14px; font-weight:600; color:var(--encre-2,#6E4A5B); margin-top:4px;}
-.meteo-now .s{font-size:12px; font-weight:500; color:var(--gris,#9B7F8C); margin-top:2px;}
-.meteo-jours{display:grid; grid-template-columns:repeat(auto-fit,minmax(72px,1fr)); gap:6px;
+.meteo-now .d{font-size:14px; font-weight:700; color:var(--encre-2,#6E4A5B); margin-top:4px;}
+.meteo-now .s{font-size:12px; font-weight:600; color:var(--gris,#9B7F8C); margin-top:2px;}
+
+.meteo-jours{display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
   padding-top:12px; border-top:1.5px solid var(--trait,#F3C7DA);}
-.meteo-jour{text-align:center; padding:6px 4px;}
-.meteo-jour .j{font-size:11px; font-weight:600; color:var(--gris,#9B7F8C);}
-.meteo-jour .e{font-size:20px; line-height:1.5;}
-.meteo-jour .m{font-size:12.5px; font-weight:700; color:var(--encre,#3A1A28);
+.meteo-jour{text-align:center; padding:8px 4px; background:var(--papier-2, #FAD9E7); border-radius:12px; border:1px solid var(--trait,#F3C7DA);}
+.meteo-jour .j{font-size:11px; font-weight:700; color:var(--encre-2); text-transform:uppercase;}
+.meteo-jour .e{font-size:18px; line-height:1.4;}
+.meteo-jour .m{font-size:12px; font-weight:700; color:var(--encre,#3A1A28);
   font-variant-numeric:tabular-nums; white-space:nowrap;}
 .meteo-jour .m .min{color:var(--gris,#9B7F8C); font-weight:500;}
+
 .meteo-conseil{background:#FDF4EA; border:1px solid #EBD3B4; color:var(--ambre,#A65B12);
-  border-radius:12px; padding:10px 13px; font-size:12.5px; font-weight:600; margin-top:12px;}
+  border-radius:12px; padding:10px 13px; font-size:12.5px; font-weight:600; margin-top:10px;}
 </style>
 """
-
 
 def _libelle(code):
     return CODES.get(int(code) if code is not None else -1, ("Temps variable", "🌡️"))
 
-
 def _t(valeur):
-    """Température arrondie, sans décimale inutile."""
     try:
         return f"{round(float(valeur))}°"
     except (TypeError, ValueError):
         return "—"
 
-
 @st.cache_data(ttl=1800, show_spinner=False)
 def previsions(latitude, longitude):
-    """Renvoie (données, erreur). Rafraîchi toutes les 30 minutes."""
     try:
         reponse = requests.get(
             "https://api.open-meteo.com/v1/forecast",
@@ -112,8 +99,7 @@ def previsions(latitude, longitude):
                 "latitude": latitude,
                 "longitude": longitude,
                 "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
-                "daily": ("weather_code,temperature_2m_max,temperature_2m_min,"
-                          "precipitation_probability_max"),
+                "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
                 "timezone": "auto",
                 "forecast_days": 4,
             },
@@ -124,25 +110,28 @@ def previsions(latitude, longitude):
     except Exception as err:
         return None, str(err)[:120]
 
-
 def carte(conteneur, entete_bloc):
-    """Dessine la carte météo. Ne lève jamais : au pire, elle s'excuse."""
-    st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown(CSS_METEO, unsafe_allow_html=True)
 
     if "meteo_ville" not in st.session_state:
         st.session_state["meteo_ville"] = VILLE_DEFAUT
+    
     ville = st.session_state["meteo_ville"]
     if ville not in VILLES:
         ville = VILLE_DEFAUT
 
     with conteneur("carte-meteo"):
-        entete_bloc(f"🌤️ Météo · {ville}")
+        # En-tête propre avec sélecteur discret intégré sur la droite
+        col_ h1, col_h2 = st.columns([2, 1.2])
+        with col_h1:
+            entete_bloc(f"🌤️ Météo")
+        with col_h2:
+            st.selectbox("Ville", list(VILLES), key="meteo_ville", label_visibility="collapsed")
 
         latitude, longitude = VILLES[ville]
         donnees, err = previsions(latitude, longitude)
         if err or not donnees:
-            st.markdown("<div class='today-none'>Météo indisponible pour le moment.</div>",
-                        unsafe_allow_html=True)
+            st.markdown("<div class='today-none'>Météo indisponible pour le moment.</div>", unsafe_allow_html=True)
             if st.button("Réessayer", key="meteo_retry"):
                 previsions.clear()
                 st.rerun()
@@ -157,7 +146,7 @@ def carte(conteneur, entete_bloc):
         st.markdown(
             f"<div class='meteo-now'><div class='ic'>{emoji}</div><div>"
             f"<div class='t'>{_t(actuel.get('temperature_2m'))}</div>"
-            f"<div class='d'>{texte}</div>"
+            f"<div class='d'>{ville} · {texte}</div>"
             f"<div class='s'>ressenti {ressenti}{vent_txt}</div>"
             f"</div></div>",
             unsafe_allow_html=True,
@@ -171,13 +160,10 @@ def carte(conteneur, entete_bloc):
                 jour = datetime.strptime(iso, "%Y-%m-%d").date()
             except ValueError:
                 continue
-            libelle = "aujourd'hui" if i == 0 else JOURS_COURTS[jour.weekday()][:3]
-            _, ico = _libelle((jours.get("weather_code") or [None])[i]
-                              if i < len(jours.get("weather_code", [])) else None)
-            haut = (jours.get("temperature_2m_max") or [None])[i] \
-                if i < len(jours.get("temperature_2m_max", [])) else None
-            bas = (jours.get("temperature_2m_min") or [None])[i] \
-                if i < len(jours.get("temperature_2m_min", [])) else None
+            libelle = "Auj." if i == 0 else JOURS_COURTS[jour.weekday()][:3].capitalize()
+            _, ico = _libelle((jours.get("weather_code") or [None])[i] if i < len(jours.get("weather_code", [])) else None)
+            haut = (jours.get("temperature_2m_max") or [None])[i] if i < len(jours.get("temperature_2m_max", [])) else None
+            bas = (jours.get("temperature_2m_min") or [None])[i] if i < len(jours.get("temperature_2m_min", [])) else None
             if i == 0:
                 proba = jours.get("precipitation_probability_max") or []
                 pluie_du_jour = proba[0] if proba else None
@@ -193,12 +179,8 @@ def carte(conteneur, entete_bloc):
             if pluie_du_jour is not None and float(pluie_du_jour) >= 50:
                 st.markdown(
                     f"<div class='meteo-conseil'>☂️ {round(float(pluie_du_jour))} % de risque "
-                    f"de pluie aujourd'hui — prenez un parapluie.</div>",
+                    f"de pluie aujourd'hui — prends un parapluie.</div>",
                     unsafe_allow_html=True,
                 )
         except (TypeError, ValueError):
             pass
-
-        st.selectbox("Ville", list(VILLES), key="meteo_ville",
-                     label_visibility="collapsed")
-    
