@@ -20,7 +20,7 @@ from datetime import datetime
 import requests
 import streamlit as st
 
-VERSION_METEO = "1.0"
+VERSION_METEO = "2.0"
 
 # Ajoutez vos villes ici : "Nom": (latitude, longitude)
 VILLES = {
@@ -70,23 +70,22 @@ JOURS_COURTS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "di
 
 CSS = """
 <style>
-.meteo-now{display:flex; align-items:center; gap:14px; padding:2px 0 10px;}
-.meteo-now .ic{font-size:44px; line-height:1;}
-.meteo-now .t{font-size:34px; font-weight:800; color:#9d174d; line-height:1;
-  font-variant-numeric:tabular-nums;}
-.meteo-now .d{font-size:13.5px; font-weight:700; color:#be185d; margin-top:3px;}
-.meteo-now .s{font-size:12px; font-weight:700; color:#6b7280; margin-top:2px;}
-.meteo-jours{display:grid; grid-template-columns:repeat(auto-fit,minmax(78px,1fr)); gap:8px;
-  margin-top:4px;}
-.meteo-jour{background:#fdf2f8; border:2px solid #f472b6; border-radius:14px;
-  padding:9px 6px; text-align:center;}
-.meteo-jour .j{font-size:11px; font-weight:800; color:#9d174d; text-transform:capitalize;}
-.meteo-jour .e{font-size:22px; line-height:1.3;}
-.meteo-jour .m{font-size:12.5px; font-weight:800; color:#311026;
+.meteo-now{display:flex; align-items:center; gap:16px; padding:2px 0 14px;}
+.meteo-now .ic{font-size:40px; line-height:1;}
+.meteo-now .t{font-size:32px; font-weight:700; color:var(--encre,#241B22); line-height:1;
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
+.meteo-now .d{font-size:14px; font-weight:600; color:var(--encre-2,#5C4F55); margin-top:4px;}
+.meteo-now .s{font-size:12px; font-weight:500; color:var(--gris,#8A7C82); margin-top:2px;}
+.meteo-jours{display:grid; grid-template-columns:repeat(auto-fit,minmax(72px,1fr)); gap:6px;
+  padding-top:12px; border-top:1px solid var(--trait,#ECE0E5);}
+.meteo-jour{text-align:center; padding:6px 4px;}
+.meteo-jour .j{font-size:11px; font-weight:600; color:var(--gris,#8A7C82);}
+.meteo-jour .e{font-size:20px; line-height:1.5;}
+.meteo-jour .m{font-size:12.5px; font-weight:700; color:var(--encre,#241B22);
   font-variant-numeric:tabular-nums; white-space:nowrap;}
-.meteo-jour .m .min{color:#6b7280; font-weight:700;}
-.meteo-conseil{background:#fff7ed; border:2px solid #fb923c; color:#c2410c;
-  border-radius:12px; padding:9px 12px; font-size:12.5px; font-weight:700; margin-top:10px;}
+.meteo-jour .m .min{color:var(--gris,#8A7C82); font-weight:500;}
+.meteo-conseil{background:#FDF4EA; border:1px solid #EBD3B4; color:var(--ambre,#A65B12);
+  border-radius:12px; padding:10px 13px; font-size:12.5px; font-weight:600; margin-top:12px;}
 </style>
 """
 
