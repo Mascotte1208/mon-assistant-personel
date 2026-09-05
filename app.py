@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "3.6"
+VERSION = "3.7"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -165,7 +165,7 @@ html, body, [class*="css"], .stApp{
   color:var(--encre); -webkit-tap-highlight-color:transparent;
 }
 #MainMenu, footer, header{visibility:hidden;}
-.block-container{padding-top:1rem !important; padding-bottom:5rem !important;
+.block-container{padding-top:0.5rem !important; padding-bottom:5rem !important;
   max-width:560px !important;}
 
 [data-testid="stHorizontalBlock"]{gap:8px !important;}
@@ -345,7 +345,6 @@ if not st.session_state["creds_json"]:
     except Exception:
         pass
 
-# Injection dynamique du thème actif
 palette_active = CSS_ROSE if st.session_state["theme_mode"] == "🌸 Rose" else CSS_NOIR_BLEU
 st.markdown(palette_active + CSS_COMMUN, unsafe_allow_html=True)
 
@@ -948,12 +947,10 @@ elif page_cle == "maison":
     elif onglet_m == ONGLETS_M[1]:
         recettes = rows("Recettes")
         for idx, r in recettes:
-            t, ing, inst = pad(r, 3)
+            t, ing, _ = pad(r, 3)
             with st.expander(f"🍲 {t}"):
                 if ing:
                     st.markdown(f"**Ingrédients**\n\n{ing}")
-                if inst:
-                    st.markdown(f"**Préparation**\n\n{inst}")
                 b1, b2 = st.columns(2)
                 with b1:
                     if st.button("🛒 Au panier", key=f"rec_panier_{idx}") and ing:
@@ -977,10 +974,9 @@ elif page_cle == "maison":
             titre("Nouvelle recette")
             st.caption("Un ingrédient par ligne : « 200 g de farine ». Le panier saura les relire.")
             r_titre = st.text_input("Nom")
-            r_ing = st.text_area("Ingrédients", height=90)
-            r_inst = st.text_area("Préparation", height=110)
+            r_ing = st.text_area("Ingrédients", height=120)
             if st.form_submit_button("Enregistrer la recette", type="primary") and r_titre.strip():
-                add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
+                add_row("Recettes", [r_titre.strip(), r_ing, ""])
                 st.rerun()
 
 # ==========================================================
