@@ -35,7 +35,7 @@ from datetime import datetime, timezone
 import requests
 import streamlit as st
 
-VERSION_TRANSPORTS = "4.0"
+VERSION_TRANSPORTS = "4.1"
 
 BASE = "https://api-management-opendata-production.azure-api.net/api/datasets/stibmivb"
 URL_ATTENTE = f"{BASE}/rt/WaitingTimes"
@@ -84,48 +84,49 @@ CANDIDATS = {
 
 CSS = """
 <style>
-.tr-carte{background:#fff; border:2.5px solid #f472b6; border-radius:18px;
-  padding:12px 14px 8px; margin:0 0 14px; box-shadow:0 4px 16px rgba(157,23,77,.10);}
-.tr-tete{display:flex; align-items:baseline; justify-content:space-between; gap:8px;
-  padding-bottom:8px; margin-bottom:4px; border-bottom:2px solid #fce7f3;}
-.tr-nom{font-size:15px; font-weight:800; color:#9d174d; text-transform:capitalize;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.tr-compte{font-size:11px; font-weight:800; color:#be185d; background:#fdf2f8;
-  border-radius:8px; padding:2px 8px; white-space:nowrap;}
+.tr-carte{background:var(--surface,#fff); border:1px solid var(--trait,#ECE0E5);
+  border-radius:var(--r,16px); padding:14px 16px 6px; margin:0 0 12px;
+  box-shadow:var(--ombre,0 1px 2px rgba(36,27,34,.04));}
+.tr-tete{display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+  padding-bottom:10px; margin-bottom:2px; border-bottom:1px solid var(--trait,#ECE0E5);}
+.tr-nom{font-size:15px; font-weight:700; color:var(--encre,#241B22); letter-spacing:-.01em;
+  text-transform:capitalize; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.tr-compte{font-size:11.5px; font-weight:600; color:var(--gris,#8A7C82); white-space:nowrap;}
 
-.tr-ligne{display:flex; align-items:center; gap:11px; padding:9px 0;
-  border-bottom:1px solid #fdf2f8;}
+.tr-ligne{display:flex; align-items:center; gap:12px; padding:10px 0;
+  border-bottom:1px solid var(--trait,#ECE0E5);}
 .tr-ligne:last-child{border-bottom:none;}
-.tr-badge{flex:0 0 auto; display:flex; align-items:center; gap:5px; min-width:52px;
-  justify-content:center; color:#fff; font-size:13px; font-weight:800;
-  padding:5px 9px; border-radius:10px;}
-.tr-badge.metro{background:#1d4ed8;}
-.tr-badge.tram{background:#7c3aed;}
-.tr-badge.bus{background:#be185d;}
+.tr-badge{flex:0 0 auto; display:flex; align-items:center; gap:5px; min-width:50px;
+  justify-content:center; color:#fff; font-size:13px; font-weight:700;
+  padding:5px 9px; border-radius:9px; font-variant-numeric:tabular-nums;}
+.tr-badge.metro{background:#164C9E;}
+.tr-badge.tram{background:#6D3BAF;}
+.tr-badge.bus{background:var(--accent,#B0184F);}
 .tr-badge .m{font-size:12px;}
 
 .tr-mid{flex:1 1 auto; min-width:0;}
-.tr-dest{font-size:13.5px; font-weight:800; color:#311026; text-transform:capitalize;
+.tr-dest{font-size:14px; font-weight:600; color:var(--encre,#241B22); text-transform:capitalize;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.tr-suite{font-size:11.5px; font-weight:700; color:#9ca3af; margin-top:1px;
+.tr-suite{font-size:11.5px; font-weight:500; color:var(--gris,#8A7C82); margin-top:2px;
   font-variant-numeric:tabular-nums;}
 
-.tr-temps{flex:0 0 auto; text-align:right; min-width:56px;}
-.tr-temps .n{font-size:22px; font-weight:800; color:#be185d; line-height:1;
-  font-variant-numeric:tabular-nums;}
-.tr-temps .u{font-size:10.5px; font-weight:800; color:#9ca3af; display:block;
-  margin-top:2px; text-transform:uppercase; letter-spacing:.04em;}
-.tr-temps.imminent .n{color:#15803d; font-size:15px;}
-.tr-temps.proche .n{color:#c2410c;}
+.tr-temps{flex:0 0 auto; text-align:right; min-width:52px;}
+.tr-temps .n{font-size:21px; font-weight:700; color:var(--encre,#241B22); line-height:1;
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
+.tr-temps .u{font-size:10px; font-weight:600; color:var(--gris,#8A7C82); display:block;
+  margin-top:3px;}
+.tr-temps.imminent .n{color:var(--vert,#17683D); font-size:14px;}
+.tr-temps.proche .n{color:var(--accent,#B0184F);}
 
-.tr-vide{font-size:13px; font-weight:700; color:#9ca3af; padding:10px 2px;
+.tr-vide{font-size:13px; font-weight:500; color:var(--gris,#8A7C82); padding:14px 2px;
   line-height:1.5; text-align:center;}
-.tr-maj{font-size:11.5px; font-weight:700; color:#9ca3af; text-align:center;
-  padding:2px 0 6px;}
-.tr-live{display:inline-block; width:7px; height:7px; border-radius:50%;
-  background:#15803d; margin-right:6px; vertical-align:middle;
-  animation:trpouls 2s ease-in-out infinite;}
-@keyframes trpouls{0%,100%{opacity:1;} 50%{opacity:.25;}}
+.tr-maj{font-size:11.5px; font-weight:500; color:var(--gris,#8A7C82); text-align:center;
+  padding:0 0 10px;}
+.tr-live{display:inline-block; width:6px; height:6px; border-radius:50%;
+  background:var(--vert,#17683D); margin-right:6px; vertical-align:middle;
+  animation:trpouls 2.4s ease-in-out infinite;}
+@keyframes trpouls{0%,100%{opacity:1;} 50%{opacity:.3;}}
+@media (prefers-reduced-motion:reduce){ .tr-live{animation:none;} }
 </style>
 """
 
@@ -620,4 +621,3 @@ def carte(ctx):
 
         _gestion(mes_arrets, cle_partenaire)
         _diagnostic(champs, temoin, err, c_arret)
-    
