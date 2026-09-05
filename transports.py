@@ -35,7 +35,7 @@ from datetime import datetime, timezone
 import requests
 import streamlit as st
 
-VERSION_TRANSPORTS = "3.4"
+VERSION_TRANSPORTS = "4.0"
 
 BASE = "https://api-management-opendata-production.azure-api.net/api/datasets/stibmivb"
 URL_ATTENTE = f"{BASE}/rt/WaitingTimes"
@@ -43,6 +43,12 @@ URL_ATTENTE = f"{BASE}/rt/WaitingTimes"
 # et la casse compte (stopDetails, pas StopDetails).
 URLS_ARRETS = [f"{BASE}/static/stopDetails", f"{BASE}/static/stopsByLine"]
 ENTETE_CLE = "bmc-partner-key"
+
+# Metro et tram sont des listes fermees : tout le reste roule sur pneus.
+METRO = {"1", "2", "5", "6"}
+TRAMS = {"3", "4", "7", "8", "9", "10", "18", "19", "25", "39", "44", "51",
+         "55", "62", "81", "82", "92", "93", "94", "97"}
+MODES = {"metro": ("🚇", "métro"), "tram": ("🚊", "tram"), "bus": ("🚌", "bus")}
 
 CATEGORIE = "Arrêt STIB"        # colonne 1 de la feuille Listes
 
@@ -78,23 +84,48 @@ CANDIDATS = {
 
 CSS = """
 <style>
-.tr-arret{font-size:13px; font-weight:800; color:#be185d; background:#fdf2f8;
-  display:inline-block; padding:4px 10px; border-radius:10px; margin:10px 0 6px;
-  border:1.5px solid #f472b6;}
-.tr-ligne{display:flex; align-items:center; gap:10px; padding:7px 2px;
-  border-bottom:1px solid #fce7f3;}
-.tr-ligne:last-child{border-bottom:none;}
-.tr-num{flex:0 0 auto; min-width:34px; text-align:center; background:#9d174d; color:#fff;
-  font-size:13px; font-weight:800; padding:4px 8px; border-radius:9px;}
-.tr-dest{flex:1 1 auto; min-width:0; font-size:13.5px; font-weight:700; color:#311026;
+.tr-carte{background:#fff; border:2.5px solid #f472b6; border-radius:18px;
+  padding:12px 14px 8px; margin:0 0 14px; box-shadow:0 4px 16px rgba(157,23,77,.10);}
+.tr-tete{display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+  padding-bottom:8px; margin-bottom:4px; border-bottom:2px solid #fce7f3;}
+.tr-nom{font-size:15px; font-weight:800; color:#9d174d; text-transform:capitalize;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.tr-min{flex:0 0 auto; font-size:14px; font-weight:800; color:#be185d;
-  font-variant-numeric:tabular-nums; white-space:nowrap;}
-.tr-min .prochain{color:#15803d;}
-.tr-vide{font-size:13px; font-weight:700; color:#6b7280; padding:6px 2px; line-height:1.5;}
-.tr-maj{font-size:11.5px; font-weight:700; color:#6b7280; padding-top:8px;}
-.tr-live{display:inline-block; width:8px; height:8px; border-radius:50%;
-  background:#15803d; margin-right:6px; vertical-align:middle;}
+.tr-compte{font-size:11px; font-weight:800; color:#be185d; background:#fdf2f8;
+  border-radius:8px; padding:2px 8px; white-space:nowrap;}
+
+.tr-ligne{display:flex; align-items:center; gap:11px; padding:9px 0;
+  border-bottom:1px solid #fdf2f8;}
+.tr-ligne:last-child{border-bottom:none;}
+.tr-badge{flex:0 0 auto; display:flex; align-items:center; gap:5px; min-width:52px;
+  justify-content:center; color:#fff; font-size:13px; font-weight:800;
+  padding:5px 9px; border-radius:10px;}
+.tr-badge.metro{background:#1d4ed8;}
+.tr-badge.tram{background:#7c3aed;}
+.tr-badge.bus{background:#be185d;}
+.tr-badge .m{font-size:12px;}
+
+.tr-mid{flex:1 1 auto; min-width:0;}
+.tr-dest{font-size:13.5px; font-weight:800; color:#311026; text-transform:capitalize;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.tr-suite{font-size:11.5px; font-weight:700; color:#9ca3af; margin-top:1px;
+  font-variant-numeric:tabular-nums;}
+
+.tr-temps{flex:0 0 auto; text-align:right; min-width:56px;}
+.tr-temps .n{font-size:22px; font-weight:800; color:#be185d; line-height:1;
+  font-variant-numeric:tabular-nums;}
+.tr-temps .u{font-size:10.5px; font-weight:800; color:#9ca3af; display:block;
+  margin-top:2px; text-transform:uppercase; letter-spacing:.04em;}
+.tr-temps.imminent .n{color:#15803d; font-size:15px;}
+.tr-temps.proche .n{color:#c2410c;}
+
+.tr-vide{font-size:13px; font-weight:700; color:#9ca3af; padding:10px 2px;
+  line-height:1.5; text-align:center;}
+.tr-maj{font-size:11.5px; font-weight:700; color:#9ca3af; text-align:center;
+  padding:2px 0 6px;}
+.tr-live{display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:#15803d; margin-right:6px; vertical-align:middle;
+  animation:trpouls 2s ease-in-out infinite;}
+@keyframes trpouls{0%,100%{opacity:1;} 50%{opacity:.25;}}
 </style>
 """
 
@@ -313,14 +344,46 @@ def regrouper(resultats, champs):
     return listes
 
 
+def mode_de(ligne):
+    """Métro, tram ou bus, d'après le numéro de la ligne."""
+    numero = str(ligne or "").strip().upper().lstrip("T")
+    if numero in METRO:
+        return "metro"
+    if numero in TRAMS:
+        return "tram"
+    return "bus"
+
+
 def libelle(minutes):
+    """Texte simple, pour les cas où l'habillage n'est pas disponible."""
     if not minutes:
         return "—"
-    morceaux = []
-    for i, m in enumerate(minutes[:3]):
-        texte = "à quai" if m == 0 else f"{m} min"
-        morceaux.append(f"<span class='prochain'>{texte}</span>" if i == 0 else texte)
-    return " · ".join(morceaux)
+    return " · ".join("à quai" if m == 0 else f"{m} min" for m in minutes[:3])
+
+
+def rendu_ligne(ligne, destination, minutes):
+    """Une rangée : badge coloré, destination, minutes en évidence."""
+    mode = mode_de(ligne)
+    icone, _ = MODES[mode]
+    prochain = minutes[0] if minutes else None
+    suite = minutes[1:3]
+
+    if prochain is None:
+        temps = "<div class='tr-temps'><span class='n'>—</span></div>"
+    elif prochain == 0:
+        temps = "<div class='tr-temps imminent'><span class='n'>à quai</span></div>"
+    else:
+        classe = "tr-temps proche" if prochain <= 2 else "tr-temps"
+        temps = (f"<div class='{classe}'><span class='n'>{prochain}</span>"
+                 f"<span class='u'>min</span></div>")
+
+    apres = ("<div class='tr-suite'>puis "
+             + ", ".join(f"{m} min" for m in suite) + "</div>") if suite else ""
+
+    return (f"<div class='tr-ligne'>"
+            f"<span class='tr-badge {mode}'><span class='m'>{icone}</span>{ligne}</span>"
+            f"<div class='tr-mid'><div class='tr-dest'>{destination.lower()}</div>{apres}</div>"
+            f"{temps}</div>")
 
 
 # ----------------------------------------------------------
@@ -333,8 +396,11 @@ def _tableau(mes_arrets, cle_partenaire, champs, c_arret):
                     "Ouvrez le volet Diagnostic ci-dessous.</div>", unsafe_allow_html=True)
         return
 
+    st.markdown(f"<div class='tr-maj'><span class='tr-live'></span>"
+                f"en direct · {datetime.now().strftime('%H:%M:%S')}</div>",
+                unsafe_allow_html=True)
+
     for arret in mes_arrets:
-        st.markdown(f"<div class='tr-arret'>{arret['nom']}</div>", unsafe_allow_html=True)
         resultats, souci = [], None
         for identifiant in arret["ids"]:
             donnees, err = interroger(
@@ -346,25 +412,27 @@ def _tableau(mes_arrets, cle_partenaire, champs, c_arret):
                 souci = err
                 continue
             resultats.extend(donnees.get("results") or [])
-        if souci and not resultats:
-            st.markdown(f"<div class='tr-vide'>Indisponible : {souci}</div>",
-                        unsafe_allow_html=True)
-            continue
-        lignes = regrouper(resultats, champs)
-        if not lignes:
-            st.markdown("<div class='tr-vide'>Aucun passage annoncé.</div>",
-                        unsafe_allow_html=True)
-            continue
-        st.markdown("".join(
-            f"<div class='tr-ligne'><span class='tr-num'>{ligne}</span>"
-            f"<span class='tr-dest'>{destination}</span>"
-            f"<span class='tr-min'>{libelle(minutes)}</span></div>"
-            for ligne, destination, minutes in lignes[:6]
-        ), unsafe_allow_html=True)
 
-    st.markdown(f"<div class='tr-maj'><span class='tr-live'></span>"
-                f"Mis à jour à {datetime.now().strftime('%H:%M:%S')} · données STIB</div>",
-                unsafe_allow_html=True)
+        lignes = regrouper(resultats, champs)
+        if lignes:
+            modes = {mode_de(ligne) for ligne, _, _ in lignes}
+            compte = " · ".join(MODES[m][0] for m in ("metro", "tram", "bus") if m in modes)
+            compte += f"  {len(lignes)} ligne" + ("s" if len(lignes) > 1 else "")
+        else:
+            compte = "—"
+
+        corps = "".join(rendu_ligne(ligne, destination, minutes)
+                        for ligne, destination, minutes in lignes[:6])
+        if not corps:
+            message = f"Indisponible : {souci}" if souci else "Aucun passage annoncé."
+            corps = f"<div class='tr-vide'>{message}</div>"
+
+        st.markdown(
+            f"<div class='tr-carte'><div class='tr-tete'>"
+            f"<span class='tr-nom'>{arret['nom'].lower()}</span>"
+            f"<span class='tr-compte'>{compte}</span></div>{corps}</div>",
+            unsafe_allow_html=True,
+        )
 
 
 # Version rafraîchie automatiquement, si la version de Streamlit le permet.
@@ -552,3 +620,4 @@ def carte(ctx):
 
         _gestion(mes_arrets, cle_partenaire)
         _diagnostic(champs, temoin, err, c_arret)
+    
