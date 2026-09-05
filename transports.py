@@ -34,7 +34,7 @@ from datetime import datetime, timezone
 import requests
 import streamlit as st
 
-VERSION_TRANSPORTS = "3.0"
+VERSION_TRANSPORTS = "3.1"
 
 BASE = "https://api-management-opendata-production.azure-api.net/api/datasets/stibmivb"
 URL_ATTENTE = f"{BASE}/rt/WaitingTimes/"
@@ -49,6 +49,7 @@ RAFRAICHISSEMENT = 20           # secondes, en mode direct
 CANDIDATS = {
     "arret":       ["pointid", "point_id", "stop_id", "stopid", "id", "stop"],
     "ligne":       ["lineid", "line_id", "line", "route_id", "routeid", "route"],
+    "passages":    ["passingtimes", "passing_times", "passages", "times"],
     "destination": ["destination", "destination_fr", "direction", "headsign", "terminus"],
     "heure":       ["expectedarrivaltime", "expected_arrival_time", "arrivaltime",
                     "arrival_time", "expectedtime", "time", "passingtime"],
@@ -208,19 +209,64 @@ def minutes_avant(horodatage):
     return max(0, int(round((arrivee - datetime.now(timezone.utc)).total_seconds() / 60)))
 
 
+def normaliser_id(identifiant):
+    """Le portail écrit les arrêts sur quatre chiffres : 821 devient 0821."""
+    brut = str(identifiant or "").strip()
+    return brut.zfill(4) if brut.isdigit() and len(brut) < 4 else brut
+
+
+def _valeur(dico, noms):
+    """Première valeur trouvée parmi plusieurs orthographes possibles."""
+    if not isinstance(dico, dict):
+        return None
+    bas = {str(c).lower(): v for c, v in dico.items()}
+    for nom in noms:
+        if nom in bas:
+            return bas[nom]
+    return None
+
+
+def liste_passages(enregistrement, c_passages):
+    """Les passages d'un enregistrement.
+
+    Le portail range les prochains véhicules dans un champ « passingtimes »
+    qui contient du JSON encodé en texte : il faut le décoder avant de lire
+    l'heure et la destination.
+    """
+    brut = enregistrement.get(c_passages) if c_passages else None
+    if brut in (None, ""):
+        return [enregistrement]          # jeu de données à plat : un passage par ligne
+    if isinstance(brut, str):
+        try:
+            brut = json.loads(brut)
+        except ValueError:
+            return []
+    if isinstance(brut, dict):
+        return [brut]
+    return list(brut) if isinstance(brut, list) else []
+
+
 def regrouper(resultats, champs):
     """[(ligne, destination, [minutes])] trié du plus imminent au plus lointain."""
+    c_passages = choisir(champs, "passages")
     c_ligne = choisir(champs, "ligne")
-    c_dest = choisir(champs, "destination")
     c_heure = choisir(champs, "heure")
     groupes = {}
     for enregistrement in resultats or []:
-        minutes = minutes_avant(enregistrement.get(c_heure)) if c_heure else None
-        if minutes is None:
-            continue
-        ligne = texte_lisible(enregistrement.get(c_ligne)) if c_ligne else "?"
-        destination = texte_lisible(enregistrement.get(c_dest)) if c_dest else ""
-        groupes.setdefault((ligne or "?", destination or "—"), []).append(minutes)
+        defaut_ligne = texte_lisible(enregistrement.get(c_ligne)) if c_ligne else ""
+        for passage in liste_passages(enregistrement, c_passages):
+            heure = _valeur(passage, ["expectedarrivaltime", "expected_arrival_time",
+                                      "arrivaltime", "arrival_time", "time"])
+            if heure is None and c_heure:
+                heure = passage.get(c_heure)
+            minutes = minutes_avant(heure)
+            if minutes is None:
+                continue
+            ligne = texte_lisible(_valeur(passage, ["lineid", "line_id", "line"])) \
+                or defaut_ligne or "?"
+            destination = texte_lisible(_valeur(
+                passage, ["destination", "direction", "headsign", "terminus"]))
+            groupes.setdefault((ligne, destination or "—"), []).append(minutes)
     listes = [(ligne, dest, sorted(m)) for (ligne, dest), m in groupes.items()]
     listes.sort(key=lambda e: (e[2][0] if e[2] else 999, e[0]))
     return listes
@@ -252,7 +298,7 @@ def _tableau(mes_arrets, cle_partenaire, champs, c_arret):
         for identifiant in arret["ids"]:
             donnees, err = interroger(
                 URL_ATTENTE,
-                {"where": f'{c_arret}="{identifiant}"', "limit": 40},
+                {"where": f'{c_arret}="{normaliser_id(identifiant)}"', "limit": 40},
                 cle_partenaire,
             )
             if err:
@@ -373,7 +419,7 @@ def _diagnostic(champs, temoin, err, c_arret):
         st.code(", ".join(champs) if champs else "aucun")
         st.write("**Champs reconnus par le module**")
         st.code("\n".join(f"{role:<12} → {choisir(champs, role) or '(non trouvé)'}"
-                          for role in ("arret", "ligne", "destination", "heure")))
+                          for role in ("arret", "ligne", "passages", "destination", "heure")))
         if temoin:
             st.write("**Premier enregistrement reçu**")
             st.json(temoin)
