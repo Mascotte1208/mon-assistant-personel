@@ -11,7 +11,7 @@ from datetime import datetime
 import requests
 import streamlit as st
 
-VERSION_METEO = "2.3"
+VERSION_METEO = "2.4"
 
 VILLES = {
     "Bruxelles": (50.8503, 4.3517),
@@ -59,8 +59,13 @@ JOURS_COURTS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "di
 
 CSS_METEO = """
 <style>
-.meteo-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
-.meteo-now{display:flex; align-items:center; gap:16px; padding:6px 0 14px;}
+/* Réduction des marges au-dessus du bloc météo pour le faire remonter */
+[data-testid="stVerticalBlock"]:has(.meteo-now) {
+  margin-top: -10px !important;
+}
+
+.meteo-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;}
+.meteo-now{display:flex; align-items:center; gap:16px; padding:2px 0 10px;}
 .meteo-now .ic{font-size:42px; line-height:1;}
 .meteo-now .t{font-size:30px; font-weight:800; color:var(--accent-fonce,#8C1444); line-height:1;
   font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
@@ -68,16 +73,16 @@ CSS_METEO = """
 .meteo-now .s{font-size:12px; font-weight:600; color:var(--gris,#9B7F8C); margin-top:2px;}
 
 .meteo-jours{display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
-  padding-top:12px; border-top:1.5px solid var(--trait,#F3C7DA);}
-.meteo-jour{text-align:center; padding:8px 4px; background:var(--papier-2, #FAD9E7); border-radius:12px; border:1px solid var(--trait,#F3C7DA);}
+  padding-top:10px; border-top:1.5px solid var(--trait,#F3C7DA);}
+.meteo-jour{text-align:center; padding:6px 4px; background:var(--papier-2, #FAD9E7); border-radius:12px; border:1px solid var(--trait,#F3C7DA);}
 .meteo-jour .j{font-size:11px; font-weight:700; color:var(--encre-2); text-transform:uppercase;}
-.meteo-jour .e{font-size:18px; line-height:1.4;}
+.meteo-jour .e{font-size:18px; line-height:1.3;}
 .meteo-jour .m{font-size:12px; font-weight:700; color:var(--encre,#3A1A28);
   font-variant-numeric:tabular-nums; white-space:nowrap;}
 .meteo-jour .m .min{color:var(--gris,#9B7F8C); font-weight:500;}
 
 .meteo-conseil{background:#FDF4EA; border:1px solid #EBD3B4; color:var(--ambre,#A65B12);
-  border-radius:12px; padding:10px 13px; font-size:12.5px; font-weight:600; margin-top:10px;}
+  border-radius:10px; padding:6px 10px; font-size:12px; font-weight:600; margin-top:8px;}
 </style>
 """
 
@@ -175,10 +180,9 @@ def carte(conteneur, entete_bloc):
             st.markdown(f"<div class='meteo-jours'>{''.join(blocs)}</div>", unsafe_allow_html=True)
 
         try:
-            if pluie_du_jour is not None and float(pluie_du_jour) >= 50:
+            if pluie_du_jour is not None and float(pluie_du_jour) >= 30:
                 st.markdown(
-                    f"<div class='meteo-conseil'>☂️ {round(float(pluie_du_jour))} % de risque "
-                    f"de pluie aujourd'hui — prends un parapluie.</div>",
+                    f"<div class='meteo-conseil'>☂️ {round(float(pluie_du_jour))} % de risque de pluie</div>",
                     unsafe_allow_html=True,
                 )
         except (TypeError, ValueError):
