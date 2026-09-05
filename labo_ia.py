@@ -32,7 +32,7 @@ import streamlit as st
 # ==========================================================
 # 1. CONSTANTES
 # ==========================================================
-VERSION_LABO = "4.1"
+VERSION_LABO = "4.2"
 CFG_SUJET = "Paramètres du labo"
 
 ONGLETS = ["📈 Marchés", "🔬 Analyse", "📚 Notes"]
@@ -68,7 +68,7 @@ PERIODES = {
     "5A": ("5y", "1wk", 52),
 }
 
-PALETTE = ["#B0184F", "#6D3BAF", "#0E7490", "#A65B12", "#17683D", "#164C9E"]
+PALETTE = ["#C2185B", "#6D3BAF", "#0E7490", "#A65B12", "#17683D", "#164C9E"]
 
 TYPES_NOTE = ["Note", "À retenir", "Idée", "Suivi"]
 
@@ -252,42 +252,42 @@ CSS = """
 
 .lab-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(var(--mini,148px),1fr));
   gap:8px; margin:4px 0 16px;}
-.lab-kpi{background:var(--surface,#fff); border:1px solid var(--trait,#ECE0E5);
+.lab-kpi{background:var(--surface,#fff); border:1.5px solid var(--trait,#F3C7DA);
   border-radius:var(--r,16px); padding:12px 14px; min-width:0; overflow:hidden;}
-.lab-kpi .l{font-size:11.5px; font-weight:600; color:var(--gris,#8A7C82);
+.lab-kpi .l{font-size:11.5px; font-weight:600; color:var(--gris,#9B7F8C);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:5px;}
-.lab-kpi .v{font-size:clamp(16px,4vw,21px); font-weight:700; color:var(--encre,#241B22);
+.lab-kpi .v{font-size:clamp(16px,4vw,21px); font-weight:700; color:var(--accent-fonce,#8C1444);
   line-height:1.1; letter-spacing:-.02em; font-variant-numeric:tabular-nums; white-space:nowrap;}
 .lab-kpi .d{font-size:11.5px; font-weight:600; margin-top:4px; white-space:nowrap;
   font-variant-numeric:tabular-nums;}
 .lab-kpi .up{color:var(--vert,#17683D);} .lab-kpi .down{color:var(--rouge,#B3261E);}
-.lab-kpi .d.flat{color:var(--gris,#8A7C82);}
+.lab-kpi .d.flat{color:var(--gris,#9B7F8C);}
 
-.lab-tablewrap{border:1px solid var(--trait,#ECE0E5); border-radius:var(--r,16px);
+.lab-tablewrap{border:1.5px solid var(--trait,#F3C7DA); border-radius:var(--r,16px);
   background:var(--surface,#fff); overflow:auto; max-height:440px; margin:4px 0 16px;
   -webkit-overflow-scrolling:touch;}
 .lab-table{border-collapse:separate; border-spacing:0; width:100%; font-size:13px;}
 .lab-table th{position:sticky; top:0; z-index:3; background:var(--surface,#fff);
-  color:var(--gris,#8A7C82); text-align:left; font-size:11.5px; font-weight:600;
-  padding:11px 13px; white-space:nowrap; border-bottom:1px solid var(--trait,#ECE0E5);}
+  color:var(--gris,#9B7F8C); text-align:left; font-size:11.5px; font-weight:600;
+  padding:11px 13px; white-space:nowrap; border-bottom:1px solid var(--trait,#F3C7DA);}
 .lab-table td{padding:10px 13px; white-space:nowrap; font-weight:600;
-  color:var(--encre,#241B22); font-variant-numeric:tabular-nums;
-  border-bottom:1px solid var(--trait,#ECE0E5);}
+  color:var(--encre,#3A1A28); font-variant-numeric:tabular-nums;
+  border-bottom:1px solid var(--trait-doux,#FBE7F0);}
 .lab-table td.num, .lab-table th.num{text-align:right;}
 .lab-table tbody tr:last-child td{border-bottom:none;}
 .lab-table td:first-child{position:sticky; left:0; z-index:2; background:var(--surface,#fff);
-  box-shadow:1px 0 0 var(--trait,#ECE0E5);}
+  box-shadow:1px 0 0 var(--trait,#F3C7DA);}
 .lab-table th:first-child{left:0; z-index:4;}
 .lab-table .up{color:var(--vert,#17683D);} .lab-table .down{color:var(--rouge,#B3261E);}
-.lab-table .flat{color:var(--gris,#8A7C82);}
+.lab-table .flat{color:var(--gris,#9B7F8C);}
 
 .lab-note{border-radius:12px; padding:12px 14px; font-size:13px; font-weight:500;
-  margin:6px 0 14px; line-height:1.55; background:var(--accent-doux,#FDF1F5);
-  border:1px solid var(--accent-bord,#F3C9D8); color:var(--accent,#B0184F);}
+  margin:6px 0 14px; line-height:1.55; background:var(--accent-doux,#FDF0F6);
+  border:1px solid var(--accent-bord,#F3C7DA); color:var(--accent,#C2185B);}
 .lab-note.warn{background:#FDF4EA; border-color:#EBD3B4; color:var(--ambre,#A65B12);}
-.lab-note.calme{background:transparent; border-color:var(--trait,#ECE0E5);
-  color:var(--gris,#8A7C82);}
-.lab-sec{font-weight:700; font-size:15px; color:var(--encre,#241B22); margin:22px 0 8px;
+.lab-note.calme{background:transparent; border-color:var(--trait,#F3C7DA);
+  color:var(--gris,#9B7F8C);}
+.lab-sec{font-weight:700; font-size:15px; color:var(--accent-fonce,#8C1444); margin:22px 0 8px;
   letter-spacing:-.01em;}
 
 [class*="st-key-labrow"] [data-testid="stHorizontalBlock"]{flex-wrap:wrap !important;
@@ -402,7 +402,7 @@ def _mise_en_page(fig, hauteur=360, titre_y=""):
         margin=dict(l=8, r=8, t=26, b=8), height=hauteur, template="plotly_white",
         hovermode="x unified", xaxis_title="", yaxis_title=titre_y,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=11)),
-        font=dict(family="Plus Jakarta Sans, sans-serif", size=12, color="#5C4F55"),
+        font=dict(family="Plus Jakarta Sans, sans-serif", size=12, color="#6E4A5B"),
         paper_bgcolor="rgba(0,0,0,0)",
     )
     return fig
@@ -670,12 +670,12 @@ def onglet_analyse(cfg):
                     decreasing_line_color="#b91c1c", showlegend=False), row=1, col=1)
             else:
                 fig.add_trace(go.Scatter(x=cloture.index, y=cloture, name="Cours",
-                                         line=dict(color="#B0184F", width=2.4)), row=1, col=1)
+                                         line=dict(color="#C2185B", width=2.4)), row=1, col=1)
 
             if len(cloture) >= 20:
                 fig.add_trace(go.Scatter(x=cloture.index, y=moyenne_mobile(cloture, 20),
                                          name="Moyenne 20",
-                                         line=dict(color="#B0184F", width=2)), row=1, col=1)
+                                         line=dict(color="#C2185B", width=2)), row=1, col=1)
             if len(cloture) >= 50:
                 fig.add_trace(go.Scatter(x=cloture.index, y=moyenne_mobile(cloture, 50),
                                          name="Moyenne 50",
