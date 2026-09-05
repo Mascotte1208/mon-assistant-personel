@@ -4,7 +4,7 @@ Notre Assistant — l'appli partagée du quotidien de Lucas & Alex.
 Streamlit + Google Sheets, un seul fichier organisé en sections :
   1. Configuration      5. Composants d'interface
   2. Style & Thèmes     6. Connexion
-  3. État de session    7. Navigation (Sidebar)
+  3. État de session    7. Navigation
   4. Couche données     8. Pages
 """
 
@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "3.3"
+VERSION = "3.4"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -695,7 +695,7 @@ if st.session_state["ops"]:
     vider_file()
 
 # ==========================================================
-# 7. NAVIGATION & MODE IA (Dans la barre latérale)
+# 7. NAVIGATION & MODE IA (Visibles en haut de l'écran)
 # ==========================================================
 params = st.query_params
 page_cle = params.get("p", "accueil")
@@ -706,13 +706,14 @@ pages_dispo = PAGES.copy()
 if st.session_state.get("mode_ia"):
     pages_dispo["ialab"] = "🧠 Labo IA"
 
-with st.sidebar:
-    st.markdown("### 🌸 Notre Assistant")
-    st.divider()
-    for cle, libelle in pages_dispo.items():
-        if st.button(libelle, key=f"nav_{cle}", type="primary" if page_cle == cle else "secondary", use_container_width=True):
+cols_nav = st.columns(len(pages_dispo))
+for col, (cle, libelle) in zip(cols_nav, pages_dispo.items()):
+    with col:
+        if st.button(libelle, key=f"nav_{cle}", type="primary" if page_cle == cle else "secondary"):
             st.query_params["p"] = cle
             st.rerun()
+
+st.divider()
 
 bandeaux()
 
