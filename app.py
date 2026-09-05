@@ -1,14 +1,981 @@
 """
-Labo IA & Marchés — module autonome pour « Notre Assistant ».
+Notre Assistant — l'appli partagée du quotidien de Lucas & Alex.
 
-Trois onglets : les cours des marchés, l'analyse d'un actif, et un carnet de
-notes. Rien d'autre : ni journal de positions, ni gestion du risque, ni
-simulation d'investissement.
+Streamlit + Google Sheets, un seul fichier organisé en sections :
+  1. Configuration      5. Composants d'interface
+  2. Style              6. Connexion
+  3. État de session    7. Navigation
+  4. Couche données     8. Pages
+"""
 
-Branchement dans l'application principale, sans dépendance inverse :
+import io
+import re
+import json
+import calendar
+import unicodedata
+import streamlit as st
+import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime, date, timedelta
 
-    elif page_cle == "ialab" and st.session_state.get("mode_ia"):
+# ==========================================================
+# 1. CONFIGURATION
+# ==========================================================
+VERSION = "2.46"
+DOC_NAME = "MonAssistantData"
+
+SHEETS = {
+    "Taches":   ["Tache", "Statut"],
+    "Agenda":   ["Date", "Heure", "Titre", "Description"],
+    "Courses":  ["Article", "Quantite", "Categorie"],
+    "Recettes": ["Titre", "Ingredients", "Instructions"],
+    "Budget":   ["Date", "Paye Par", "Intitule", "Montant", "Categorie"],
+    "Repas":    ["Jour", "Repas", "Plat"],
+    "Listes":   ["Categorie", "Element", "Notes"],
+    "IA_Lab":   ["Date", "Sujet", "Contenu", "Type"],
+    "Trades":   ["Date", "Actif", "Sens", "Entree", "Objectif", "StopLoss", "Statut", "Notes"],
+}
+
+RAYONS = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
+RAYON_COULEURS = {
+    "Fruits & Légumes": "#16a34a",
+    "Frais": "#0891b2",
+    "Boulangerie": "#d97706",
+    "Supermarché": "#7c3aed",
+    "Boissons": "#2563eb",
+    "Entretien": "#be185d",
+    "Autre": "#6b7280",
+}
+CAT_BUDGET = ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"]
+JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+JOURS_COURT = ["L", "M", "M", "J", "V", "S", "D"]
+MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+PERSONNES = ["Lucas", "Alex"]
+
+ONGLETS_M = ["🛒 Courses", "🍲 Recettes"]
+
+PAGES = {
+    "accueil": "🏠 Accueil",
+    "budget": "📊 Budget",
+    "maison": "🐾 Maison",
+}
+
+st.set_page_config(page_title="Notre Assistant", page_icon="🌸",
+                   layout="centered", initial_sidebar_state="collapsed")
+
+MEMOIRE_COURSES = [
+    {"article": "Tomates cerises", "qte": "1 bte", "rayon": "Fruits & Légumes"},
+    {"article": "Avocats", "qte": "2", "rayon": "Fruits & Légumes"},
+    {"article": "Concombre", "qte": "1", "rayon": "Fruits & Légumes"},
+    {"article": "Salade / Roquette", "qte": "1 sachet", "rayon": "Fruits & Légumes"},
+    {"article": "Oignons", "qte": "1 sachet", "rayon": "Fruits & Légumes"},
+    {"article": "Ail", "qte": "1 tête", "rayon": "Fruits & Légumes"},
+    {"article": "Courgettes", "qte": "2", "rayon": "Fruits & Légumes"},
+    {"article": "Citrons", "qte": "2", "rayon": "Fruits & Légumes"},
+    {"article": "Œufs frais", "qte": "1 bte", "rayon": "Frais"},
+    {"article": "Lait", "qte": "1 L", "rayon": "Frais"},
+    {"article": "Beurre doux", "qte": "1 plq", "rayon": "Frais"},
+    {"article": "Gouda / Fromage tranché", "qte": "1 pqt", "rayon": "Frais"},
+    {"article": "Feta / Mozzarella", "qte": "1", "rayon": "Frais"},
+    {"article": "Escalopes ou Nuggets vegan", "qte": "1 pqt", "rayon": "Frais"},
+    {"article": "Saumon fumé", "qte": "1 pqt", "rayon": "Frais"},
+    {"article": "Thon en boîte", "qte": "1 bte", "rayon": "Frais"},
+    {"article": "Yaourts nature / grecs", "qte": "4 pots", "rayon": "Frais"},
+    {"article": "Pain / Baguette", "qte": "1", "rayon": "Boulangerie"},
+    {"article": "Pains panini", "qte": "2", "rayon": "Boulangerie"},
+    {"article": "Pâtes / Tortellini", "qte": "1 sachet", "rayon": "Supermarché"},
+    {"article": "Riz basmati", "qte": "1 pqt", "rayon": "Supermarché"},
+    {"article": "Café moulu / Capsules", "qte": "1 pqt", "rayon": "Supermarché"},
+    {"article": "Huile d'olive", "qte": "1 btl", "rayon": "Supermarché"},
+    {"article": "Sel & Poivre / Épices", "qte": "1", "rayon": "Supermarché"},
+    {"article": "Sirop de menthe", "qte": "1 btl", "rayon": "Boissons"},
+    {"article": "Jus d'orange", "qte": "1 btl", "rayon": "Boissons"},
+    {"article": "Papier toilette", "qte": "1 pqt", "rayon": "Entretien"},
+    {"article": "Liquide vaisselle", "qte": "1 btl", "rayon": "Entretien"},
+    {"article": "Éponges", "qte": "1 pqt", "rayon": "Entretien"},
+    {"article": "Sacs poubelle", "qte": "1 rlx", "rayon": "Entretien"},
+]
+
+INDICES_RAYON = [
+    ("Fruits & Légumes", ["tomate", "salade", "roquette", "pomme", "banane", "carotte", "oignon",
+                         "citron", "courgette", "avocat", "concombre", "ail", "poivron", "champignon",
+                         "épinard", "basilic", "persil", "fraise", "brocoli", "patate", "pomme de terre"]),
+    ("Frais", ["lait", "yaourt", "fromage", "beurre", "œuf", "oeuf", "crème", "creme", "jambon",
+               "poulet", "saumon", "mozzarella", "feta", "parmesan", "thon", "escalope", "tofu"]),
+    ("Boulangerie", ["pain", "baguette", "panini", "brioche", "wrap", "tortilla"]),
+    ("Boissons", ["jus", "eau", "soda", "sirop", "vin", "bière", "biere", "limonade"]),
+    ("Entretien", ["papier", "lessive", "éponge", "eponge", "savon", "poubelle", "vaisselle"]),
+    ("Supermarché", ["pâtes", "pates", "riz", "farine", "sucre", "huile", "café", "cafe", "sel",
+                     "poivre", "épice", "epice", "conserve", "sauce", "bouillon", "lentille", "semoule"]),
+]
+
+UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pincee", "tranche",
+         "tranches", "gousse", "gousses", "boîte", "boite", "sachet", "sachets", "pot", "pots",
+         "botte", "brique", "briques", "paquet", "paquets", "bouquet", "brin", "brins", "verre",
+         "verres", "cuillère", "cuillere", "cuillères", "cuilleres", "filet", "barquette",
+         "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
+
+# ==========================================================
+# 2. STYLE
+# ==========================================================
+def slug(texte):
+    plat = unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", plat.lower()).strip("-")
+
+
+CSS_CATEGORIES = "".join(
+    f".st-key-grp-{slug(rayon)}{{border-left:6px solid {couleur};"
+    f"padding-left:14px; margin:14px 0 4px;}}"
+    f".st-key-grp-{slug(rayon)} .rayon{{color:{couleur};}}"
+    for rayon, couleur in RAYON_COULEURS.items()
+)
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root{
+  --rose-vif:#be185d; --rose-fonce:#9d174d; --prune:#581c87;
+  --prune-clair:#701a75; --bord-cadre:#be185d;
+}
+
+html, body, [class*="css"], .stApp{
+  font-family:'Plus Jakarta Sans', sans-serif !important;
+  color:var(--prune); -webkit-tap-highlight-color:transparent;
+}
+.stApp{
+  background:linear-gradient(180deg,#fbcfe8 0%,#f472b6 40%,#e879f9 100%) fixed !important;
+}
+#MainMenu, footer, header{visibility:hidden;}
+.block-container{padding-top:1.2rem !important; padding-bottom:5rem !important; max-width:540px !important;}
+
+[data-testid="stHorizontalBlock"]{flex-wrap:nowrap !important; gap:8px !important;}
+[data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
+
+.st-key-navrow{margin-bottom:12px;}
+.st-key-navrow [data-testid="stHorizontalBlock"]{gap:8px !important;}
+.st-key-navrow button{font-size:13px !important; padding:11px 6px !important; border-radius:14px !important;}
+.st-key-navrow button p{font-size:13px !important; font-weight:800 !important;}
+
+.bloc-head{
+  display:flex; justify-content:space-between; align-items:center; gap:8px;
+  padding:2px 0 8px; font-size:16.5px; font-weight:800; color:var(--rose-fonce);
+  border-bottom:2.5px solid #f472b6; margin-bottom:10px;
+}
+.bloc-head .n{background:#fce7f3; color:var(--rose-vif); border-radius:10px;
+  padding:2px 10px; font-size:11.5px; font-weight:800;}
+
+.stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
+  border-radius:14px !important; font-weight:700 !important; font-size:14px !important;
+  padding:11px 15px !important; width:100%; border:2.5px solid var(--bord-cadre) !important;
+  transition:transform .1s ease;
+}
+.stButton>button:active, .stFormSubmitButton>button:active{transform:scale(.98);}
+button[kind="secondary"], button[data-testid="stBaseButton-secondary"],
+button[kind="secondaryFormSubmit"], button[data-testid="stBaseButton-secondaryFormSubmit"],
+.stDownloadButton>button{
+  background:#ffffff !important; color:var(--rose-vif) !important;
+  box-shadow:0 4px 14px rgba(157,23,77,.2) !important;
+}
+button[kind="primary"], button[data-testid="stBaseButton-primary"],
+button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSubmit"]{
+  background:linear-gradient(135deg,#be185d 0%,#9d174d 100%) !important;
+  color:#fff !important; border:none !important;
+  box-shadow:0 6px 20px -4px rgba(157,23,77,.6) !important;
+}
+button:focus-visible{outline:2px solid #831843 !important; outline-offset:2px;}
+
+[data-testid="stVerticalBlockBorderWrapper"], 
+div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
+[data-baseweb="block"] {
+  background: #ffffff !important;
+  border: 3.5px solid var(--bord-cadre) !important;
+  border-radius: 22px !important;
+  padding: 16px 20px 14px !important;
+  box-shadow: 0 14px 40px rgba(131, 24, 67, 0.3) !important;
+  margin-bottom: 18px !important;
+}
+
+[data-testid="stMetricValue"] {color: var(--rose-fonce) !important; font-weight: 800 !important;}
+[data-testid="stMetricLabel"] {color: var(--prune-clair) !important; font-weight: 700 !important;}
+[data-testid="stMetric"] {
+  background: #ffffff; border: 3.5px solid var(--bord-cadre) !important;
+  border-radius: 18px; padding: 14px 18px; box-shadow: 0 6px 20px rgba(131,24,67,.2);
+}
+
+.jour-titre{font-size:13.5px; font-weight:800; color:var(--rose-vif); padding:8px 0 4px;}
+.section{font-weight:800; font-size:16px; color:var(--rose-fonce); margin:18px 0 6px;}
+
+.line{font-size:14.5px; font-weight:700; color:#311026;}
+.line.done{color:#a3a3a3; text-decoration:line-through;}
+.line .q{font-weight:700; color:var(--rose-vif); font-size:13px;}
+
+.tag{display:inline-block; padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:800;
+     background:#fce7f3; color:var(--rose-vif); margin-left:6px; vertical-align:middle; border:1px solid #f472b6;}
+.rayon{font-size:13px; font-weight:800; color:var(--rose-vif); background:#fdf2f8;
+       display:inline-block; padding:4px 10px; border-radius:12px; margin:12px 0 6px; border:1.5px solid #f472b6;}
+.empty{text-align:center; padding:22px 14px; border-radius:18px; background:#fff5f8;
+       border:3px dashed var(--bord-cadre); color:var(--rose-fonce); font-weight:600; font-size:13.5px;}
+.today-none{font-size:13.5px; color:var(--rose-fonce); font-weight:600; opacity:.85; padding:8px 0;}
+
+.solde{border-radius:18px; padding:16px 20px; margin:14px 0; font-weight:700; font-size:15px;
+       background:linear-gradient(135deg,#fdf2f8,#fce7f3); border:3.5px solid var(--bord-cadre); color:var(--rose-fonce);
+       display:flex; justify-content:space-between; align-items:center; gap:10px;
+       box-shadow:0 8px 25px rgba(157,23,77,.25);}
+.solde .m{font-size:17.5px; font-weight:800; color:var(--rose-vif); white-space:nowrap;}
+
+.bandeau{border-radius:14px; padding:10px 14px; font-size:13.5px; font-weight:700; margin-bottom:10px;}
+.bandeau.info{background:#fdf2f8; border:2.5px solid #f472b6; color:var(--rose-vif);}
+.bandeau.warn{background:#fff7ed; border:2.5px solid #fb923c; color:#c2410c;}
+
+.stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input, .stTimeInput input{
+  color:#311026 !important; background:#fff !important; -webkit-text-fill-color:#311026 !important;
+  border-radius:14px !important; border:3px solid var(--bord-cadre) !important;
+  padding:11px 15px !important; font-size:14.5px !important;
+}
+[data-baseweb="select"]>div{border-radius:14px !important; border:3px solid var(--bord-cadre) !important; background:#fff !important;}
+label p{font-weight:700 !important; font-size:13.5px !important; color:var(--rose-fonce) !important;}
+
+.stTabs [data-baseweb="tab-list"]{gap:6px; background:#fff; padding:6px;
+  border-radius:18px; border:3px solid var(--bord-cadre);}
+.stTabs [data-baseweb="tab"]{border-radius:12px; padding:8px 14px; font-weight:700; font-size:13.5px; color:var(--rose-vif);}
+.stTabs [aria-selected="true"]{background:linear-gradient(135deg,#be185d,#9d174d); color:#fff !important;}
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
+
+.cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:0 -2px 8px;}
+.cal-week span{text-align:center; font-size:11.5px; font-weight:800; color:var(--rose-vif);}
+.cal-title{text-align:center; font-size:16px; font-weight:800; color:var(--rose-fonce); padding-top:8px;}
+.st-key-cal-grid{margin:0 -2px;}
+.st-key-cal-grid [data-testid="stHorizontalBlock"],
+[data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]){gap:4px !important;}
+.st-key-cal-grid [data-testid="stHorizontalBlock"] > div,
+[data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]) > div{
+  flex:1 1 0 !important; width:auto !important; min-width:0 !important; padding:0 !important;
+}
+[class*="st-key-cal_"] button{
+  min-height:0 !important; padding:9px 0 !important; border-radius:12px !important;
+  font-size:12.5px !important; font-weight:700 !important; background:#fdf2f8 !important;
+  color:#311026 !important; border:2px solid #f472b6 !important; box-shadow:none !important;
+}
+[class*="st-key-cal_"] button p{font-size:12.5px !important; font-weight:700 !important; line-height:1.1 !important;}
+[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#fbcfe8 !important; opacity:1 !important; border:none !important;}
+[class*="st-key-cal_"] button[kind="primary"], [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
+  background:linear-gradient(135deg,#be185d,#9d174d) !important; color:#fff !important;
+  box-shadow:0 4px 12px -2px rgba(157,23,77,.5) !important; border:none !important;
+}
+
+[class*="st-key-goto-"] button{
+  background:transparent !important; border:none !important; box-shadow:none !important;
+  border-bottom:2.5px solid #f472b6 !important; border-radius:0 !important;
+  color:var(--rose-fonce) !important; font-size:16px !important; font-weight:800 !important;
+  padding:4px 0 10px !important; display:flex !important; align-items:center !important;
+  justify-content:flex-start !important; text-align:left !important;
+}
+[class*="st-key-goto-"] button p{font-size:16px !important; font-weight:800 !important;}
+[class*="st-key-goto-"] button:hover::after{opacity:.9;}
+
+.st-key-labtabs{margin-bottom:8px;}
+.st-key-labtabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
+.st-key-labtabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
+.st-key-labtabs button p{font-size:12.5px !important; font-weight:800 !important;}
+
+.st-key-mtabs{margin-bottom:8px;}
+.st-key-mtabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
+.st-key-mtabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
+.st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
+
+[data-testid="stHorizontalBlock"]:has(.line){
+  background: #fff5f8 !important;
+  border: 2px solid #f472b6 !important;
+  border-radius: 14px !important;
+  padding: 6px 12px !important;
+  margin-bottom: 8px !important;
+  align-items:center !important; 
+  gap: 8px !important;
+  box-shadow: 0 3px 10px rgba(157, 23, 77, 0.08) !important;
+}
+[data-testid="stHorizontalBlock"]:has(.line) button{
+  background:#ffffff !important; border:1.5px solid #f472b6 !important; box-shadow:0 2px 6px rgba(157,23,77,0.15) !important;
+  color:var(--rose-vif) !important; padding:6px 10px !important; font-size:13.5px !important;
+  border-radius:10px !important; transition:transform .1s ease;
+}
+[data-testid="stHorizontalBlock"]:has(.line) button:active{transform:scale(.95);}
+
+.line{padding:6px 0; line-height:1.4;}
+.line .q{font-variant-numeric:tabular-nums; opacity:.9;}
+.solde .m{font-variant-numeric:tabular-nums;}
+
+.rayon{background:#fdf2f8; padding:4px 10px; border-radius:10px; margin:8px 0 6px; font-size:13px; font-weight:800; border:1.5px solid #f472b6;}
+.rayon .c{opacity:.7; font-weight:700;}
+
+.today-none{padding:12px 0;}
+.empty{padding:24px 14px;}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown(f"<style>{CSS_CATEGORIES}</style>", unsafe_allow_html=True)
+
+# ==========================================================
+# 3. ÉTAT DE SESSION
+# ==========================================================
+DEFAULTS = {
+    "creds_json": None,
+    "ops": [],
+    "erreur_synchro": None,
+    "derniere_synchro": None,
+    "annulation": None,
+    "show_add_tache": False,
+    "mode_ia": False,
+    "m_tab": ONGLETS_M[0],
+    "_reset": {},
+}
+for cle, val in DEFAULTS.items():
+    if cle not in st.session_state:
+        st.session_state[cle] = val
+
+for cle, val in st.session_state["_reset"].items():
+    st.session_state[cle] = val
+st.session_state["_reset"] = {}
+
+def reset_after(**champs):
+    st.session_state["_reset"] = champs
+
+if not st.session_state["creds_json"]:
+    try:
+        if "gcp_service_account" in st.secrets:
+            st.session_state["creds_json"] = json.dumps(dict(st.secrets["gcp_service_account"]))
+    except Exception:
+        pass
+
+# ==========================================================
+# 4. COUCHE DONNÉES
+# ==========================================================
+@st.cache_resource(show_spinner=False)
+def get_client(json_str):
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    return gspread.authorize(Credentials.from_service_account_info(json.loads(json_str), scopes=scope))
+
+@st.cache_resource(show_spinner=False)
+def get_doc(json_str):
+    client = get_client(json_str)
+    try:
+        doc = client.open(DOC_NAME)
+    except gspread.SpreadsheetNotFound:
+        doc = client.create(DOC_NAME)
+    titres = {ws.title: ws for ws in doc.worksheets()}
+    for nom, entetes in SHEETS.items():
+        if nom not in titres:
+            ws = doc.add_worksheet(title=nom, rows=1000, cols=max(8, len(entetes)))
+            ws.append_row(entetes)
+    if "Sheet1" in titres and len(titres) > 1:
+        try:
+            doc.del_worksheet(titres["Sheet1"])
+        except Exception:
+            pass
+    return doc
+
+@st.cache_resource(show_spinner=False)
+def get_ws(json_str, feuille):
+    return get_doc(json_str).worksheet(feuille)
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_all(json_str):
+    doc = get_doc(json_str)
+    donnees = {}
+    try:
+        res = doc.values_batch_get([f"'{n}'!A1:Z2000" for n in SHEETS])
+        for nom, vr in zip(SHEETS.keys(), res.get("valueRanges", [])):
+            donnees[nom] = vr.get("values", []) or []
+    except Exception:
+        for nom in SHEETS:
+            try:
+                donnees[nom] = doc.worksheet(nom).get_all_values()
+            except Exception:
+                donnees[nom] = []
+    for nom, entetes in SHEETS.items():
+        if not donnees.get(nom):
+            donnees[nom] = [entetes]
+    return donnees
+
+def db():
+    if "db" not in st.session_state:
+        creds = st.session_state["creds_json"]
+        if creds:
+            with st.spinner("Chargement de vos données…"):
+                st.session_state["db"] = fetch_all(creds)
+                st.session_state["derniere_synchro"] = datetime.now()
+        else:
+            st.session_state["db"] = {n: [e] for n, e in SHEETS.items()}
+    return st.session_state["db"]
+
+def rows(feuille):
+    brut = db().get(feuille, [])
+    return [(i + 1, r) for i, r in enumerate(brut[1:])]
+
+def pad(ligne_, n):
+    return (list(ligne_) + [""] * n)[:n]
+
+def _executer(op):
+    creds = st.session_state["creds_json"]
+    genre = op[0]
+    if genre == "append":
+        get_ws(creds, op[1]).append_row(op[2], value_input_option="USER_ENTERED")
+    elif genre == "insert":
+        get_ws(creds, op[1]).insert_row(op[2], op[3] + 1, value_input_option="USER_ENTERED")
+    elif genre == "delete":
+        get_ws(creds, op[1]).delete_rows(op[2] + 1)
+    elif genre == "update":
+        get_ws(creds, op[1]).update_cell(op[2] + 1, op[3], op[4])
+    elif genre == "clear":
+        get_ws(creds, op[1]).batch_clear(["A2:Z2000"])
+
+def vider_file():
+    if not st.session_state.get("creds_json"):
+        return True
+    file = st.session_state["ops"]
+    while file:
+        try:
+            _executer(file[0])
+            file.pop(0)
+            st.session_state["derniere_synchro"] = datetime.now()
+        except Exception as err:
+            st.session_state["erreur_synchro"] = str(err)[:140]
+            return False
+    st.session_state["erreur_synchro"] = None
+    return True
+
+def pousser(op):
+    st.session_state["ops"].append(op)
+    vider_file()
+
+def add_row(feuille, ligne_):
+    db()[feuille].append(ligne_)
+    pousser(("append", feuille, ligne_))
+
+def delete_row(feuille, index, annulable=True, libelle="Élément supprimé"):
+    donnees = db()[feuille]
+    if not 0 < index < len(donnees):
+        return
+    ancienne = list(donnees[index])
+    donnees.pop(index)
+    pousser(("delete", feuille, index))
+    if annulable:
+        st.session_state["annulation"] = {"type": "restaurer", "feuille": feuille,
+                                         "index": index, "ligne": ancienne, "libelle": libelle}
+
+def set_cell(feuille, index, colonne, valeur, annulable=False, libelle=""):
+    donnees = db()[feuille]
+    if not 0 < index < len(donnees):
+        return
+    ligne_ = pad(donnees[index], max(colonne, len(donnees[index])))
+    ancienne = ligne_[colonne - 1]
+    ligne_[colonne - 1] = valeur
+    donnees[index] = ligne_
+    pousser(("update", feuille, index, colonne, valeur))
+
+def to_float(valeur):
+    try:
+        return float(str(valeur).replace(",", ".").replace("€", "").strip())
+    except (ValueError, AttributeError):
+        return 0.0
+
+def parse_date(texte):
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(str(texte).strip(), fmt).date()
+        except ValueError:
+            continue
+    return None
+
+def merge_qte(a, b):
+    motif = r"^\s*(\d+(?:[.,]\d+)?)\s*(.*)$"
+    ma, mb = re.match(motif, str(a or "")), re.match(motif, str(b or ""))
+    if ma and mb and ma.group(2).strip().lower() == mb.group(2).strip().lower():
+        total = float(ma.group(1).replace(",", ".")) + float(mb.group(1).replace(",", "."))
+        nombre = int(total) if total.is_integer() else round(total, 2)
+        return f"{nombre} {ma.group(2).strip()}".strip()
+    return f"{a} + {b}"
+
+def deviner_rayon(nom):
+    minus = nom.lower()
+    for memo in MEMOIRE_COURSES:
+        base = memo["article"].lower().split(" /")[0].strip()
+        if base and (base in minus or minus in memo["article"].lower()):
+            return memo["rayon"]
+    for rayon, mots in INDICES_RAYON:
+        if any(mot in minus for mot in mots):
+            return rayon
+    return "Autre"
+
+def separer_quantite(ligne_texte):
+    texte = re.sub(r"^\s*[-•*·]\s*", "", str(ligne_texte)).strip()
+    m = re.match(r"^(\d+(?:[.,]\d+)?)\s*([a-zA-Zàâçéèêëîïôûùüÿœ.]*)\s+(?:de\s+|d')?(.+)$", texte)
+    if m:
+        unite = m.group(2).lower().strip()
+        if unite in UNITES or unite == "":
+            return m.group(3).strip(), f"{m.group(1)} {unite}".strip()
+    return texte, "1"
+
+def add_course(article, qte, rayon=None):
+    article = str(article).strip()
+    if not article:
+        return
+    nom = article.lower()
+    for idx, r in rows("Courses"):
+        if pad(r, 3)[0].strip().lower() == nom:
+            set_cell("Courses", idx, 2, merge_qte(pad(r, 3)[1] or "1", qte))
+            return
+    add_row("Courses", [article, qte, rayon or deviner_rayon(article)])
+
+def evenements_tries():
+    sortie = []
+    for idx, r in rows("Agenda"):
+        d, h, ti, desc = pad(r, 4)
+        jour = parse_date(d)
+        if jour:
+            sortie.append((jour, h, ti, desc, idx))
+    return sorted(sortie, key=lambda e: (e[0], e[1] or "99:99"))
+
+def taches_actives():
+    resultat = []
+    for idx, r in rows("Taches"):
+        nom, statut = pad(r, 2)
+        if statut == "Fait":
+            continue
+        resultat.append((idx, nom))
+    return resultat
+
+def depuis(instant):
+    if not instant:
+        return "jamais"
+    secondes = (datetime.now() - instant).total_seconds()
+    if secondes < 60:
+        return "à l'instant"
+    if secondes < 3600:
+        return f"il y a {int(secondes // 60)} min"
+    return f"il y a {int(secondes // 3600)} h"
+
+# ==========================================================
+# 5. COMPOSANTS D'INTERFACE
+# ==========================================================
+def conteneur(cle=None, bordure=True):
+    try:
+        return st.container(border=bordure, key=cle) if cle else st.container(border=bordure)
+    except TypeError:
+        return st.container(border=bordure)
+
+def titre(texte):
+    st.markdown(f"<div class='section'>{texte}</div>", unsafe_allow_html=True)
+
+def vide(texte):
+    st.markdown(f"<div class='empty'>{texte}</div>", unsafe_allow_html=True)
+
+def ligne(html, done=False):
+    st.markdown(f"<div class='line{' done' if done else ''}'>{html}</div>", unsafe_allow_html=True)
+
+def ligne_action(html, boutons, done=False):
+    cols = st.columns([4] + [1] * len(boutons))
+    with cols[0]:
+        ligne(html, done)
+    clique = None
+    for col, (icone, cle) in zip(cols[1:], boutons):
+        with col:
+            if st.button(icone, key=cle):
+                clique = cle
+    return clique
+
+def pills(cle, options, defaut=None, cols=3):
+    if cle not in st.session_state or st.session_state[cle] not in options:
+        st.session_state[cle] = defaut if defaut in options else options[0]
+    for debut in range(0, len(options), cols):
+        groupe = options[debut:debut + cols]
+        colonnes = st.columns(cols)
+        for col, opt in zip(colonnes, groupe):
+            with col:
+                actif = st.session_state[cle] == opt
+                if st.button(opt, key=f"pill_{cle}_{opt}", type="primary" if actif else "secondary"):
+                    st.session_state[cle] = opt
+                    st.rerun()
+    return st.session_state[cle]
+
+def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
+    st.markdown("<div class='cal-week'>" + "".join(f"<span>{j}</span>" for j in JOURS_COURT) + "</div>",
+                unsafe_allow_html=True)
+    choisi, styles = None, []
+    with conteneur("cal-grid"):
+        for semaine in calendar.Calendar(firstweekday=0).monthdatescalendar(annee, mois):
+            colonnes = st.columns(7)
+            for col, jour in zip(colonnes, semaine):
+                with col:
+                    cle = f"{prefixe}_{jour.isoformat()}"
+                    if jour.month != mois:
+                        st.button(str(jour.day), key=cle, disabled=True)
+                        continue
+                    nb = len(par_jour.get(jour, []))
+                    if st.button(f"{jour.day}•" if nb else str(jour.day), key=cle,
+                                 type="primary" if jour == selection else "secondary"):
+                        choisi = jour
+                    if jour == selection:
+                        continue
+                    if nb:
+                        styles.append(f".st-key-{cle} button{{background:linear-gradient("
+                                      f"135deg,#fce7f3,#f472b6) !important;color:#831843 !important;}}")
+                    if jour == aujourd:
+                        styles.append(f".st-key-{cle} button{{border:2.5px solid #be185d !important;"
+                                      f"color:#be185d !important;}}")
+    if styles:
+        st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
+    return choisi
+
+def navigateur_mois(cle_etat, aujourd, prefixe):
+    if cle_etat not in st.session_state:
+        st.session_state[cle_etat] = (aujourd.year, aujourd.month)
+    annee, mois = st.session_state[cle_etat]
+    c1, c2, c3 = st.columns([1, 3, 1])
+    with c1:
+        if st.button("◀", key=f"{prefixe}_prev"):
+            st.session_state[cle_etat] = (annee - 1, 12) if mois == 1 else (annee, mois - 1)
+            st.rerun()
+    with c2:
+        st.markdown(f"<div class='cal-title'>{MOIS[mois - 1].capitalize()} {annee}</div>",
+                    unsafe_allow_html=True)
+    with c3:
+        if st.button("▶", key=f"{prefixe}_next"):
+            st.session_state[cle_etat] = (annee + 1, 1) if mois == 12 else (annee, mois + 1)
+            st.rerun()
+    return st.session_state[cle_etat]
+
+def bandeaux():
+    en_attente = len(st.session_state.get("ops", []))
+    if en_attente:
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.markdown(f"<div class='bandeau warn'>⏳ {en_attente} modification(s) en attente</div>", unsafe_allow_html=True)
+        with c2:
+            if st.button("Réessayer", key="retry_sync"):
+                vider_file()
+                st.rerun()
+
+def entete_bloc(texte, compteur=None):
+    pastille = f"<span class='n'>{compteur}</span>" if compteur is not None else ""
+    st.markdown(f"<div class='bloc-head'><span>{texte}</span>{pastille}</div>", unsafe_allow_html=True)
+
+def entete_lien(cle, texte, compteur, onglet):
+    with conteneur(f"goto-{cle}"):
+        if st.button(f"{texte}   ·   {compteur}", key=f"goto_{cle}"):
+            st.session_state["m_tab"] = onglet
+            st.query_params["p"] = "maison"
+            st.rerun()
+
+# ==========================================================
+# 6. CONNEXION
+# ==========================================================
+ajd = date.today()
+
+if not st.session_state["creds_json"]:
+    titre("Connexion à Google Sheets")
+    st.caption("Déposez le fichier JSON du compte de service.")
+    fichier = st.file_uploader("Configuration", type=["json"], label_visibility="collapsed")
+    if fichier is not None:
+        brut = fichier.read().decode("utf-8")
+        try:
+            with st.spinner("Préparation du classeur…"):
+                st.session_state["creds_json"] = brut
+                get_doc(brut)
+            st.session_state.pop("db", None)
+            st.toast("Connexion réussie 💖", icon="✨")
+            st.rerun()
+        except Exception as err:
+            st.session_state["creds_json"] = None
+            st.error(f"Connexion impossible : {err}")
+    st.stop()
+
+if st.session_state["ops"]:
+    vider_file()
+
+# ==========================================================
+# 7. NAVIGATION & MODE IA
+# ==========================================================
+params = st.query_params
+page_cle = params.get("p", "accueil")
+if page_cle not in PAGES and page_cle != "ialab":
+    page_cle = "accueil"
+
+pages_dispo = PAGES.copy()
+if st.session_state.get("mode_ia"):
+    pages_dispo["ialab"] = "🧠 Labo IA"
+
+with conteneur("navrow"):
+    cols = st.columns(len(pages_dispo))
+    for col, (cle, libelle) in zip(cols, pages_dispo.items()):
+        with col:
+            if st.button(libelle, key=f"nav_{cle}", type="primary" if page_cle == cle else "secondary"):
+                st.query_params["p"] = cle
+                st.rerun()
+
+bandeaux()
+
+evenements = evenements_tries()
+par_jour = {}
+for ev in evenements:
+    par_jour.setdefault(ev[0], []).append(ev)
+
+# ==========================================================
+# 8a. ACCUEIL
+# ==========================================================
+if page_cle == "accueil":
+    courses = rows("Courses")
+    budget = rows("Budget")
+    repas = rows("Repas")
+    actives = taches_actives()
+
+    evts_jour = par_jour.get(ajd, [])
+    a_venir = [e for e in evenements if e[0] > ajd]
+    repas_jour = [(i, pad(r, 3)) for i, r in repas if pad(r, 3)[0] == JOURS[ajd.weekday()]]
+
+    # 1. À FAIRE
+    with conteneur("carte-taches"):
+        entete_bloc("🌸 À faire", len(actives) or None)
+        if actives:
+            for idx, nom in actives[:6]:
+                clique = ligne_action(nom, [("✔️", f"acc_tk_{idx}"), ("🗑️", f"acc_td_{idx}")])
+                if clique == f"acc_tk_{idx}":
+                    set_cell("Taches", idx, 2, "Fait")
+                    st.rerun()
+                elif clique == f"acc_td_{idx}":
+                    delete_row("Taches", idx, libelle=f"« {nom} » supprimée")
+                    st.rerun()
+        else:
+            st.markdown("<div class='today-none'>🎉 Tout est fait.</div>", unsafe_allow_html=True)
+
+        if not st.session_state.get("show_add_tache", False):
+            if st.button("＋ Ajouter une tâche", key="btn_toggle_tache"):
+                st.session_state["show_add_tache"] = True
+                st.rerun()
+        else:
+            dash_t_txt = st.text_input("Nouvelle tâche", key="dash_t_txt", placeholder="Écrire ici…", label_visibility="collapsed")
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("Enregistrer", key="dash_add_t", type="primary") and dash_t_txt.strip():
+                    add_row("Taches", [dash_t_txt.strip(), "À faire"])
+                    st.session_state["show_add_tache"] = False
+                    reset_after(dash_t_txt="")
+                    st.rerun()
+            with col_b2:
+                if st.button("Annuler", key="dash_cancel_t"):
+                    st.session_state["show_add_tache"] = False
+                    st.rerun()
+
+    # 2. AUJOURD'HUI
+    with conteneur("carte-aujourdhui"):
+        entete_bloc("📅 Aujourd'hui", len(evts_jour) + len(repas_jour) or None)
+        if not evts_jour and not repas_jour:
+            st.markdown("<div class='today-none'>Journée libre 🌸</div>", unsafe_allow_html=True)
+        for jd, h, ti, desc, idx in evts_jour:
+            detail = f"<br><span class='q'>{desc}</span>" if desc else ""
+            if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}", [("🗑️", f"acc_ev_{idx}")]):
+                delete_row("Agenda", idx, libelle=f"« {ti} » supprimé")
+                st.rerun()
+        for idx, (_, typ, plat) in repas_jour:
+            if ligne_action(f"<span class='tag'>{typ}</span> 🍽️ {plat}", [("🗑️", f"acc_rp_{idx}")]):
+                delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
+                st.rerun()
+
+    # 3. COURSES (Redirection épurée)
+    entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
+
+    # 4. LE MOIS
+    if "dash_jour" not in st.session_state:
+        st.session_state["dash_jour"] = ajd
+    jour_sel = st.session_state["dash_jour"]
+
+    with conteneur("dash-cal"):
+        entete_bloc("🗓️ Notre mois", len(a_venir) or None)
+        d_annee, d_mois = navigateur_mois("dash_ym", ajd, "dash")
+        clic = grille_mois(d_annee, d_mois, par_jour, ajd, jour_sel)
+        if clic:
+            st.session_state["dash_jour"] = clic
+            st.rerun()
+
+        marque = " · aujourd'hui" if jour_sel == ajd else ""
+        st.markdown(f"<div class='jour-titre'>{JOURS[jour_sel.weekday()]} {jour_sel.day} {MOIS[jour_sel.month - 1]}{marque}</div>", unsafe_allow_html=True)
+        du_jour = par_jour.get(jour_sel, [])
+        for jd, h, ti, desc, idx in du_jour:
+            detail = f"<br><span class='q'>{desc}</span>" if desc else ""
+            if ligne_action(f"<span class='tag'>{h or '—'}</span> {ti}{detail}", [("🗑️", f"cal_ev_{idx}")]):
+                delete_row("Agenda", idx, libelle=f"« {ti} » supprimé")
+                st.rerun()
+        if not du_jour:
+            st.markdown("<div class='today-none'>Rien de prévu ce jour-là.</div>", unsafe_allow_html=True)
+
+        na, nb, nc = st.columns([1.2, 3, 1])
+        with na:
+            n_heure = st.text_input("Heure", key="dash_eheure", placeholder="19:30", label_visibility="collapsed")
+        with nb:
+            n_titre = st.text_input("Événement", key="dash_etitre", placeholder="Ajouter ici…", label_visibility="collapsed")
+        with nc:
+            if st.button("＋", key="dash_add_ev", type="primary") and n_titre.strip():
+                add_row("Agenda", [str(jour_sel), n_heure.strip(), n_titre.strip(), ""])
+                reset_after(dash_etitre="", dash_eheure="")
+                st.rerun()
+
+    # 5. BUDGET PARTAGÉ
+    total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
+    total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
+    ecart = (total_l - total_a) / 2
+    qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés 💖"
+    st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>", unsafe_allow_html=True)
+
+    # 6. RÉGLAGES & ACCÈS DIRECT LABO IA
+    with st.expander("⚙️ Réglages"):
+        d1, d2 = st.columns(2)
+        with d1:
+            if st.button("🔄 Actualiser", key="refresh"):
+                st.cache_data.clear()
+                st.session_state.pop("db", None)
+                st.rerun()
+        with d2:
+            if st.button("🚪 Déconnexion", key="logout"):
+                st.cache_data.clear()
+                st.cache_resource.clear()
+                for k in ["creds_json", "db", "ops", "annulation", "mode_ia"]:
+                    st.session_state.pop(k, None)
+                st.rerun()
+        
+        st.divider()
+        st.markdown("**🔐 Accès Labo IA**")
+        pwd = st.text_input("Code secret", type="password", key="sec_pwd_input", placeholder="Entrez le code…")
+        if pwd == "2026":
+            st.session_state["mode_ia"] = True
+            st.query_params["p"] = "ialab"
+            st.rerun()
+        elif pwd:
+            st.error("Code incorrect")
+
+        st.caption(f"Synchronisé {depuis(st.session_state['derniere_synchro'])} · version {VERSION}")
+
+# ==========================================================
+# 8b. BUDGET
+# ==========================================================
+elif page_cle == "budget":
+    budget = rows("Budget")
+    if budget:
+        lignes = []
+        for idx, r in budget:
+            d, pyr, lbl, mnt, cat = pad(r, 5)
+            lignes.append({"idx": idx, "Date": parse_date(d), "Payeur": pyr, "Intitulé": lbl, "Montant": to_float(mnt), "Catégorie": cat or "Alimentation"})
+        df = pd.DataFrame(lignes)
+        m1, m2 = st.columns(2)
+        m1.metric("Payé par Lucas", f"{df[df['Payeur'] == 'Lucas']['Montant'].sum():.2f} €")
+        m2.metric("Payé par Alex", f"{df[df['Payeur'] == 'Alex']['Montant'].sum():.2f} €")
+        titre("Dépenses")
+        for _, r in df.iloc[::-1].iterrows():
+            if ligne_action(f"{r['Intitulé']} <span class='tag'>{r['Catégorie']}</span><br><span class='q'>{r['Montant']:.2f} € · {r['Payeur']}</span>", [("🗑️", f"bu_{r['idx']}")]):
+                delete_row("Budget", int(r["idx"]), libelle="Dépense supprimée")
+                st.rerun()
+    else:
+        vide("Aucune dépense.")
+
+    st.divider()
+    titre("Nouvelle dépense")
+    b_payeur = pills("new_bud_payeur", PERSONNES, cols=2)
+    b_cat = pills("new_bud_cat", CAT_BUDGET, cols=2)
+    b_label = st.text_input("Intitulé", key="new_bud_label", placeholder="Magasin…")
+    bc1, bc2 = st.columns(2)
+    with bc1:
+        b_montant = st.number_input("Montant (€)", min_value=0.0, step=0.5, key="new_bud_montant")
+    with bc2:
+        b_date = st.date_input("Date", value=ajd, key="new_bud_date")
+    if st.button("Enregistrer", type="primary", key="add_budget") and b_label.strip() and b_montant > 0:
+        add_row("Budget", [str(b_date), b_payeur, b_label.strip(), f"{b_montant:.2f}", b_cat])
+        reset_after(new_bud_label="", new_bud_montant=0.0)
+        st.rerun()
+
+# ==========================================================
+# 8c. MAISON
+# ==========================================================
+elif page_cle == "maison":
+    with conteneur("mtabs"):
+        onglet_m = pills("m_tab", ONGLETS_M, cols=2)
+
+    if onglet_m == ONGLETS_M[0]:
+        courses = rows("Courses")
+        titre("💖 Articles habituels")
+        rayon_memo = pills("memo_rayon", RAYONS[:-1], cols=2)
+        deja = {pad(r, 3)[0].strip().lower() for _, r in courses}
+        mc1, mc2 = st.columns(2)
+        for i, memo in enumerate([m for m in MEMOIRE_COURSES if m["rayon"] == rayon_memo]):
+            with (mc1 if i % 2 == 0 else mc2):
+                if st.button(("✅ " if memo["article"].lower() in deja else "＋ ") + memo["article"], key=f"memo_{memo['article']}"):
+                    add_course(memo["article"], memo["qte"], memo["rayon"])
+                    st.rerun()
+
+        st.divider()
+        titre(f"🛒 Panier ({len(courses)})")
+        if courses:
+            for rayon in RAYONS:
+                du_rayon = [(i, r) for i, r in courses if (pad(r, 3)[2] or "Autre") == rayon]
+                if not du_rayon:
+                    continue
+                with conteneur(f"grp-{slug(rayon)}"):
+                    st.markdown(f"<div class='rayon'>{rayon}</div>", unsafe_allow_html=True)
+                    for idx, r in du_rayon:
+                        art, qte, _ = pad(r, 3)
+                        if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"co_{idx}")]):
+                            delete_row("Courses", idx, libelle="Article retiré")
+                            st.rerun()
+        else:
+            vide("Panier vide.")
+
+    elif onglet_m == ONGLETS_M[1]:
+        recettes = rows("Recettes")
+        for idx, r in recettes:
+            t, ing, inst = pad(r, 3)
+            with st.expander(f"🍲 {t}"):
+                if ing:
+                    st.markdown(f"**Ingrédients**\n\n{ing}")
+                if inst:
+                    st.markdown(f"**Préparation**\n\n{inst}")
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button("🛒 Au panier", key=f"rec_panier_{idx}") and ing:
+                        ajoutes = 0
+                        for brut in ing.splitlines():
+                            if brut.strip():
+                                article, qte = separer_quantite(brut)
+                                add_course(article, qte)
+                                ajoutes += 1
+                        st.toast(f"{ajoutes} ingrédient(s) ajouté(s) 🛒", icon="✅")
+                        st.rerun()
+                with b2:
+                    if st.button("🗑️ Supprimer", key=f"re_{idx}"):
+                        delete_row("Recettes", idx, libelle="Recette supprimée")
+                        st.rerun()
+        if not recettes:
+            vide("Aucune recette pour l'instant.")
+
+        st.divider()
+        with st.form("form_recette", clear_on_submit=True):
+            titre("Nouvelle recette")
+            st.caption("Un ingrédient par ligne : « 200 g de farine ». Le panier saura les relire.")
+            r_titre = st.text_input("Nom")
+            r_ing = st.text_area("Ingrédients", height=90)
+            r_inst = st.text_area("Préparation", height=110)
+            if st.form_submit_button("Enregistrer la recette", type="primary") and r_titre.strip():
+                add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
+                st.rerun()
+
+# ==========================================================
+# 8d. LABO IA & MARCHÉS — module externe labo_ia.py
+# ==========================================================
+elif page_cle == "ialab" and st.session_state.get("mode_ia"):
+    try:
         import labo_ia
+    except Exception as err:
+        st.error(f"Module labo_ia.py introuvable : {err}")
+    else:
         labo_ia.render({
             "rows": rows, "add_row": add_row, "delete_row": delete_row,
             "set_cell": set_cell, "pad": pad, "to_float": to_float,
@@ -17,835 +984,8 @@ Branchement dans l'application principale, sans dépendance inverse :
             "vider_file": vider_file,
         })
 
-Le module n'écrit que dans la feuille « IA_Lab », qui existe déjà avec ses
-quatre colonnes (Date, Sujet, Contenu, Type). Aucune migration nécessaire.
-
-Sections :
-  1. Constantes         4. Données de marché
-  2. Accès à l'app      5. Notes & réglages
-  3. Mise en forme      6. Onglets · 7. render()
-"""
-
-import json
-import math
-import re
-import traceback
-from datetime import date
-
-import pandas as pd
-import streamlit as st
-
 # ==========================================================
-# 1. CONSTANTES
+# 8e. LABO DEMANDÉ SANS ACCÈS
 # ==========================================================
-VERSION_LABO = "4.0"
-CFG_SUJET = "Paramètres du labo"
-
-ONGLETS = ["📈 Marchés", "🔬 Analyse", "📚 Notes"]
-
-UNIVERS = {
-    "Bitcoin":        ("BTC-USD",   "Crypto"),
-    "Ethereum":       ("ETH-USD",   "Crypto"),
-    "Solana":         ("SOL-USD",   "Crypto"),
-    "Or":             ("GC=F",      "Matières premières"),
-    "Argent":         ("SI=F",      "Matières premières"),
-    "Pétrole WTI":    ("CL=F",      "Matières premières"),
-    "S&P 500":        ("^GSPC",     "Indices"),
-    "Nasdaq 100":     ("^NDX",      "Indices"),
-    "CAC 40":         ("^FCHI",     "Indices"),
-    "Euro Stoxx 50":  ("^STOXX50E", "Indices"),
-    "Apple":          ("AAPL",      "Actions"),
-    "Nvidia":         ("NVDA",      "Actions"),
-    "Microsoft":      ("MSFT",      "Actions"),
-    "Tesla":          ("TSLA",      "Actions"),
-    "Amazon":         ("AMZN",      "Actions"),
-    "ASML":           ("ASML",      "Actions"),
-    "EUR/USD":        ("EURUSD=X",  "Devises"),
-}
-NOM_PAR_TICKER = {t: n for n, (t, _) in UNIVERS.items()}
-
-# libellé : (période yfinance, intervalle, barres par an pour l'annualisation)
-PERIODES = {
-    "1J": ("1d", "5m", 252 * 78),
-    "5J": ("5d", "15m", 252 * 26),
-    "1M": ("1mo", "1h", 252 * 7),
-    "6M": ("6mo", "1d", 252),
-    "1A": ("1y", "1d", 252),
-    "5A": ("5y", "1wk", 52),
-}
-
-PALETTE = ["#be185d", "#7c3aed", "#0891b2", "#d97706", "#16a34a", "#2563eb"]
-
-TYPES_NOTE = ["Note", "À retenir", "Idée", "Suivi"]
-
-# ==========================================================
-# 2. ACCÈS À L'APPLICATION HÔTE
-# ==========================================================
-_CTX = {}
-
-REQUIS = ["rows", "add_row", "delete_row", "set_cell", "pad",
-          "conteneur", "titre", "vide", "pills"]
-
-
-def _f(nom):
-    fonction = _CTX.get(nom)
-    if fonction is None:
-        raise RuntimeError(f"Contexte incomplet : « {nom} » n'a pas été transmis à labo_ia.render().")
-    return fonction
-
-
-def rows(feuille):
-    return _f("rows")(feuille)
-
-
-def add_row(feuille, ligne):
-    # L'app expose add_row(feuille, ligne) : deux arguments, pas davantage.
-    return _f("add_row")(feuille, ligne)
-
-
-def delete_row(feuille, index, libelle="Élément supprimé"):
-    return _f("delete_row")(feuille, index, True, libelle)
-
-
-def set_cell(feuille, index, colonne, valeur):
-    # L'app expose set_cell(feuille, index, colonne, valeur, annulable, libelle).
-    return _f("set_cell")(feuille, index, colonne, valeur)
-
-
-def pad(ligne, n):
-    return _f("pad")(ligne, n)
-
-
-def conteneur(cle=None, bordure=True):
-    return _f("conteneur")(cle, bordure)
-
-
-def titre(texte):
-    return _f("titre")(texte)
-
-
-def vide(texte):
-    return _f("vide")(texte)
-
-
-def pills(cle, options, defaut=None, cols=3):
-    """Un défaut est toujours transmis : sans lui, certaines implémentations
-    renvoient None et la suite de la page part en erreur."""
-    if defaut is None and options:
-        defaut = options[0]
-    return _f("pills")(cle, options, defaut, cols)
-
-
-def reset_after(**champs):
-    """Applique des valeurs au prochain rerun.
-
-    C'est la seule façon sûre de modifier une clé de widget déjà instanciée :
-    Streamlit refuse l'affectation directe dans ce cas.
-    """
-    fonction = _CTX.get("reset_after")
-    if fonction:
-        fonction(**champs)
-        return True
-    return False
-
-
-def _defaut(cle, valeur):
-    """Valeur initiale d'un widget, posée avant sa création.
-
-    Évite le mélange `value=` + `key=`, source d'avertissements et de valeurs
-    qui ne se rafraîchissent pas.
-    """
-    if cle not in st.session_state:
-        st.session_state[cle] = valeur
-
-# ==========================================================
-# 3. MISE EN FORME & COMPOSANTS
-# ==========================================================
-FINE = "\u202f"  # espace fine insécable : jamais de nombre coupé en deux lignes
-
-
-def _nan(valeur):
-    if valeur is None:
-        return True
-    try:
-        f = float(valeur)
-    except (TypeError, ValueError):
-        return True
-    return math.isnan(f) or math.isinf(f)
-
-
-def fnum(valeur, dec=2, suffixe=""):
-    if _nan(valeur):
-        return "—"
-    brut = f"{float(valeur):,.{dec}f}".replace(",", "§").replace(".", ",").replace("§", FINE)
-    return f"{brut}{FINE}{suffixe}" if suffixe else brut
-
-
-def fprix(valeur, devise="$"):
-    """Décimales adaptées à l'ordre de grandeur : 68 420 $ mais 0,4213 $."""
-    if _nan(valeur):
-        return "—"
-    amplitude = abs(float(valeur))
-    dec = 0 if amplitude >= 1000 else (2 if amplitude >= 5 else 4)
-    return fnum(valeur, dec, devise)
-
-
-def fpct(valeur, dec=2, signe=True):
-    if _nan(valeur):
-        return "—"
-    valeur = float(valeur)
-    prefixe = ("+" if valeur >= 0 else "-") if signe else ("-" if valeur < 0 else "")
-    return f"{prefixe}{fnum(abs(valeur), dec)}{FINE}%"
-
-
-def ton(valeur, seuil=1e-9):
-    if _nan(valeur) or abs(float(valeur)) < seuil:
-        return "flat"
-    return "up" if float(valeur) > 0 else "down"
-
-
-def kpis(cartes, largeur=152):
-    """cartes : liste de dicts {label, valeur, delta, delta_ton, aide}."""
-    blocs = []
-    for carte in cartes:
-        bas = ""
-        if carte.get("delta"):
-            bas = f"<div class='d {carte.get('delta_ton', 'flat')}'>{carte['delta']}</div>"
-        elif carte.get("aide"):
-            bas = f"<div class='d flat'>{carte['aide']}</div>"
-        blocs.append(
-            f"<div class='lab-kpi'><div class='l'>{carte['label']}</div>"
-            f"<div class='v'>{carte['valeur']}</div>{bas}</div>"
-        )
-    st.markdown(f"<div class='lab-grid' style='--mini:{largeur}px'>{''.join(blocs)}</div>",
-                unsafe_allow_html=True)
-
-
-def table(colonnes, lignes):
-    """colonnes : liste de (titre, classe 'txt' ou 'num').
-
-    Tableau défilable, en-tête et première colonne figées : sur téléphone,
-    aucune valeur n'est tronquée, on fait glisser horizontalement.
-    """
-    if not lignes:
-        return
-    entete = "".join(f"<th class='{cls}'>{lib}</th>" for lib, cls in colonnes)
-    corps = []
-    for ligne in lignes:
-        cellules = "".join(
-            f"<td class='{colonnes[i][1] if i < len(colonnes) else 'txt'}'>{valeur}</td>"
-            for i, valeur in enumerate(ligne)
-        )
-        corps.append(f"<tr>{cellules}</tr>")
-    st.markdown(
-        "<div class='lab-tablewrap'><table class='lab-table'>"
-        f"<thead><tr>{entete}</tr></thead><tbody>{''.join(corps)}</tbody></table></div>",
-        unsafe_allow_html=True,
-    )
-
-
-def note(texte, style="info"):
-    st.markdown(f"<div class='lab-note {style}'>{texte}</div>", unsafe_allow_html=True)
-
-
-def sous_titre(texte):
-    st.markdown(f"<div class='lab-sec'>{texte}</div>", unsafe_allow_html=True)
-
-
-CSS = """
-<style>
-/* Le labo respire plus large que le reste de l'app, mais seulement sur écran :
-   sur téléphone on garde la mise en page de l'application principale. */
-@media (min-width:700px){ .block-container{max-width:980px !important;} }
-
-.lab-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(var(--mini,152px),1fr));
-  gap:10px; margin:4px 0 14px;}
-.lab-kpi{background:#fff; border:3px solid #be185d; border-radius:16px; padding:10px 13px 11px;
-  box-shadow:0 6px 18px rgba(131,24,67,.16); min-width:0; overflow:hidden;}
-.lab-kpi .l{font-size:11px; font-weight:800; letter-spacing:.02em; color:#701a75;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px;}
-.lab-kpi .v{font-size:clamp(15px,4vw,21px); font-weight:800; color:#9d174d; line-height:1.15;
-  font-variant-numeric:tabular-nums; white-space:nowrap;}
-.lab-kpi .d{font-size:12px; font-weight:800; margin-top:3px; white-space:nowrap;
-  font-variant-numeric:tabular-nums;}
-.lab-kpi .up{color:#15803d;} .lab-kpi .down{color:#b91c1c;} .lab-kpi .d.flat{color:#6b7280;}
-
-.lab-tablewrap{border:3px solid #be185d; border-radius:16px; background:#fff; overflow:auto;
-  max-height:440px; box-shadow:0 6px 18px rgba(131,24,67,.14); margin:4px 0 14px;
-  -webkit-overflow-scrolling:touch;}
-.lab-table{border-collapse:separate; border-spacing:0; width:100%; font-size:13px;}
-.lab-table th{position:sticky; top:0; z-index:3; background:#fdf2f8; color:#9d174d; text-align:left;
-  font-size:11.5px; font-weight:800; padding:10px 12px; white-space:nowrap;
-  border-bottom:2px solid #f472b6;}
-.lab-table td{padding:9px 12px; white-space:nowrap; font-weight:700; color:#311026;
-  font-variant-numeric:tabular-nums; border-bottom:1px solid #fce7f3;}
-.lab-table td.num, .lab-table th.num{text-align:right;}
-.lab-table tbody tr:last-child td{border-bottom:none;}
-.lab-table td:first-child{position:sticky; left:0; z-index:2; background:#fff;
-  box-shadow:1px 0 0 #fce7f3;}
-.lab-table th:first-child{left:0; z-index:4;}
-.lab-table .up{color:#15803d;} .lab-table .down{color:#b91c1c;} .lab-table .flat{color:#6b7280;}
-
-.lab-note{border-radius:14px; padding:11px 14px; font-size:13px; font-weight:700; margin:6px 0 12px;
-  background:#fdf2f8; border:2px solid #f472b6; color:#9d174d; line-height:1.5;}
-.lab-note.warn{background:#fff7ed; border-color:#fb923c; color:#c2410c;}
-.lab-note.calme{background:#f8fafc; border-color:#cbd5e1; color:#475569;}
-.lab-sec{font-weight:800; font-size:15.5px; color:#9d174d; margin:16px 0 6px;}
-
-/* Dans le labo, les rangées de champs passent à la ligne au lieu de s'écraser. */
-[class*="st-key-labrow"] [data-testid="stHorizontalBlock"]{flex-wrap:wrap !important; gap:10px !important;}
-[class*="st-key-labrow"] [data-testid="stHorizontalBlock"] > div{min-width:150px !important;}
-</style>
-"""
-
-# ==========================================================
-# 4. DONNÉES DE MARCHÉ
-# ==========================================================
-@st.cache_data(ttl=180, show_spinner=False)
-def _telecharger(tickers, periode, intervalle):
-    """Renvoie {ticker: DataFrame OHLCV}, message d'erreur."""
-    try:
-        import yfinance as yf
-    except ImportError:
-        return {}, "Le module yfinance n'est pas installé (pip install yfinance)."
-    try:
-        brut = yf.download(list(tickers), period=periode, interval=intervalle,
-                           progress=False, auto_adjust=False, group_by="column", threads=True)
-    except Exception as err:
-        return {}, f"Téléchargement impossible : {str(err)[:120]}"
-    if brut is None or brut.empty:
-        return {}, "Aucune donnée pour cette période — le marché est peut-être fermé."
-
-    paquets = {}
-    if isinstance(brut.columns, pd.MultiIndex):
-        for ticker in tickers:
-            try:
-                sous = brut.xs(ticker, axis=1, level=-1).dropna(how="all")
-            except Exception:
-                continue
-            if not sous.empty:
-                paquets[ticker] = sous
-    else:
-        sous = brut.dropna(how="all")
-        if not sous.empty:
-            paquets[list(tickers)[0]] = sous
-
-    if not paquets:
-        return {}, "Aucune série exploitable pour cette sélection."
-    return paquets, None
-
-
-def marche(noms, periode_label):
-    """noms : libellés de UNIVERS. Renvoie {nom: DataFrame}, barres/an, erreur.
-
-    Ne lève jamais : une panne réseau doit afficher un message, pas casser la page.
-    """
-    periode, intervalle, barres_an = PERIODES.get(periode_label, PERIODES["1J"])
-    tickers = tuple(sorted({UNIVERS[n][0] for n in noms if n in UNIVERS}))
-    if not tickers:
-        return {}, barres_an, "Sélectionnez au moins un actif."
-    try:
-        paquets, err = _telecharger(tickers, periode, intervalle)
-    except Exception as erreur:
-        return {}, barres_an, f"Marchés injoignables : {str(erreur)[:120]}"
-    return {NOM_PAR_TICKER.get(t, t): df for t, df in paquets.items()}, barres_an, err
-
-
-def moyenne_mobile(serie, n):
-    return serie.rolling(n).mean()
-
-
-def volatilite(serie, barres_an):
-    """Amplitude typique des variations, ramenée à une échelle annuelle."""
-    variations = serie.pct_change().dropna()
-    if len(variations) < 3:
-        return float("nan")
-    return float(variations.std() * math.sqrt(barres_an) * 100)
-
-
-def profil(df, barres_an):
-    """Photo d'un actif sur la période chargée : que des lectures de cours."""
-    if df is None or "Close" not in df:
-        return None
-    cloture = df["Close"].dropna()
-    if len(cloture) < 2:
-        return None
-    dernier, premier = float(cloture.iloc[-1]), float(cloture.iloc[0])
-    p = {
-        "serie": cloture,
-        "dernier": dernier,
-        "premier": premier,
-        "var": (dernier / premier - 1) * 100 if premier else float("nan"),
-        "haut": float(cloture.max()),
-        "bas": float(cloture.min()),
-        "moyenne": float(cloture.mean()),
-        "vol": volatilite(cloture, barres_an),
-        "repli": float((cloture / cloture.cummax() - 1).min() * 100),
-    }
-    amplitude = p["haut"] - p["bas"]
-    # Position du dernier cours dans le couloir de la période, en pourcentage.
-    p["position"] = ((dernier - p["bas"]) / amplitude * 100) if amplitude else float("nan")
-    p["mm20"] = float(moyenne_mobile(cloture, 20).iloc[-1]) if len(cloture) >= 20 else float("nan")
-    p["ecart20"] = (dernier / p["mm20"] - 1) * 100 if not _nan(p["mm20"]) else float("nan")
-    return p
-
-
-# --- Graphiques -------------------------------------------------------------
-def _plotly():
-    try:
-        import plotly.graph_objects as go
-        return go
-    except Exception:
-        return None
-
-
-def _mise_en_page(fig, hauteur=360, titre_y=""):
-    fig.update_layout(
-        margin=dict(l=8, r=8, t=26, b=8), height=hauteur, template="plotly_white",
-        hovermode="x unified", xaxis_title="", yaxis_title=titre_y,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=11)),
-        font=dict(family="Plus Jakarta Sans, sans-serif", size=12, color="#581c87"),
-        paper_bgcolor="rgba(0,0,0,0)",
-    )
-    return fig
-
-
-def courbe(df, titre_y="", hauteur=360):
-    go = _plotly()
-    if go is None:
-        st.line_chart(df)
-        return
-    try:
-        fig = go.Figure()
-        for i, colonne in enumerate(df.columns):
-            fig.add_trace(go.Scatter(
-                x=df.index, y=df[colonne], name=str(colonne), mode="lines",
-                line=dict(width=2.6, color=PALETTE[i % len(PALETTE)]),
-            ))
-        st.plotly_chart(_mise_en_page(fig, hauteur, titre_y), use_container_width=True)
-    except Exception:
-        st.line_chart(df)
-
-# ==========================================================
-# 5. NOTES & RÉGLAGES
-# ==========================================================
-def _config_par_defaut():
-    return {"watchlist": ["Bitcoin", "Or", "S&P 500", "Nvidia"]}
-
-
-def config():
-    """Réglages du labo, lus une seule fois par session.
-
-    L'index de la ligne « Config » est mémorisé pour que les enregistrements
-    suivants soient des mises à jour, jamais de nouvelles lignes.
-    """
-    if "lab_cfg" in st.session_state:
-        return st.session_state["lab_cfg"]
-
-    base = _config_par_defaut()
-    try:
-        for index, ligne in rows("IA_Lab"):
-            _, sujet, contenu, type_ = pad(ligne, 4)
-            if type_ == "Config" and sujet == CFG_SUJET:
-                try:
-                    charge = json.loads(contenu)
-                    if isinstance(charge, dict):
-                        base.update(charge)
-                except Exception:
-                    pass
-                st.session_state["lab_cfg_idx"] = index
-                break
-    except Exception:
-        pass  # feuille absente ou illisible : on démarre sur les valeurs par défaut
-
-    base["watchlist"] = [n for n in base.get("watchlist", []) if n in UNIVERS][:6]
-    st.session_state["lab_cfg"] = base
-    return base
-
-
-def sauver_config(cfg):
-    """Écrit les réglages sans relire la feuille dans la foulée.
-
-    Relire juste après une écriture faisait diverger la configuration, ce qui
-    relançait une écriture à chaque rerun : l'app bouclait sur l'API Google et
-    ne finissait jamais de s'afficher.
-    """
-    st.session_state["lab_cfg"] = cfg
-    charge = json.dumps(cfg, ensure_ascii=False)
-    index = st.session_state.get("lab_cfg_idx")
-    try:
-        if index:
-            set_cell("IA_Lab", index, 3, charge)
-            return
-        add_row("IA_Lab", [str(date.today()), CFG_SUJET, charge, "Config"])
-        for i, ligne in rows("IA_Lab"):          # on retient l'index tout de suite
-            _, sujet, _, type_ = pad(ligne, 4)
-            if type_ == "Config" and sujet == CFG_SUJET:
-                st.session_state["lab_cfg_idx"] = i
-                break
-    except Exception as err:
-        st.warning(f"Réglages non enregistrés : {str(err)[:120]}")
-
-
-def notes_utilisateur():
-    """Toutes les notes, sauf la ligne technique de configuration."""
-    sortie = []
-    try:
-        lignes = rows("IA_Lab")
-    except Exception:
-        return sortie
-    for index, ligne in lignes:
-        d, sujet, contenu, type_ = pad(ligne, 4)
-        if type_ == "Config":
-            continue
-        sortie.append({"idx": index, "date": d, "sujet": sujet,
-                       "contenu": contenu, "type": type_ or TYPES_NOTE[0]})
-    return sortie
-
-# ==========================================================
-# 6. ONGLETS
-# ==========================================================
-def _selection(cle_widget, cfg, maxi=6):
-    """Sélecteur d'actifs qui n'écrit la configuration qu'à un vrai changement."""
-    _defaut(cle_widget, [n for n in cfg["watchlist"] if n in UNIVERS][:maxi] or ["Bitcoin", "Or"])
-    choix = st.multiselect("Actifs suivis", list(UNIVERS), max_selections=maxi, key=cle_widget)
-
-    deja = st.session_state.get("lab_watch_saved")
-    if deja is None:
-        deja = tuple(cfg["watchlist"])
-    if choix and tuple(choix) != tuple(deja):
-        st.session_state["lab_watch_saved"] = tuple(choix)
-        cfg["watchlist"] = list(choix)
-        sauver_config(cfg)
-    return choix
-
-
-def onglet_marches(cfg):
-    with conteneur("labrow-sel"):
-        choix = _selection("lab_cmp", cfg)
-        colonne_a, colonne_b = st.columns(2)
-        with colonne_a:
-            periode = pills("lab_periode", list(PERIODES), defaut="5J", cols=3)
-        with colonne_b:
-            base = pills("lab_base", ["Base 100", "Prix réels"], defaut="Base 100", cols=2)
-
-    if not choix:
-        note("Sélectionnez au moins un actif pour afficher les cours.")
-        return
-
-    # Chargement à la demande : sur téléphone, télécharger plusieurs séries
-    # avant le premier affichage laissait la page sur un spinner interminable.
-    if not st.session_state.get("lab_live"):
-        note("Les cours ne sont pas encore chargés — appuyez pour interroger les marchés.")
-        if st.button("📡 Charger les cours", type="primary", key="lab_go"):
-            st.session_state["lab_live"] = True
-            st.rerun()
-        return
-
-    with st.spinner("Lecture des marchés…"):
-        donnees, barres_an, err = marche(choix, periode)
-    if err:
-        note(f"⚠️ {err}", "warn")
-        if st.button("Réessayer", key="lab_retry"):
-            st.cache_data.clear()
-            st.rerun()
-        return
-
-    valides = {nom: p for nom, p in ((n, profil(donnees.get(n), barres_an)) for n in choix) if p}
-    if not valides:
-        note("Aucune donnée exploitable sur cette période.", "warn")
-        return
-
-    kpis([{"label": nom, "valeur": fprix(p["dernier"]),
-           "delta": fpct(p["var"]), "delta_ton": ton(p["var"])}
-          for nom, p in valides.items()], largeur=160)
-
-    sous_titre("Les cours sur la période")
-    table([("Actif", "txt"), ("Dernier", "num"), ("Variation", "num"), ("Plus haut", "num"),
-           ("Plus bas", "num"), ("Moyenne", "num"), ("Amplitude", "num")],
-          [[nom, fprix(p["dernier"]),
-            f"<span class='{ton(p['var'])}'>{fpct(p['var'])}</span>",
-            fprix(p["haut"]), fprix(p["bas"]), fprix(p["moyenne"]),
-            fpct((p["haut"] / p["bas"] - 1) * 100 if p["bas"] else float("nan"), 1, signe=False)]
-           for nom, p in valides.items()])
-    st.caption("Le tableau défile horizontalement : aucune valeur n'est tronquée.")
-
-    sous_titre("Évolution comparée")
-    series = pd.DataFrame({nom: p["serie"] for nom, p in valides.items()})
-    if base == "Base 100":
-        series = series.apply(lambda c: c / c.dropna().iloc[0] * 100 if not c.dropna().empty else c)
-        courbe(series, "Base 100 au départ de la période")
-        st.caption("Chaque actif part de 100 : les courbes se comparent malgré des prix "
-                   "très différents.")
-    else:
-        courbe(series, "Prix, dans la devise de cotation")
-
-    if len(valides) >= 2 and len(series.dropna()) > 5:
-        sous_titre("Est-ce que ça bouge ensemble ?")
-        matrice = series.pct_change().corr()
-        colonnes = [("", "txt")] + [(nom, "num") for nom in matrice.columns]
-        lignes = []
-        for nom in matrice.index:
-            cellules = [f"<b>{nom}</b>"]
-            for autre in matrice.columns:
-                valeur = matrice.loc[nom, autre]
-                classe = "up" if valeur > 0.5 else ("down" if valeur < -0.2 else "flat")
-                cellules.append(f"<span class='{classe}'>{fnum(valeur, 2)}</span>")
-            lignes.append(cellules)
-        table(colonnes, lignes)
-        st.caption("1,00 = les deux actifs montent et descendent ensemble · 0,00 = aucun lien · "
-                   "négatif = quand l'un monte, l'autre baisse.")
-
-    sous_titre("Garder une trace")
-    with conteneur("labrow-note-marche"):
-        commentaire = st.text_area("Ce que vous retenez de cette séance",
-                                   key="lab_note_marche", height=90,
-                                   placeholder="Ex : l'or tient pendant que le Nasdaq recule…")
-        if st.button("Enregistrer dans mes notes", type="primary", key="lab_save_marche"):
-            if commentaire.strip():
-                resume = " · ".join(f"{nom} {fpct(p['var'])}" for nom, p in valides.items())
-                add_row("IA_Lab", [str(date.today()), f"Marchés ({periode})",
-                                   f"{resume}\n\n{commentaire.strip()}", "Suivi"])
-                reset_after(lab_note_marche="")
-                st.toast("Note enregistrée", icon="✅")
-                st.rerun()
-            else:
-                st.warning("Écrivez d'abord ce que vous retenez.")
-
-
-def onglet_analyse(cfg):
-    with conteneur("labrow-ana"):
-        colonne_a, colonne_b = st.columns([2, 1])
-        with colonne_a:
-            actif = st.selectbox("Actif étudié", list(UNIVERS), key="lab_ana_actif")
-        with colonne_b:
-            periode = pills("lab_ana_periode", list(PERIODES), defaut="1M", cols=3)
-
-    if not st.session_state.get("lab_live"):
-        note("Les cours ne sont pas encore chargés — appuyez pour interroger les marchés.")
-        if st.button("📡 Charger les cours", type="primary", key="lab_go_ana"):
-            st.session_state["lab_live"] = True
-            st.rerun()
-        return
-
-    with st.spinner("Lecture des marchés…"):
-        donnees, barres_an, err = marche([actif], periode)
-    if err:
-        note(f"⚠️ {err}", "warn")
-        return
-    df = donnees.get(actif)
-    p = profil(df, barres_an)
-    if not p:
-        note("Pas assez de données pour cet actif sur cette période.", "warn")
-        return
-
-    cloture = p["serie"]
-    kpis([
-        {"label": "Dernier cours", "valeur": fprix(p["dernier"]),
-         "delta": fpct(p["var"]), "delta_ton": ton(p["var"])},
-        {"label": "Plus haut", "valeur": fprix(p["haut"]),
-         "aide": "sommet de la période"},
-        {"label": "Plus bas", "valeur": fprix(p["bas"]),
-         "aide": "creux de la période"},
-        {"label": "Dans le couloir", "valeur": fpct(p["position"], 0, signe=False),
-         "aide": "0 % = au plus bas · 100 % = au plus haut"},
-        {"label": "Écart à la moyenne 20", "valeur": fpct(p["ecart20"], 2),
-         "delta_ton": ton(p["ecart20"])},
-        {"label": "Agitation annualisée", "valeur": fpct(p["vol"], 1, signe=False),
-         "aide": "amplitude typique des variations"},
-    ])
-
-    go = _plotly()
-    trace_ok = False
-    if go is not None:
-        try:
-            from plotly.subplots import make_subplots
-            avec_volume = "Volume" in df.columns and float(df["Volume"].fillna(0).sum()) > 0
-            fig = make_subplots(rows=2 if avec_volume else 1, cols=1, shared_xaxes=True,
-                                row_heights=[0.74, 0.26] if avec_volume else [1.0],
-                                vertical_spacing=0.05)
-
-            if {"Open", "High", "Low", "Close"}.issubset(df.columns):
-                fig.add_trace(go.Candlestick(
-                    x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"],
-                    name="Cours", increasing_line_color="#15803d",
-                    decreasing_line_color="#b91c1c", showlegend=False), row=1, col=1)
-            else:
-                fig.add_trace(go.Scatter(x=cloture.index, y=cloture, name="Cours",
-                                         line=dict(color="#be185d", width=2.4)), row=1, col=1)
-
-            if len(cloture) >= 20:
-                fig.add_trace(go.Scatter(x=cloture.index, y=moyenne_mobile(cloture, 20),
-                                         name="Moyenne 20",
-                                         line=dict(color="#be185d", width=2)), row=1, col=1)
-            if len(cloture) >= 50:
-                fig.add_trace(go.Scatter(x=cloture.index, y=moyenne_mobile(cloture, 50),
-                                         name="Moyenne 50",
-                                         line=dict(color="#7c3aed", width=2, dash="dot")),
-                              row=1, col=1)
-
-            if avec_volume:
-                fig.add_trace(go.Bar(x=df.index, y=df["Volume"], name="Volume",
-                                     marker_color="#f472b6", showlegend=False), row=2, col=1)
-                fig.update_yaxes(title_text="Volume", row=2, col=1)
-
-            fig.update_xaxes(rangeslider_visible=False)
-            st.plotly_chart(_mise_en_page(fig, 520 if avec_volume else 400, "Prix"),
-                            use_container_width=True)
-            trace_ok = True
-        except Exception:
-            trace_ok = False
-    if not trace_ok:
-        courbe(pd.DataFrame({actif: cloture}), "Prix", hauteur=380)
-
-    sous_titre("Repères de la période")
-    reperes = [
-        ("Plus haut", p["haut"]),
-        ("Moyenne des cours", p["moyenne"]),
-        ("Moyenne mobile 20", p["mm20"]),
-        ("Premier cours de la période", p["premier"]),
-        ("Plus bas", p["bas"]),
-    ]
-    dernier = p["dernier"]
-    table([("Repère", "txt"), ("Cours", "num"), ("Écart au dernier", "num")],
-          [[libelle, fprix(valeur),
-            f"<span class='{ton(dernier - valeur)}'>{fpct((dernier / valeur - 1) * 100, 2)}</span>"
-            if not _nan(valeur) and valeur else "—"]
-           for libelle, valeur in reperes])
-
-    note("Ces chiffres décrivent des cours passés. Ils ne prédisent rien et ne constituent "
-         "pas un conseil en investissement.", "calme")
-
-    sous_titre("Noter cette observation")
-    with conteneur("labrow-note-ana"):
-        obs = st.text_area(f"Ce que vous observez sur {actif}", key="lab_note_ana", height=90,
-                           placeholder="Ex : le cours reste au-dessus de sa moyenne 20 depuis…")
-        if st.button("Enregistrer dans mes notes", type="primary", key="lab_save_ana"):
-            if obs.strip():
-                entete = (f"{actif} · {fprix(p['dernier'])} ({fpct(p['var'])}) "
-                          f"sur {periode}")
-                add_row("IA_Lab", [str(date.today()), f"Observation — {actif}",
-                                   f"{entete}\n\n{obs.strip()}", "Suivi"])
-                reset_after(lab_note_ana="")
-                st.toast("Note enregistrée", icon="✅")
-                st.rerun()
-            else:
-                st.warning("Écrivez d'abord votre observation.")
-
-
-def onglet_notes(cfg):
-    notes_liste = notes_utilisateur()
-
-    with conteneur("labrow-search"):
-        recherche = st.text_input("Rechercher dans vos notes", key="lab_recherche",
-                                  placeholder="Ex : or, séance, idée…")
-        filtre_type = pills("lab_type_filtre", ["Tous"] + TYPES_NOTE, defaut="Tous", cols=3)
-
-    visibles = notes_liste
-    if filtre_type != "Tous":
-        visibles = [n for n in visibles if n["type"] == filtre_type]
-    if recherche.strip():
-        mots = re.findall(r"\w{3,}", recherche.lower())
-        classees = []
-        for n in visibles:
-            blob = f"{n['sujet']} {n['contenu']}".lower()
-            score = sum(blob.count(mot) for mot in mots)
-            if score:
-                classees.append((score, n))
-        visibles = [n for _, n in sorted(classees, key=lambda c: -c[0])]
-
-    kpis([
-        {"label": "Notes enregistrées", "valeur": fnum(len(notes_liste), 0)},
-        {"label": "Affichées ici", "valeur": fnum(len(visibles), 0)},
-    ], largeur=170)
-
-    if visibles:
-        for n in reversed(visibles[-40:]):
-            with st.expander(f"{n['sujet']} · {n['type']} · {n['date']}"):
-                cle_edition = f"lab_edit_{n['idx']}"
-                _defaut(cle_edition, n["contenu"] or "")
-                edition = st.text_area("Contenu", height=140, key=cle_edition)
-                with conteneur(f"labrow-note-{n['idx']}"):
-                    colonne_a, colonne_b = st.columns(2)
-                    with colonne_a:
-                        if st.button("Enregistrer les modifications", type="primary",
-                                     key=f"lab_maj_{n['idx']}"):
-                            set_cell("IA_Lab", n["idx"], 3, edition)
-                            st.toast("Note mise à jour", icon="✅")
-                            st.rerun()
-                    with colonne_b:
-                        if st.button("Supprimer", key=f"lab_supp_{n['idx']}"):
-                            delete_row("IA_Lab", n["idx"], libelle="Note supprimée")
-                            st.rerun()
-    else:
-        vide("Aucune note ne correspond. Créez-en une ci-dessous.")
-
-    if notes_liste:
-        export = pd.DataFrame(notes_liste)[["date", "type", "sujet", "contenu"]]
-        st.download_button("Télécharger toutes les notes (CSV)",
-                           export.to_csv(index=False).encode("utf-8"),
-                           file_name=f"notes-labo-{date.today()}.csv", mime="text/csv",
-                           key="lab_export")
-
-    sous_titre("Nouvelle note")
-    sujet = st.text_input("Sujet", key="lab_n_sujet", placeholder="Ex : ce que j'ai compris sur l'or")
-    type_note = pills("lab_n_type", TYPES_NOTE, defaut=TYPES_NOTE[0], cols=2)
-    contenu = st.text_area("Contenu", key="lab_n_contenu", height=170,
-                           placeholder="Ce que vous voulez retrouver plus tard…")
-    if st.button("Enregistrer la note", type="primary", key="lab_n_save"):
-        if sujet.strip():
-            add_row("IA_Lab", [str(date.today()), sujet.strip(), contenu.strip(), type_note])
-            reset_after(lab_n_sujet="", lab_n_contenu="")
-            st.toast("Note enregistrée", icon="📚")
-            st.rerun()
-        else:
-            st.warning("Donnez un sujet à la note.")
-
-    with st.expander("Réglages du labo"):
-        st.caption("Les actifs suivis se choisissent dans l'onglet Marchés et sont partagés "
-                   "entre vous deux via Google Sheets.")
-        if st.button("Recharger les cours et vider le cache", key="lab_cfg_cache"):
-            st.cache_data.clear()
-            st.session_state.pop("lab_live", None)
-            st.rerun()
-        st.caption(f"Labo version {VERSION_LABO}")
-
-# ==========================================================
-# 7. POINT D'ENTRÉE
-# ==========================================================
-ROUTES = {
-    ONGLETS[0]: onglet_marches,
-    ONGLETS[1]: onglet_analyse,
-    ONGLETS[2]: onglet_notes,
-}
-
-
-def render(ctx):
-    global _CTX
-    _CTX = ctx
-
-    absents = [nom for nom in REQUIS if nom not in ctx]
-    if absents:
-        st.error("Le labo n'a pas reçu toutes les fonctions de l'application : "
-                 + ", ".join(absents))
-        return
-
-    st.markdown(CSS, unsafe_allow_html=True)
-    titre("🧠 Labo IA & marchés")
-    with conteneur("labtabs"):
-        onglet = pills("lab_tab", ONGLETS, defaut=ONGLETS[0], cols=3)
-
-    try:
-        cfg = config()
-        ROUTES.get(onglet, onglet_marches)(cfg)
-    except Exception as err:
-        # Une erreur dans un onglet ne doit jamais laisser une page vide :
-        # on affiche le message pour pouvoir corriger.
-        st.error(f"Le labo a rencontré une erreur sur « {onglet} » : {err}")
-        with st.expander("Détail technique"):
-            st.code(traceback.format_exc())
-        if st.button("Réinitialiser le labo", key="lab_panic"):
-            for cle in [c for c in list(st.session_state) if str(c).startswith("lab_")]:
-                st.session_state.pop(cle, None)
-            st.cache_data.clear()
-            st.rerun()
+elif page_cle == "ialab":
+    vide("Le labo est verrouillé. Entrez le code dans Réglages, sur la page d'accueil.")
