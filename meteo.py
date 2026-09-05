@@ -20,7 +20,7 @@ from datetime import datetime
 import requests
 import streamlit as st
 
-VERSION_METEO = "2.0"
+VERSION_METEO = "2.1"
 
 # Ajoutez vos villes ici : "Nom": (latitude, longitude)
 VILLES = {
@@ -72,18 +72,18 @@ CSS = """
 <style>
 .meteo-now{display:flex; align-items:center; gap:16px; padding:2px 0 14px;}
 .meteo-now .ic{font-size:40px; line-height:1;}
-.meteo-now .t{font-size:32px; font-weight:700; color:var(--encre,#241B22); line-height:1;
+.meteo-now .t{font-size:32px; font-weight:700; color:var(--accent-fonce,#8C1444); line-height:1;
   font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
-.meteo-now .d{font-size:14px; font-weight:600; color:var(--encre-2,#5C4F55); margin-top:4px;}
-.meteo-now .s{font-size:12px; font-weight:500; color:var(--gris,#8A7C82); margin-top:2px;}
+.meteo-now .d{font-size:14px; font-weight:600; color:var(--encre-2,#6E4A5B); margin-top:4px;}
+.meteo-now .s{font-size:12px; font-weight:500; color:var(--gris,#9B7F8C); margin-top:2px;}
 .meteo-jours{display:grid; grid-template-columns:repeat(auto-fit,minmax(72px,1fr)); gap:6px;
-  padding-top:12px; border-top:1px solid var(--trait,#ECE0E5);}
+  padding-top:12px; border-top:1.5px solid var(--trait,#F3C7DA);}
 .meteo-jour{text-align:center; padding:6px 4px;}
-.meteo-jour .j{font-size:11px; font-weight:600; color:var(--gris,#8A7C82);}
+.meteo-jour .j{font-size:11px; font-weight:600; color:var(--gris,#9B7F8C);}
 .meteo-jour .e{font-size:20px; line-height:1.5;}
-.meteo-jour .m{font-size:12.5px; font-weight:700; color:var(--encre,#241B22);
+.meteo-jour .m{font-size:12.5px; font-weight:700; color:var(--encre,#3A1A28);
   font-variant-numeric:tabular-nums; white-space:nowrap;}
-.meteo-jour .m .min{color:var(--gris,#8A7C82); font-weight:500;}
+.meteo-jour .m .min{color:var(--gris,#9B7F8C); font-weight:500;}
 .meteo-conseil{background:#FDF4EA; border:1px solid #EBD3B4; color:var(--ambre,#A65B12);
   border-radius:12px; padding:10px 13px; font-size:12.5px; font-weight:600; margin-top:12px;}
 </style>
@@ -201,3 +201,4 @@ def carte(conteneur, entete_bloc):
 
         st.selectbox("Ville", list(VILLES), key="meteo_ville",
                      label_visibility="collapsed")
+    
