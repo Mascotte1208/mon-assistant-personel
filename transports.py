@@ -29,12 +29,13 @@
 # ==========================================================
 
 import json
+import unicodedata
 from datetime import datetime, timezone
 
 import requests
 import streamlit as st
 
-VERSION_TRANSPORTS = "3.1"
+VERSION_TRANSPORTS = "3.3"
 
 BASE = "https://api-management-opendata-production.azure-api.net/api/datasets/stibmivb"
 URL_ATTENTE = f"{BASE}/rt/WaitingTimes/"
@@ -43,6 +44,23 @@ URLS_ARRETS = [f"{BASE}/rt/StopDetails/", f"{BASE}/StopDetails/", f"{BASE}/rt/St
 ENTETE_CLE = "bmc-partner-key"
 
 CATEGORIE = "Arrêt STIB"        # colonne 1 de la feuille Listes
+
+# ----------------------------------------------------------
+# VOS ARRETS HABITUELS
+# ----------------------------------------------------------
+# Completez les numeros, un par sens de circulation, et ils
+# s'ajouteront tout seuls au premier lancement. Laissez une liste
+# vide et l'arret est simplement ignore.
+#
+# Pour trouver un numero : stib-mivb.be, rubrique Horaires, choisir
+# la ligne, puis la direction, puis l'arret. Le numero se lit a la
+# fin de l'adresse du navigateur, apres "_stop=". Recommencez avec
+# l'autre direction pour obtenir le second numero.
+ARRETS_PAR_DEFAUT = {
+    "Langeveld":   [],      # ex : ["1234", "1235"]
+    "René Gobert": [],
+    "Defré":       [],
+}
 RAFRAICHISSEMENT = 20           # secondes, en mode direct
 
 # Noms de champs possibles, du plus probable au moins probable.
@@ -165,6 +183,27 @@ def arrets():
         if element and ids:
             sortie.append({"idx": index, "nom": element, "ids": ids})
     return sortie
+
+
+def installer_defauts(existants):
+    """Ajoute les arrêts habituels, une seule fois, s'ils manquent.
+
+    Protégé par un drapeau de session : sans lui, un échec d'écriture
+    relancerait l'ajout à chaque passage.
+    """
+    if st.session_state.get("tr_defauts_faits"):
+        return False
+    st.session_state["tr_defauts_faits"] = True
+    connus = {a["nom"].strip().lower() for a in existants}
+    ajoutes = False
+    for nom, ids in ARRETS_PAR_DEFAUT.items():
+        if ids and nom.strip().lower() not in connus:
+            try:
+                ajouter_arret(nom, ids)
+                ajoutes = True
+            except Exception:
+                pass
+    return ajoutes
 
 
 def ajouter_arret(nom, ids):
@@ -335,37 +374,63 @@ except Exception:
     _tableau_direct = _tableau
 
 
-def _chercher_arret(texte, cle_partenaire):
-    """Cherche un arrêt par son nom dans le jeu Stop Details."""
-    texte = (texte or "").strip()
-    if len(texte) < 2:
-        return [], None
-    dernier = "Aucun résultat."
+def sans_accents(texte):
+    """« Defré » et « defre » doivent se retrouver l'un l'autre."""
+    plat = unicodedata.normalize("NFKD", str(texte or ""))
+    return "".join(c for c in plat if not unicodedata.combining(c)).lower().strip()
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def catalogue_arrets(cle_partenaire):
+    """Tous les arrêts du réseau : [(identifiant, nom)], url utilisée, erreur.
+
+    Le catalogue est chargé une fois par jour et fouillé ensuite en local :
+    c'est plus fiable que de filtrer côté serveur, dont la syntaxe et les noms
+    de champs ne sont pas documentés.
+    """
+    dernier = "Catalogue des arrêts introuvable."
     for url in URLS_ARRETS:
         champs, _, err = champs_disponibles(url, cle_partenaire)
         if err or not champs:
             dernier = err or "Jeu de données vide."
             continue
-        c_nom, c_id = choisir(champs, "nom"), choisir(champs, "arret")
-        if not (c_nom and c_id):
-            dernier = "Champs nom/identifiant non reconnus."
+        c_id, c_nom = choisir(champs, "arret"), choisir(champs, "nom")
+        if not (c_id and c_nom):
+            dernier = f"Champs non reconnus dans {url.rsplit('/', 2)[-2]}."
             continue
-        donnees, err = interroger(
-            url, {"where": f'{c_nom} LIKE "%{texte}%"', "limit": 20}, cle_partenaire)
-        if err:
-            dernier = err
-            continue
-        trouves, vus = [], set()
-        for enregistrement in donnees.get("results") or []:
-            identifiant = str(enregistrement.get(c_id) or "")
-            nom = texte_lisible(enregistrement.get(c_nom))
-            if not identifiant or not nom or identifiant in vus:
-                continue
-            vus.add(identifiant)
-            trouves.append((identifiant, nom))
-        if trouves:
-            return trouves, None
-    return [], dernier
+        tous, vus = [], set()
+        for page in range(6):                      # 6 000 arrêts au maximum
+            donnees, err = interroger(
+                url, {"limit": 1000, "offset": page * 1000}, cle_partenaire)
+            if err or not donnees:
+                break
+            resultats = donnees.get("results") or []
+            for enregistrement in resultats:
+                identifiant = str(enregistrement.get(c_id) or "").strip()
+                nom = texte_lisible(enregistrement.get(c_nom)).strip()
+                if identifiant and nom and identifiant not in vus:
+                    vus.add(identifiant)
+                    tous.append((identifiant, nom))
+            if len(resultats) < 1000:
+                break
+        if tous:
+            return tous, url, None
+    return [], None, dernier
+
+
+def chercher_par_nom(texte, cle_partenaire):
+    """{nom d'arrêt: [identifiants]} — un identifiant par sens de circulation."""
+    tous, _, err = catalogue_arrets(cle_partenaire)
+    if err:
+        return {}, err
+    cherche = sans_accents(texte)
+    if len(cherche) < 2:
+        return {}, None
+    groupes = {}
+    for identifiant, nom in tous:
+        if cherche in sans_accents(nom):
+            groupes.setdefault(nom, []).append(identifiant)
+    return {nom: sorted(ids) for nom, ids in sorted(groupes.items())}, None
 
 
 def _gestion(mes_arrets, cle_partenaire):
@@ -384,14 +449,17 @@ def _gestion(mes_arrets, cle_partenaire):
         recherche = st.text_input("Nom de l'arrêt", key="tr_q",
                                   placeholder="Ex : Flagey, Gare Centrale…")
         if recherche.strip():
-            trouves, err = _chercher_arret(recherche, cle_partenaire)
-            if err and not trouves:
+            groupes, err = chercher_par_nom(recherche, cle_partenaire)
+            if err:
                 st.caption(f"Recherche indisponible : {err}")
+            elif not groupes:
+                st.caption("Aucun arrêt de ce nom.")
             deja = {i for a in mes_arrets for i in a["ids"]}
-            for identifiant, nom in trouves[:12]:
-                marque = "✅ " if identifiant in deja else "＋ "
-                if st.button(f"{marque}{nom} · {identifiant}", key=f"tr_add_{identifiant}"):
-                    ajouter_arret(nom, [identifiant])
+            for nom, ids in list(groupes.items())[:8]:
+                marque = "✅ " if set(ids) <= deja else "＋ "
+                sens = "les deux sens" if len(ids) == 2 else f"{len(ids)} quai(s)"
+                if st.button(f"{marque}{nom} · {sens}", key=f"tr_add_{'_'.join(ids)}"):
+                    ajouter_arret(nom, ids)
                     st.rerun()
 
         st.caption("Un même arrêt porte un numéro différent dans chaque sens : "
@@ -423,6 +491,10 @@ def _diagnostic(champs, temoin, err, c_arret):
         if temoin:
             st.write("**Premier enregistrement reçu**")
             st.json(temoin)
+        tous, url, err_cat = catalogue_arrets(cle())
+        st.write("**Catalogue des arrêts**")
+        st.code(f"{len(tous)} arrêts chargés" + (f"\nsource : {url}" if url else "")
+                + (f"\n{err_cat}" if err_cat else ""))
         if not c_arret:
             st.caption("Envoyez-moi le contenu de ces trois blocs et j'ajuste le module.")
 
@@ -437,6 +509,8 @@ def carte(ctx):
     entete_bloc = ctx["entete_bloc"]
     cle_partenaire = cle()
     mes_arrets = arrets()
+    if installer_defauts(mes_arrets):
+        mes_arrets = arrets()
 
     with conteneur("carte-transports"):
         entete_bloc("🚋 Prochains passages", len(mes_arrets) or None)
