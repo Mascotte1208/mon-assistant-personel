@@ -22,12 +22,20 @@ Sections :
   2. Accès à l'app       6. Onglets
   3. Mise en forme       7. render()
   4. Données de marché
+
+Version 3.1 — corrections d'ouverture sur mobile :
+  · plus de boucle d'écriture Google Sheets sur la watchlist du cockpit ;
+  · les cours ne sont plus téléchargés avant l'affichage de la page ;
+  · plus d'écriture dans st.session_state après création d'un widget ;
+  · CSS de largeur restreint aux grands écrans ;
+  · toute erreur d'onglet est affichée au lieu de casser la page.
 """
 
 import json
 import math
 import re
-from datetime import date, datetime
+import traceback
+from datetime import date
 
 import pandas as pd
 import streamlit as st
@@ -35,7 +43,7 @@ import streamlit as st
 # ==========================================================
 # 1. CONSTANTES
 # ==========================================================
-VERSION_LABO = "3.0"
+VERSION_LABO = "3.1"
 CFG_SUJET = "Paramètres du labo"
 
 ONGLETS = ["🧭 Cockpit", "📈 Marchés", "🔬 Analyse", "🎯 Journal", "🧮 DCA", "📚 Notes"]
@@ -168,6 +176,10 @@ def vide(texte):
 
 
 def pills(cle, options, defaut=None, cols=3):
+    """Un défaut est toujours transmis : sans lui, certaines implémentations
+    renvoient None et le reste de la page part en erreur."""
+    if defaut is None and options:
+        defaut = options[0]
     return _f("pills")(cle, options, defaut, cols)
 
 
@@ -176,9 +188,23 @@ def flush():
 
 
 def reset_after(**champs):
+    """Applique des valeurs au prochain rerun. C'est la seule façon sûre de
+    modifier une clé de widget déjà instanciée dans le run en cours."""
     fonction = _CTX.get("reset_after")
     if fonction:
         fonction(**champs)
+        return True
+    return False
+
+
+def _defaut(cle, valeur):
+    """Valeur initiale d'un widget, posée avant sa création.
+
+    Évite le mélange `value=` + `key=` qui déclenche des avertissements et des
+    comportements imprévisibles quand la session contient déjà la clé.
+    """
+    if cle not in st.session_state:
+        st.session_state[cle] = valeur
 
 # ==========================================================
 # 3. MISE EN FORME & COMPOSANTS
@@ -252,7 +278,8 @@ def table(colonnes, lignes):
     corps = []
     for ligne in lignes:
         cellules = "".join(
-            f"<td class='{colonnes[i][1]}'>{valeur}</td>" for i, valeur in enumerate(ligne)
+            f"<td class='{colonnes[i][1] if i < len(colonnes) else 'txt'}'>{valeur}</td>"
+            for i, valeur in enumerate(ligne)
         )
         corps.append(f"<tr>{cellules}</tr>")
     st.markdown(
@@ -276,8 +303,9 @@ def sous_titre(texte):
 
 CSS = """
 <style>
-/* Le labo respire plus large que le reste de l'app : c'est un tableau de bord. */
-.block-container{max-width:980px !important;}
+/* Le labo respire plus large que le reste de l'app, mais seulement sur écran :
+   sur téléphone on laisse la mise en page de l'application principale. */
+@media (min-width:700px){ .block-container{max-width:980px !important;} }
 
 .lab-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(var(--mini,152px),1fr));
   gap:10px; margin:4px 0 14px;}
@@ -363,12 +391,18 @@ def _telecharger(tickers, periode, intervalle):
 
 
 def marche(noms, periode_label):
-    """noms : libellés de UNIVERS. Renvoie {nom: DataFrame}, barres/an, erreur."""
-    periode, intervalle, barres_an = PERIODES[periode_label]
+    """noms : libellés de UNIVERS. Renvoie {nom: DataFrame}, barres/an, erreur.
+
+    Ne lève jamais : une panne réseau doit afficher un message, pas casser la page.
+    """
+    periode, intervalle, barres_an = PERIODES.get(periode_label, PERIODES["1J"])
     tickers = tuple(sorted({UNIVERS[n][0] for n in noms if n in UNIVERS}))
     if not tickers:
         return {}, barres_an, "Sélectionnez au moins un actif."
-    paquets, err = _telecharger(tickers, periode, intervalle)
+    try:
+        paquets, err = _telecharger(tickers, periode, intervalle)
+    except Exception as erreur:
+        return {}, barres_an, f"Marchés injoignables : {str(erreur)[:120]}"
     par_nom = {NOM_PAR_TICKER.get(t, t): df for t, df in paquets.items()}
     return par_nom, barres_an, err
 
@@ -399,7 +433,7 @@ def bollinger(serie, n=20, k=2.0):
 
 
 def atr(df, n=14):
-    if not {"High", "Low", "Close"}.issubset(df.columns):
+    if df is None or not {"High", "Low", "Close"}.issubset(df.columns):
         return None
     haut, bas, cloture = df["High"], df["Low"], df["Close"]
     precedent = cloture.shift()
@@ -473,7 +507,7 @@ def signaux(df):
         listes.append(("Cassure du plus haut 20 périodes", "achat"))
     if prix < plus_bas:
         listes.append(("Cassure du plus bas 20 périodes", "vente"))
-    if e20 > e50 and abs(prix / e20 - 1) <= 0.01:
+    if e20 > e50 and e20 and abs(prix / e20 - 1) <= 0.01:
         listes.append(("Pullback sur EMA 20 en tendance haussière", "achat"))
     if len(histogramme) >= 2:
         avant, maintenant = float(histogramme.iloc[-2]), float(histogramme.iloc[-1])
@@ -518,56 +552,95 @@ def courbe(df, titre_y="", hauteur=360, aire=False):
     if go is None:
         st.line_chart(df)
         return
-    fig = go.Figure()
-    for i, colonne in enumerate(df.columns):
-        fig.add_trace(go.Scatter(
-            x=df.index, y=df[colonne], name=str(colonne), mode="lines",
-            line=dict(width=2.6, color=PALETTE[i % len(PALETTE)]),
-            fill="tozeroy" if aire and i == 0 else None,
-        ))
-    st.plotly_chart(_mise_en_page(fig, hauteur, titre_y), use_container_width=True)
+    try:
+        fig = go.Figure()
+        for i, colonne in enumerate(df.columns):
+            fig.add_trace(go.Scatter(
+                x=df.index, y=df[colonne], name=str(colonne), mode="lines",
+                line=dict(width=2.6, color=PALETTE[i % len(PALETTE)]),
+                fill="tozeroy" if aire and i == 0 else None,
+            ))
+        st.plotly_chart(_mise_en_page(fig, hauteur, titre_y), use_container_width=True)
+    except Exception:
+        st.line_chart(df)
 
 # ==========================================================
 # 5. CONFIGURATION, JOURNAL ET STATISTIQUES
 # ==========================================================
-def config():
-    if "lab_cfg" in st.session_state:
-        return st.session_state["lab_cfg"]
-    base = {
+def _config_par_defaut():
+    return {
         "capital": 5000.0,
         "risque": 1.0,
         "watchlist": ["Bitcoin", "Or", "S&P 500", "Nvidia"],
         "dca_montant": 150.0,
         "dca_poids": {"Bitcoin": 40, "Or": 30, "Nvidia": 30},
     }
-    for index, ligne in rows("IA_Lab"):
-        _, sujet, contenu, type_ = pad(ligne, 4)
-        if type_ == "Config" and sujet == CFG_SUJET:
-            try:
-                base.update(json.loads(contenu))
-            except Exception:
-                pass
-            st.session_state["lab_cfg_idx"] = index
-            break
+
+
+def config():
+    """Réglages du labo, lus une seule fois par session.
+
+    L'index de la ligne « Config » est mémorisé pour que les enregistrements
+    suivants soient des mises à jour, jamais de nouvelles lignes.
+    """
+    if "lab_cfg" in st.session_state:
+        return st.session_state["lab_cfg"]
+
+    base = _config_par_defaut()
+    try:
+        for index, ligne in rows("IA_Lab"):
+            _, sujet, contenu, type_ = pad(ligne, 4)
+            if type_ == "Config" and sujet == CFG_SUJET:
+                try:
+                    charge = json.loads(contenu)
+                    if isinstance(charge, dict):
+                        base.update(charge)
+                except Exception:
+                    pass
+                st.session_state["lab_cfg_idx"] = index
+                break
+    except Exception:
+        # Feuille absente ou illisible : on démarre sur les valeurs par défaut.
+        pass
+
+    base["watchlist"] = [n for n in base.get("watchlist", []) if n in UNIVERS][:8]
+    base["dca_poids"] = {n: int(p) for n, p in base.get("dca_poids", {}).items() if n in UNIVERS}
     st.session_state["lab_cfg"] = base
     return base
 
 
 def sauver_config(cfg):
+    """Écrit les réglages sans jamais relire la feuille dans la foulée.
+
+    L'ancienne version supprimait « lab_cfg » de la session après un ajout, ce
+    qui provoquait une relecture, une divergence, puis une nouvelle écriture :
+    l'application bouclait sur l'API Google et ne s'affichait plus.
+    """
     st.session_state["lab_cfg"] = cfg
     charge = json.dumps(cfg, ensure_ascii=False)
     index = st.session_state.get("lab_cfg_idx")
-    if index:
-        set_cell("IA_Lab", index, 3, charge)
-    else:
+    try:
+        if index:
+            set_cell("IA_Lab", index, 3, charge)
+            return
         add_row("IA_Lab", [str(date.today()), CFG_SUJET, charge, "Config"])
-        st.session_state.pop("lab_cfg", None)  # relecture au prochain passage pour l'index
+        for i, ligne in rows("IA_Lab"):          # on retient l'index tout de suite
+            _, sujet, _, type_ = pad(ligne, 4)
+            if type_ == "Config" and sujet == CFG_SUJET:
+                st.session_state["lab_cfg_idx"] = i
+                break
+    except Exception as err:
+        st.warning(f"Réglages non enregistrés : {str(err)[:120]}")
 
 
 def notes_utilisateur():
     """Toutes les notes sauf la ligne technique de configuration."""
     sortie = []
-    for index, ligne in rows("IA_Lab"):
+    try:
+        lignes = rows("IA_Lab")
+    except Exception:
+        return sortie
+    for index, ligne in lignes:
         d, sujet, contenu, type_ = pad(ligne, 4)
         if type_ == "Config":
             continue
@@ -587,7 +660,11 @@ def actif_connu(libelle):
 
 def lire_trades():
     sortie = []
-    for index, ligne in rows("Trades"):
+    try:
+        lignes = rows("Trades")
+    except Exception:
+        return sortie
+    for index, ligne in lignes:
         (d, actif, sens, entree, objectif, stop,
          statut, notes, taille, sortie_prix, date_sortie) = pad(ligne, COLS_TRADE)
         prix_e, prix_o, prix_s = to_float(entree), to_float(objectif), to_float(stop)
@@ -665,15 +742,38 @@ def onglet_cockpit(cfg):
     # --- Watchlist ---------------------------------------------------------
     with conteneur("labrow-watch"):
         st.markdown("**Suivi du jour**")
-        defaut = [n for n in cfg["watchlist"] if n in UNIVERS][:8]
-        choix = st.multiselect("Actifs suivis", list(UNIVERS), default=defaut,
-                               max_selections=8, key="lab_watch", label_visibility="collapsed")
-        if choix != cfg["watchlist"]:
-            cfg["watchlist"] = choix
-            sauver_config(cfg)
+        _defaut("lab_watch", [n for n in cfg["watchlist"] if n in UNIVERS][:8])
+        choix = st.multiselect("Actifs suivis", list(UNIVERS), max_selections=8,
+                               key="lab_watch", label_visibility="collapsed")
+
+    # Une seule écriture par changement réel : sans ce garde-fou, la page
+    # réécrivait la configuration à chaque rerun et ne finissait jamais de charger.
+    deja_sauve = st.session_state.get("lab_watch_saved")
+    if deja_sauve is None:
+        deja_sauve = tuple(cfg["watchlist"])
+    if tuple(choix) != tuple(deja_sauve):
+        st.session_state["lab_watch_saved"] = tuple(choix)
+        cfg["watchlist"] = list(choix)
+        sauver_config(cfg)
 
     if not choix:
         note("Choisissez les actifs à suivre pour afficher le tableau du jour.")
+        return
+
+    # --- Chargement des cours à la demande ---------------------------------
+    # Sur téléphone, télécharger huit séries intraday avant le premier affichage
+    # laissait la page sur un spinner interminable.
+    if not st.session_state.get("lab_cockpit_live"):
+        note("Les cours ne sont pas encore chargés — appuyez pour interroger les marchés.")
+        if st.button("📡 Charger les cours", type="primary", key="lab_cockpit_go"):
+            st.session_state["lab_cockpit_live"] = True
+            st.rerun()
+        dernieres = notes_utilisateur()[-3:]
+        if dernieres:
+            sous_titre("Dernières notes")
+            for n in reversed(dernieres):
+                st.markdown(f"<div class='lab-note calme'><b>{n['sujet']}</b> · {n['date']}<br>"
+                            f"{(n['contenu'] or '')[:180]}</div>", unsafe_allow_html=True)
         return
 
     besoins = set(choix) | {t["nom_marche"] for t in ouverts if t["nom_marche"]}
@@ -681,6 +781,9 @@ def onglet_cockpit(cfg):
         donnees, barres_an, err = marche(sorted(besoins), "1J")
     if err:
         note(f"⚠️ {err}", "warn")
+        if st.button("Réessayer", key="lab_cockpit_retry"):
+            st.cache_data.clear()
+            st.rerun()
         return
 
     lignes, alertes = [], []
@@ -752,8 +855,9 @@ def onglet_marches(cfg):
     with conteneur("labrow-sel"):
         colonne_a, colonne_b = st.columns([2, 1])
         with colonne_a:
-            defaut = [n for n in cfg["watchlist"] if n in UNIVERS][:4] or ["Bitcoin", "Or"]
-            choix = st.multiselect("Actifs à comparer", list(UNIVERS), default=defaut,
+            _defaut("lab_cmp", [n for n in cfg["watchlist"] if n in UNIVERS][:4]
+                    or ["Bitcoin", "Or"])
+            choix = st.multiselect("Actifs à comparer", list(UNIVERS),
                                    max_selections=6, key="lab_cmp")
         with colonne_b:
             periode = pills("lab_periode", list(PERIODES), defaut="5J", cols=3)
@@ -861,8 +965,11 @@ def onglet_analyse(cfg):
 
     cloture = p["serie"]
     valeurs_atr = atr(df)
-    atr_actuel = float(valeurs_atr.dropna().iloc[-1]) if valeurs_atr is not None and \
-        not valeurs_atr.dropna().empty else float("nan")
+    atr_actuel = float("nan")
+    if valeurs_atr is not None:
+        propres = valeurs_atr.dropna()
+        if not propres.empty:
+            atr_actuel = float(propres.iloc[-1])
 
     kpis([
         {"label": "Dernier prix", "valeur": fprix(p["dernier"]),
@@ -930,15 +1037,18 @@ def onglet_analyse(cfg):
     # --- Niveaux ------------------------------------------------------------
     haut, bas, dernier = p["haut"], p["bas"], p["dernier"]
     pivot = (haut + bas + dernier) / 3
+    haute_propre, basse_propre = haute_b.dropna(), basse_b.dropna()
     niveaux = [
         ("Résistance 2", pivot + (haut - bas)),
         ("Résistance 1", 2 * pivot - bas),
         ("Plus haut de la période", haut),
-        ("Bande de Bollinger haute", float(haute_b.dropna().iloc[-1]) if not haute_b.dropna().empty else float("nan")),
+        ("Bande de Bollinger haute",
+         float(haute_propre.iloc[-1]) if not haute_propre.empty else float("nan")),
         ("Pivot", pivot),
         ("EMA 20", p["ema20"]),
         ("EMA 50", p["ema50"]),
-        ("Bande de Bollinger basse", float(basse_b.dropna().iloc[-1]) if not basse_b.dropna().empty else float("nan")),
+        ("Bande de Bollinger basse",
+         float(basse_propre.iloc[-1]) if not basse_propre.empty else float("nan")),
         ("Plus bas de la période", bas),
         ("Support 1", 2 * pivot - haut),
         ("Support 2", pivot - (haut - bas)),
@@ -973,23 +1083,33 @@ def onglet_analyse(cfg):
             with colonne_a:
                 if st.button("Préparer un achat", key="lab_prep_achat"):
                     _preparer(actif, "Achat", dernier, dernier - 1.5 * atr_actuel,
-                              dernier + 3 * atr_actuel, cfg)
+                              dernier + 3 * atr_actuel)
             with colonne_b:
                 if st.button("Préparer une vente", key="lab_prep_vente"):
                     _preparer(actif, "Vente", dernier, dernier + 1.5 * atr_actuel,
-                              dernier - 3 * atr_actuel, cfg)
+                              dernier - 3 * atr_actuel)
 
 
-def _preparer(actif, sens, entree, stop, objectif, cfg):
-    """Pré-remplit le formulaire du journal puis bascule sur l'onglet."""
-    st.session_state["lab_tab"] = ONGLETS[3]
-    st.session_state["lab_t_sens"] = sens
-    reset_after(lab_t_actif=actif,
-                lab_t_entree=round(float(entree), 4),
-                lab_t_stop=round(float(stop), 4),
-                lab_t_objectif=round(float(objectif), 4),
-                lab_t_taille=0.0,
-                lab_t_notes=f"Préparé depuis l'analyse technique de {actif}.")
+def _preparer(actif, sens, entree, stop, objectif):
+    """Pré-remplit le formulaire du journal puis bascule sur l'onglet.
+
+    Tout passe par reset_after : « lab_tab » et « lab_t_sens » sont des clés de
+    widgets déjà créés dans ce run, et Streamlit refuse qu'on les modifie
+    directement — c'était la cause d'une exception au clic.
+    """
+    applique = reset_after(
+        lab_tab=ONGLETS[3],
+        lab_t_sens=sens,
+        lab_t_actif=actif,
+        lab_t_entree=round(float(entree), 4),
+        lab_t_stop=round(float(stop), 4),
+        lab_t_objectif=round(float(objectif), 4),
+        lab_t_taille=0.0,
+        lab_t_notes=f"Préparé depuis l'analyse technique de {actif}.",
+    )
+    if not applique:
+        st.warning("Ouvrez l'onglet Journal pour saisir la position.")
+        return
     st.rerun()
 
 
@@ -1063,8 +1183,7 @@ def onglet_journal(cfg):
                     colonne_a, colonne_b = st.columns([2, 1])
                     with colonne_a:
                         cle_sortie = f"lab_out_{t['idx']}"
-                        if cle_sortie not in st.session_state:
-                            st.session_state[cle_sortie] = float(t["entree"] or 0.0)
+                        _defaut(cle_sortie, float(t["entree"] or 0.0))
                         prix_sortie = st.number_input("Prix de sortie", min_value=0.0, step=0.1,
                                                       key=cle_sortie)
                     with colonne_b:
@@ -1088,7 +1207,7 @@ def onglet_journal(cfg):
         with colonne_a:
             actif = st.selectbox("Actif", list(UNIVERS), key="lab_t_actif")
         with colonne_b:
-            sens = pills("lab_t_sens", ["Achat", "Vente"], cols=2)
+            sens = pills("lab_t_sens", ["Achat", "Vente"], defaut="Achat", cols=2)
 
         colonne_1, colonne_2, colonne_3 = st.columns(3)
         with colonne_1:
@@ -1120,6 +1239,7 @@ def onglet_journal(cfg):
         with colonne_a:
             if not st.session_state.get("lab_t_taille") and not _nan(taille_conseillee):
                 st.session_state["lab_t_taille"] = float(round(taille_conseillee, 4))
+            _defaut("lab_t_taille", 0.0)
             taille = st.number_input("Taille retenue", min_value=0.0, step=0.0001, format="%.4f",
                                      key="lab_t_taille")
         with colonne_b:
@@ -1148,13 +1268,15 @@ def onglet_dca(cfg):
     with conteneur("labrow-dca"):
         colonne_a, colonne_b = st.columns(2)
         with colonne_a:
+            _defaut("lab_dca_montant", float(cfg["dca_montant"]))
             montant = st.number_input("Versement mensuel (€)", min_value=10.0, step=10.0,
-                                      value=float(cfg["dca_montant"]), key="lab_dca_montant")
+                                      key="lab_dca_montant")
         with colonne_b:
-            annees = st.slider("Durée du test (années)", 1, 10,
-                               value=3, key="lab_dca_annees")
+            _defaut("lab_dca_annees", 3)
+            annees = st.slider("Durée du test (années)", 1, 10, key="lab_dca_annees")
+        _defaut("lab_dca_actifs",
+                [a for a in cfg["dca_poids"] if a in UNIVERS][:6] or ["Bitcoin"])
         choix = st.multiselect("Actifs du plan", list(UNIVERS),
-                               default=[a for a in cfg["dca_poids"] if a in UNIVERS] or ["Bitcoin"],
                                max_selections=6, key="lab_dca_actifs")
 
     if not choix:
@@ -1167,10 +1289,10 @@ def onglet_dca(cfg):
         colonnes = st.columns(min(3, len(choix)))
         for i, nom in enumerate(choix):
             with colonnes[i % len(colonnes)]:
-                poids[nom] = st.number_input(
-                    nom, min_value=0, max_value=100, step=5,
-                    value=int(cfg["dca_poids"].get(nom, round(100 / len(choix)))),
-                    key=f"lab_poids_{nom}")
+                _defaut(f"lab_poids_{nom}",
+                        int(cfg["dca_poids"].get(nom, round(100 / len(choix)))))
+                poids[nom] = st.number_input(nom, min_value=0, max_value=100, step=5,
+                                             key=f"lab_poids_{nom}")
 
     total = sum(poids.values())
     kpis([{"label": "Total réparti", "valeur": fpct(total, 0, signe=False),
@@ -1200,6 +1322,13 @@ def onglet_dca(cfg):
 
     # --- Simulation historique ---------------------------------------------
     sous_titre(f"Si vous aviez commencé il y a {annees} an(s)")
+    if not st.session_state.get("lab_dca_live"):
+        note("La simulation télécharge plusieurs années d'historique — appuyez pour la lancer.")
+        if st.button("🧮 Lancer la simulation", type="primary", key="lab_dca_go"):
+            st.session_state["lab_dca_live"] = True
+            st.rerun()
+        return
+
     with st.spinner("Reconstitution de l'historique…"):
         historique, err = _mensuel(tuple(sorted(UNIVERS[n][0] for n in choix)), annees)
     if err:
@@ -1258,7 +1387,10 @@ def onglet_dca(cfg):
 
     lignes = []
     for nom in colonnes_ok:
-        derniere = float(historique[nom].dropna().iloc[-1])
+        serie_propre = historique[nom].dropna()
+        if serie_propre.empty:
+            continue
+        derniere = float(serie_propre.iloc[-1])
         verse = montant * poids[nom] / 100 * len(flux)
         valeur_ligne = unites[nom] * derniere
         lignes.append([nom, fnum(verse, 0, "€"), fnum(valeur_ligne, 0, "€"),
@@ -1293,6 +1425,8 @@ def _mensuel(tickers, annees):
         except KeyError:
             return pd.DataFrame(), "Format de données inattendu."
     else:
+        if "Close" not in brut.columns:
+            return pd.DataFrame(), "Format de données inattendu."
         cloture = brut[["Close"]].rename(columns={"Close": list(tickers)[0]})
     return cloture.dropna(how="all"), None
 
@@ -1308,14 +1442,17 @@ def _tri(flux, valeur_finale):
         return sortie + valeur_finale / ((1 + taux) ** (n - 1))
 
     bas, haut = -0.9, 1.0
-    if valeur_actuelle(bas) * valeur_actuelle(haut) > 0:
+    try:
+        if valeur_actuelle(bas) * valeur_actuelle(haut) > 0:
+            return float("nan")
+        for _ in range(80):
+            milieu = (bas + haut) / 2
+            if valeur_actuelle(bas) * valeur_actuelle(milieu) <= 0:
+                haut = milieu
+            else:
+                bas = milieu
+    except (OverflowError, ZeroDivisionError):
         return float("nan")
-    for _ in range(80):
-        milieu = (bas + haut) / 2
-        if valeur_actuelle(bas) * valeur_actuelle(milieu) <= 0:
-            haut = milieu
-        else:
-            bas = milieu
     mensuel = (bas + haut) / 2
     return (1 + mensuel) ** 12 - 1
 
@@ -1353,8 +1490,9 @@ def onglet_notes(cfg):
     if visibles:
         for n in reversed(visibles[-40:]):
             with st.expander(f"{n['sujet']} · {n['type']} · {n['date']}"):
-                edition = st.text_area("Contenu", value=n["contenu"], height=140,
-                                       key=f"lab_edit_{n['idx']}")
+                cle_edition = f"lab_edit_{n['idx']}"
+                _defaut(cle_edition, n["contenu"] or "")
+                edition = st.text_area("Contenu", height=140, key=cle_edition)
                 with conteneur(f"labrow-note-{n['idx']}"):
                     colonne_a, colonne_b = st.columns(2)
                     with colonne_a:
@@ -1403,16 +1541,23 @@ def onglet_notes(cfg):
         with conteneur("labrow-cfg"):
             colonne_a, colonne_b = st.columns(2)
             with colonne_a:
+                _defaut("lab_cfg_capital", float(cfg["capital"]))
                 capital = st.number_input("Capital de référence (€)", min_value=0.0, step=100.0,
-                                          value=float(cfg["capital"]), key="lab_cfg_capital")
+                                          key="lab_cfg_capital")
             with colonne_b:
+                _defaut("lab_cfg_risque", float(cfg["risque"]))
                 risque = st.number_input("Risque par position (%)", min_value=0.1, max_value=10.0,
-                                         step=0.1, value=float(cfg["risque"]), key="lab_cfg_risque")
+                                         step=0.1, key="lab_cfg_risque")
         if st.button("Enregistrer les réglages", type="primary", key="lab_cfg_save"):
             cfg["capital"] = float(capital)
             cfg["risque"] = float(risque)
             sauver_config(cfg)
             st.toast("Réglages enregistrés", icon="⚙️")
+            st.rerun()
+        if st.button("Recharger les cours et vider le cache", key="lab_cfg_cache"):
+            st.cache_data.clear()
+            st.session_state.pop("lab_cockpit_live", None)
+            st.session_state.pop("lab_dca_live", None)
             st.rerun()
         st.caption(f"Labo version {VERSION_LABO} · les réglages sont partagés "
                    f"entre vous deux via Google Sheets.")
@@ -1420,6 +1565,16 @@ def onglet_notes(cfg):
 # ==========================================================
 # 7. POINT D'ENTRÉE
 # ==========================================================
+ROUTES = {
+    ONGLETS[0]: onglet_cockpit,
+    ONGLETS[1]: onglet_marches,
+    ONGLETS[2]: onglet_analyse,
+    ONGLETS[3]: onglet_journal,
+    ONGLETS[4]: onglet_dca,
+    ONGLETS[5]: onglet_notes,
+}
+
+
 def render(ctx):
     global _CTX
     _CTX = ctx
@@ -1429,16 +1584,17 @@ def render(ctx):
     with conteneur("labtabs"):
         onglet = pills("lab_tab", ONGLETS, defaut=ONGLETS[0], cols=3)
 
-    cfg = config()
-    if onglet == ONGLETS[0]:
-        onglet_cockpit(cfg)
-    elif onglet == ONGLETS[1]:
-        onglet_marches(cfg)
-    elif onglet == ONGLETS[2]:
-        onglet_analyse(cfg)
-    elif onglet == ONGLETS[3]:
-        onglet_journal(cfg)
-    elif onglet == ONGLETS[4]:
-        onglet_dca(cfg)
-    else:
-        onglet_notes(cfg)
+    try:
+        cfg = config()
+        ROUTES.get(onglet, onglet_cockpit)(cfg)
+    except Exception as err:
+        # Une erreur dans un onglet ne doit jamais laisser une page blanche :
+        # on affiche le message pour pouvoir corriger.
+        st.error(f"Le labo a rencontré une erreur sur « {onglet} » : {err}")
+        with st.expander("Détail technique"):
+            st.code(traceback.format_exc())
+        if st.button("Réinitialiser le labo", key="lab_panic"):
+            for cle in [c for c in list(st.session_state) if str(c).startswith("lab_")]:
+                st.session_state.pop(cle, None)
+            st.cache_data.clear()
+            st.rerun()
