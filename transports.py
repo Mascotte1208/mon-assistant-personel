@@ -35,7 +35,7 @@ from datetime import datetime, timezone
 import requests
 import streamlit as st
 
-VERSION_TRANSPORTS = "4.1"
+VERSION_TRANSPORTS = "4.2"
 
 BASE = "https://api-management-opendata-production.azure-api.net/api/datasets/stibmivb"
 URL_ATTENTE = f"{BASE}/rt/WaitingTimes"
@@ -84,43 +84,43 @@ CANDIDATS = {
 
 CSS = """
 <style>
-.tr-carte{background:var(--surface,#fff); border:1px solid var(--trait,#ECE0E5);
+.tr-carte{background:var(--surface,#fff); border:1.5px solid var(--trait,#F3C7DA);
   border-radius:var(--r,16px); padding:14px 16px 6px; margin:0 0 12px;
   box-shadow:var(--ombre,0 1px 2px rgba(36,27,34,.04));}
 .tr-tete{display:flex; align-items:baseline; justify-content:space-between; gap:10px;
-  padding-bottom:10px; margin-bottom:2px; border-bottom:1px solid var(--trait,#ECE0E5);}
-.tr-nom{font-size:15px; font-weight:700; color:var(--encre,#241B22); letter-spacing:-.01em;
+  padding-bottom:10px; margin-bottom:2px; border-bottom:1.5px solid var(--trait,#F3C7DA);}
+.tr-nom{font-size:15px; font-weight:700; color:var(--accent-fonce,#8C1444); letter-spacing:-.01em;
   text-transform:capitalize; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.tr-compte{font-size:11.5px; font-weight:600; color:var(--gris,#8A7C82); white-space:nowrap;}
+.tr-compte{font-size:11.5px; font-weight:600; color:var(--gris,#9B7F8C); white-space:nowrap;}
 
 .tr-ligne{display:flex; align-items:center; gap:12px; padding:10px 0;
-  border-bottom:1px solid var(--trait,#ECE0E5);}
+  border-bottom:1px solid var(--trait-doux,#FBE7F0);}
 .tr-ligne:last-child{border-bottom:none;}
 .tr-badge{flex:0 0 auto; display:flex; align-items:center; gap:5px; min-width:50px;
   justify-content:center; color:#fff; font-size:13px; font-weight:700;
   padding:5px 9px; border-radius:9px; font-variant-numeric:tabular-nums;}
 .tr-badge.metro{background:#164C9E;}
 .tr-badge.tram{background:#6D3BAF;}
-.tr-badge.bus{background:var(--accent,#B0184F);}
+.tr-badge.bus{background:var(--accent,#C2185B);}
 .tr-badge .m{font-size:12px;}
 
 .tr-mid{flex:1 1 auto; min-width:0;}
-.tr-dest{font-size:14px; font-weight:600; color:var(--encre,#241B22); text-transform:capitalize;
+.tr-dest{font-size:14px; font-weight:600; color:var(--encre,#3A1A28); text-transform:capitalize;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.tr-suite{font-size:11.5px; font-weight:500; color:var(--gris,#8A7C82); margin-top:2px;
+.tr-suite{font-size:11.5px; font-weight:500; color:var(--gris,#9B7F8C); margin-top:2px;
   font-variant-numeric:tabular-nums;}
 
 .tr-temps{flex:0 0 auto; text-align:right; min-width:52px;}
-.tr-temps .n{font-size:21px; font-weight:700; color:var(--encre,#241B22); line-height:1;
+.tr-temps .n{font-size:21px; font-weight:700; color:var(--encre,#3A1A28); line-height:1;
   font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
-.tr-temps .u{font-size:10px; font-weight:600; color:var(--gris,#8A7C82); display:block;
+.tr-temps .u{font-size:10px; font-weight:600; color:var(--gris,#9B7F8C); display:block;
   margin-top:3px;}
 .tr-temps.imminent .n{color:var(--vert,#17683D); font-size:14px;}
-.tr-temps.proche .n{color:var(--accent,#B0184F);}
+.tr-temps.proche .n{color:var(--accent,#C2185B);}
 
-.tr-vide{font-size:13px; font-weight:500; color:var(--gris,#8A7C82); padding:14px 2px;
+.tr-vide{font-size:13px; font-weight:500; color:var(--gris,#9B7F8C); padding:14px 2px;
   line-height:1.5; text-align:center;}
-.tr-maj{font-size:11.5px; font-weight:500; color:var(--gris,#8A7C82); text-align:center;
+.tr-maj{font-size:11.5px; font-weight:500; color:var(--gris,#9B7F8C); text-align:center;
   padding:0 0 10px;}
 .tr-live{display:inline-block; width:6px; height:6px; border-radius:50%;
   background:var(--vert,#17683D); margin-right:6px; vertical-align:middle;
