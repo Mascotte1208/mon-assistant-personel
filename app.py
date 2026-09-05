@@ -60,6 +60,7 @@ PAGES = {
     "accueil": "🏠 Accueil",
     "budget": "📊 Budget",
     "maison": "🐾 Maison",
+    "transport": "🚋 Transports",
 }
 
 st.set_page_config(page_title="Notre Assistant", page_icon="🌸",
@@ -155,7 +156,8 @@ html, body, [class*="css"], .stApp{
 [data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
 
 .st-key-navrow{margin-bottom:12px;}
-.st-key-navrow [data-testid="stHorizontalBlock"]{gap:8px !important;}
+.st-key-navrow [data-testid="stHorizontalBlock"]{gap:8px !important; flex-wrap:wrap !important;}
+.st-key-navrow [data-testid="stHorizontalBlock"] > div{min-width:88px !important; flex:1 1 88px !important;}
 .st-key-navrow button{font-size:13px !important; padding:11px 6px !important; border-radius:14px !important;}
 .st-key-navrow button p{font-size:13px !important; font-weight:800 !important;}
 
@@ -790,20 +792,10 @@ if page_cle == "accueil":
     except Exception as err:
         st.caption(f"Météo indisponible : {str(err)[:90]}")
 
-    # 4. TRANSPORTS (module externe transports.py)
-    try:
-        import transports
-        transports.carte({
-            "conteneur": conteneur, "entete_bloc": entete_bloc,
-            "rows": rows, "add_row": add_row, "delete_row": delete_row, "pad": pad,
-        })
-    except Exception as err:
-        st.caption(f"Horaires indisponibles : {str(err)[:90]}")
-
-    # 5. COURSES (Redirection épurée)
+    # 4. COURSES (Redirection épurée)
     entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
 
-    # 6. LE MOIS
+    # 5. LE MOIS
     if "dash_jour" not in st.session_state:
         st.session_state["dash_jour"] = ajd
     jour_sel = st.session_state["dash_jour"]
@@ -838,14 +830,14 @@ if page_cle == "accueil":
                 reset_after(dash_etitre="", dash_eheure="")
                 st.rerun()
 
-    # 7. BUDGET PARTAGÉ
+    # 6. BUDGET PARTAGÉ
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
     ecart = (total_l - total_a) / 2
     qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés 💖"
     st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>", unsafe_allow_html=True)
 
-    # 8. RÉGLAGES & ACCÈS DIRECT LABO IA
+    # 7. RÉGLAGES & ACCÈS DIRECT LABO IA
     with st.expander("⚙️ Réglages"):
         d1, d2 = st.columns(2)
         with d1:
@@ -985,7 +977,20 @@ elif page_cle == "maison":
                 st.rerun()
 
 # ==========================================================
-# 8d. LABO IA & MARCHÉS — module externe labo_ia.py
+# 8d. TRANSPORTS — module externe transports.py
+# ==========================================================
+elif page_cle == "transport":
+    try:
+        import transports
+        transports.carte({
+            "conteneur": conteneur, "entete_bloc": entete_bloc,
+            "rows": rows, "add_row": add_row, "delete_row": delete_row, "pad": pad,
+        })
+    except Exception as err:
+        st.error(f"Module transports.py indisponible : {str(err)[:120]}")
+
+# ==========================================================
+# 8e. LABO IA & MARCHÉS — module externe labo_ia.py
 # ==========================================================
 elif page_cle == "ialab" and st.session_state.get("mode_ia"):
     try:
@@ -1002,7 +1007,7 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
         })
 
 # ==========================================================
-# 8e. LABO DEMANDÉ SANS ACCÈS
+# 8f. LABO DEMANDÉ SANS ACCÈS
 # ==========================================================
 elif page_cle == "ialab":
     vide("Le labo est verrouillé. Entrez le code dans Réglages, sur la page d'accueil.")
