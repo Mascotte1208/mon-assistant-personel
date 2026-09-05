@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.41"
+VERSION = "2.45"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -34,6 +34,7 @@ SHEETS = {
     "Repas":    ["Jour", "Repas", "Plat"],
     "Listes":   ["Categorie", "Element", "Notes"],
     "IA_Lab":   ["Date", "Sujet", "Contenu", "Type"],
+    "Trades":   ["Date", "Actif", "Sens", "Entree", "Objectif", "StopLoss", "Statut", "Notes"],
 }
 
 RAYONS = ["Fruits & Légumes", "Frais", "Boulangerie", "Supermarché", "Boissons", "Entretien", "Autre"]
@@ -54,7 +55,7 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
 PERSONNES = ["Lucas", "Alex"]
 
 ONGLETS_M = ["🛒 Courses", "🍲 Recettes"]
-ONGLETS_IA = ["📝 Notes & Contexte", "📈 Marchés & Analyse"]
+ONGLETS_IA = ["📝 Notes & Contexte", "📈 Marchés & Analyse", "🎯 Journal de Trade", "🧮 Simulateur DCA"]
 
 PAGES = {
     "accueil": "🏠 Accueil",
@@ -989,7 +990,7 @@ elif page_cle == "maison":
                 st.rerun()
 
 # ==========================================================
-# 8d. LABO IA & FORMATIONS / MARCHÉS (Dashboard multi-actifs)
+# 8d. LABO IA & MARCHÉS (Dashboard multi-actifs, Journal, DCA, Chat)
 # ==========================================================
 elif page_cle == "ialab" and st.session_state.get("mode_ia"):
     titre("🧠 Labo IA & Marchés Financiers")
@@ -997,9 +998,35 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
     with conteneur("iatabs"):
         onglet_ia = pills("ia_tab", ONGLETS_IA, cols=2)
 
+    # 1. NOTES & CONTEXTE + ASSISTANT IA SIMULÉ
     if onglet_ia == ONGLETS_IA[0]:
-        st.caption("Espace dédié à l'enregistrement de tes apprentissages, priorités et gestion des dangers.")
+        st.caption("Espace de consignes, règles de trading et assistant intelligent sur vos notes.")
 
+        # Simulateur de Chatbot Assistant basé sur les notes IA_Lab
+        with conteneur("chat-assistant"):
+            st.markdown("🤖 **Assistant IA de vos notes**")
+            question_ia = st.text_input("Posez une question sur vos stratégies ou règles enregistrées", placeholder="Ex: Quelle est ma règle de breakout ?")
+            if question_ia:
+                ialab_rows_chat = rows("IA_Lab")
+                contexte_global = " ".join([str(pad(r, 4)[1]) + " " + str(pad(r, 4)[2]) for _, r in ialab_rows_chat]).lower()
+                
+                reponse = "Je n'ai pas trouvé de notes correspondantes dans votre base."
+                q_lower = question_ia.lower()
+                if "breakout" in q_lower:
+                    match_br = [pad(r, 4) for _, r in ialab_rows_chat if "breakout" in str(r).lower()]
+                    if match_br:
+                        reponse = f"D'après vos notes ({match_br[0][1]}) : {match_br[0][2]}"
+                elif "dca" in q_lower:
+                    match_dca = [pad(r, 4) for _, r in ialab_rows_chat if "dca" in str(r).lower()]
+                    if match_dca:
+                        reponse = f"D'après vos notes ({match_dca[0][1]}) : {match_dca[0][2]}"
+                else:
+                    if len(contexte_global) > 10:
+                        reponse = f"En analysant vos notes enregistrées, voici ce qui s'en rapproche le plus : {contexte_global[:250]}..."
+                
+                st.info(reponse)
+
+        st.divider()
         regles_trading_preset = st.selectbox(
             "⚡ Charger une règle d'investissement court terme classique",
             [
@@ -1045,6 +1072,7 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
         else:
             vide("Aucune note enregistrée pour le moment.")
 
+    # 2. MARCHÉS & ANALYSE (Graphique Plotly Haute Lisibilité)
     elif onglet_ia == ONGLETS_IA[1]:
         st.caption("Dashboard de comparaison des marchés financiers (Graphique haute lisibilité).")
 
@@ -1115,10 +1143,7 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                         df_plot = df_close
                         y_title = "Prix en USD ($)"
 
-                    # Création d'un graphique Plotly propre et lisible
                     fig = px.line(df_plot, labels={"value": y_title, "Datetime": "Temps", "Date": "Date"})
-                    
-                    # Style visuel net : courbes épaisses et fond épuré
                     fig.update_traces(line=dict(width=3))
                     fig.update_layout(
                         margin=dict(l=10, r=10, t=20, b=10),
@@ -1146,3 +1171,80 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                 st.info("Chargement des données boursières...")
         else:
             st.info("Veuillez sélectionner au moins un actif ci-dessus pour afficher le dashboard.")
+
+    # 3. JOURNAL DE TRADE COURT TERME
+    elif onglet_ia == ONGLETS_IA[2]:
+        st.caption("Consignez vos positions et tests de trading court terme (Breakout, Pullback...).")
+
+        trades_rows = rows("Trades")
+        if trades_rows:
+            titre("📋 Historique des trades")
+            for idx, r in reversed(trades_rows):
+                dt, actif, sens, ent, obj, sl, stat, notes = pad(r, 8)
+                badge_couleur = "🟢" if sens == "Achat" else "🔴"
+                with st.expander(f"{badge_couleur} {actif} ({sens}) · Entrée : {ent}$ [{stat}]"):
+                    st.markdown(f"**Objectif (TP) :** {obj}$ | **Stop-Loss (SL) :** {sl}$ | **Date :** {dt}")
+                    if notes:
+                        st.write(f"Notes : {notes}")
+                    
+                    col_s1, col_s2 = st.columns(2)
+                    with col_s1:
+                        if stat != "Clôturé" and st.button("Clôturer le trade", key=f"close_t_{idx}"):
+                            set_cell("Trades", idx, 7, "Clôturé")
+                            st.rerun()
+                    with col_s2:
+                        if st.button("🗑️ Supprimer", key=f"del_t_{idx}"):
+                            delete_row("Trades", idx, libelle="Trade supprimé")
+                            st.rerun()
+        else:
+            vide("Aucun trade enregistré pour le moment.")
+
+        st.divider()
+        titre("➕ Enregistrer un nouveau trade")
+        t_actif = st.selectbox("Actif", ["Bitcoin (BTC)", "Or (Gold)", "Apple", "Nvidia", "Ethereum", "Tesla"])
+        t_sens = pills("trade_sens", ["Achat", "Vente"], cols=2)
+        tc1, tc2, tc3 = st.columns(3)
+        with tc1:
+            t_entree = st.number_input("Prix d'entrée ($)", min_value=0.0, step=0.1, key="t_ent")
+        with tc2:
+            t_objectif = st.number_input("Objectif TP ($)", min_value=0.0, step=0.1, key="t_obj")
+        with tc3:
+            t_stop = st.number_input("Stop-Loss SL ($)", min_value=0.0, step=0.1, key="t_sl")
+        t_notes = st.text_area("Notes de setup (ex: Breakout 5m validé)", key="t_notes")
+
+        if st.button("Enregistrer le trade", type="primary", key="btn_save_trade") and t_entree > 0:
+            add_row("Trades", [str(ajd), t_actif, t_sens, f"{t_entree}", f"{t_objectif}", f"{t_stop}", "En cours", t_notes])
+            st.toast("Trade enregistré avec succès ! 🎯", icon="✅")
+            st.rerun()
+
+    # 4. SIMULATEUR DE DCA
+    elif onglet_ia == ONGLETS_IA[3]:
+        st.caption("Simulateur d'investissement programmé (Dollar-Cost Averaging) pour lisser vos achats sur vos actifs favoris.")
+
+        capital_total = st.number_input("Montant total à investir par mois (€)", min_value=10.0, value=150.0, step=10.0)
+        
+        st.markdown("**Répartition de votre DCA (%)**")
+        dca_btc = st.slider("Bitcoin (BTC)", 0, 100, 40)
+        dca_or = st.slider("Or (Gold)", 0, 100, 30)
+        dca_actions = st.slider("Actions (Apple / Nvidia)", 0, 100, 30)
+
+        total_parts = dca_btc + dca_or + dca_actions
+        if total_parts == 100:
+            st.success("✨ Répartition parfaite à 100 % !")
+            m_btc = capital_total * (dca_btc / 100)
+            m_or = capital_total * (dca_or / 100)
+            m_act = capital_total * (dca_actions / 100)
+
+            c_res1, c_res2, c_res3 = st.columns(3)
+            c_res1.metric("Bitcoin", f"{m_btc:.2f} € /mois")
+            c_res2.metric("Or", f"{m_or:.2f} € /mois")
+            c_res3.metric("Actions", f"{m_act:.2f} € /mois")
+
+            st.divider()
+            if st.button("Sauvegarder cette stratégie DCA dans le Labo", type="primary"):
+                contenu_dca = f"Stratégie DCA : {capital_total}€/mois | Bitcoin: {dca_btc}% ({m_btc:.2f}€), Or: {dca_or}% ({m_or:.2f}€), Actions: {dca_actions}% ({m_act:.2f}€)"
+                add_row("IA_Lab", [str(ajd), "Plan DCA Mensuel", contenu_dca, "Apprentissage / Note"])
+                st.toast("Stratégie DCA enregistrée dans vos notes IA ! 🧮", icon="✅")
+                st.rerun()
+        else:
+            st.warning(f"Le total de la répartition doit être égal à 100 % (Actuel : {total_parts} %).")
