@@ -783,10 +783,27 @@ if page_cle == "accueil":
                 delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
 
-    # 3. COURSES (Redirection épurée)
+    # 3. MÉTÉO (module externe meteo.py)
+    try:
+        import meteo
+        meteo.carte(conteneur, entete_bloc)
+    except Exception as err:
+        st.caption(f"Météo indisponible : {str(err)[:90]}")
+
+    # 4. TRANSPORTS (module externe transports.py)
+    try:
+        import transports
+        transports.carte({
+            "conteneur": conteneur, "entete_bloc": entete_bloc,
+            "rows": rows, "add_row": add_row, "delete_row": delete_row, "pad": pad,
+        })
+    except Exception as err:
+        st.caption(f"Horaires indisponibles : {str(err)[:90]}")
+
+    # 5. COURSES (Redirection épurée)
     entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
 
-    # 4. LE MOIS
+    # 6. LE MOIS
     if "dash_jour" not in st.session_state:
         st.session_state["dash_jour"] = ajd
     jour_sel = st.session_state["dash_jour"]
@@ -821,14 +838,14 @@ if page_cle == "accueil":
                 reset_after(dash_etitre="", dash_eheure="")
                 st.rerun()
 
-    # 5. BUDGET PARTAGÉ
+    # 7. BUDGET PARTAGÉ
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
     ecart = (total_l - total_a) / 2
     qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés 💖"
     st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>", unsafe_allow_html=True)
 
-    # 6. RÉGLAGES & ACCÈS DIRECT LABO IA
+    # 8. RÉGLAGES & ACCÈS DIRECT LABO IA
     with st.expander("⚙️ Réglages"):
         d1, d2 = st.columns(2)
         with d1:
