@@ -8,7 +8,6 @@ Streamlit + Google Sheets, un seul fichier organisé en sections :
   4. Couche données     8. Pages
 """
 
-import io
 import re
 import json
 import calendar
@@ -17,13 +16,14 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "2.45"
+VERSION = "2.46"
 DOC_NAME = "MonAssistantData"
+CODE_IA_DEFAUT = "2026"
 
 SHEETS = {
     "Taches":   ["Tache", "Statut"],
@@ -32,7 +32,6 @@ SHEETS = {
     "Recettes": ["Titre", "Ingredients", "Instructions"],
     "Budget":   ["Date", "Paye Par", "Intitule", "Montant", "Categorie"],
     "Repas":    ["Jour", "Repas", "Plat"],
-    "Listes":   ["Categorie", "Element", "Notes"],
     "IA_Lab":   ["Date", "Sujet", "Contenu", "Type"],
     "Trades":   ["Date", "Actif", "Sens", "Entree", "Objectif", "StopLoss", "Statut", "Notes"],
 }
@@ -53,8 +52,9 @@ JOURS_COURT = ["L", "M", "M", "J", "V", "S", "D"]
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
         "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 PERSONNES = ["Lucas", "Alex"]
+TYPES_REPAS = ["Midi", "Soir"]
 
-ONGLETS_M = ["🛒 Courses", "🍲 Recettes"]
+ONGLETS_M = ["🛒 Courses", "🍲 Recettes", "📅 Repas"]
 ONGLETS_IA = ["📝 Notes & Contexte", "📈 Marchés & Analyse", "🎯 Journal de Trade", "🧮 Simulateur DCA"]
 
 PAGES = {
@@ -101,8 +101,8 @@ MEMOIRE_COURSES = [
 
 INDICES_RAYON = [
     ("Fruits & Légumes", ["tomate", "salade", "roquette", "pomme", "banane", "carotte", "oignon",
-                         "citron", "courgette", "avocat", "concombre", "ail", "poivron", "champignon",
-                         "épinard", "basilic", "persil", "fraise", "brocoli", "patate", "pomme de terre"]),
+                          "citron", "courgette", "avocat", "concombre", "ail", "poivron", "champignon",
+                          "épinard", "basilic", "persil", "fraise", "brocoli", "patate", "pomme de terre"]),
     ("Frais", ["lait", "yaourt", "fromage", "beurre", "œuf", "oeuf", "crème", "creme", "jambon",
                "poulet", "saumon", "mozzarella", "feta", "parmesan", "thon", "escalope", "tofu"]),
     ("Boulangerie", ["pain", "baguette", "panini", "brioche", "wrap", "tortilla"]),
@@ -112,11 +112,11 @@ INDICES_RAYON = [
                      "poivre", "épice", "epice", "conserve", "sauce", "bouillon", "lentille", "semoule"]),
 ]
 
-UNITES = ["g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pincee", "tranche",
-         "tranches", "gousse", "gousses", "boîte", "boite", "sachet", "sachets", "pot", "pots",
-         "botte", "brique", "briques", "paquet", "paquets", "bouquet", "brin", "brins", "verre",
-         "verres", "cuillère", "cuillere", "cuillères", "cuilleres", "filet", "barquette",
-         "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"]
+UNITES = {"g", "kg", "ml", "cl", "l", "cs", "cc", "c.s", "c.c", "pincée", "pincee", "tranche",
+          "tranches", "gousse", "gousses", "boîte", "boite", "sachet", "sachets", "pot", "pots",
+          "botte", "brique", "briques", "paquet", "paquets", "bouquet", "brin", "brins", "verre",
+          "verres", "cuillère", "cuillere", "cuillères", "cuilleres", "filet", "barquette",
+          "rouleau", "bocal", "boule", "boules", "part", "parts", "portion", "portions"}
 
 # ==========================================================
 # 2. STYLE
@@ -155,6 +155,17 @@ html, body, [class*="css"], .stApp{
 [data-testid="stHorizontalBlock"]{flex-wrap:nowrap !important; gap:8px !important;}
 [data-testid="stHorizontalBlock"] > div{min-width:0 !important;}
 
+/* --- Cadres : un seul sélecteur, celui des conteneurs bordés --- */
+[data-testid="stVerticalBlockBorderWrapper"]{
+  background:#ffffff !important;
+  border:3.5px solid var(--bord-cadre) !important;
+  border-radius:22px !important;
+  padding:16px 20px 14px !important;
+  box-shadow:0 14px 40px rgba(131,24,67,.3) !important;
+  margin-bottom:18px !important;
+}
+
+/* --- Barre de navigation --- */
 .st-key-navrow{margin-bottom:12px;}
 .st-key-navrow [data-testid="stHorizontalBlock"]{gap:8px !important;}
 .st-key-navrow button{font-size:13px !important; padding:11px 6px !important; border-radius:14px !important;}
@@ -168,6 +179,7 @@ html, body, [class*="css"], .stApp{
 .bloc-head .n{background:#fce7f3; color:var(--rose-vif); border-radius:10px;
   padding:2px 10px; font-size:11.5px; font-weight:800;}
 
+/* --- Boutons --- */
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
   border-radius:14px !important; font-weight:700 !important; font-size:14px !important;
   padding:11px 15px !important; width:100%; border:2.5px solid var(--bord-cadre) !important;
@@ -188,44 +200,37 @@ button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSu
 }
 button:focus-visible{outline:2px solid #831843 !important; outline-offset:2px;}
 
-[data-testid="stVerticalBlockBorderWrapper"], 
-div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
-[data-baseweb="block"] {
-  background: #ffffff !important;
-  border: 3.5px solid var(--bord-cadre) !important;
-  border-radius: 22px !important;
-  padding: 16px 20px 14px !important;
-  box-shadow: 0 14px 40px rgba(131, 24, 67, 0.3) !important;
-  margin-bottom: 18px !important;
-}
-
-[data-testid="stMetricValue"] {color: var(--rose-fonce) !important; font-weight: 800 !important;}
-[data-testid="stMetricLabel"] {color: var(--prune-clair) !important; font-weight: 700 !important;}
-[data-testid="stMetric"] {
-  background: #ffffff; border: 3.5px solid var(--bord-cadre) !important;
-  border-radius: 18px; padding: 14px 18px; box-shadow: 0 6px 20px rgba(131,24,67,.2);
+[data-testid="stMetricValue"]{color:var(--rose-fonce) !important; font-weight:800 !important;}
+[data-testid="stMetricLabel"]{color:var(--prune-clair) !important; font-weight:700 !important;}
+[data-testid="stMetric"]{
+  background:#ffffff; border:3.5px solid var(--bord-cadre) !important;
+  border-radius:18px; padding:14px 18px; box-shadow:0 6px 20px rgba(131,24,67,.2);
 }
 
 .jour-titre{font-size:13.5px; font-weight:800; color:var(--rose-vif); padding:8px 0 4px;}
 .section{font-weight:800; font-size:16px; color:var(--rose-fonce); margin:18px 0 6px;}
 
-.line{font-size:14.5px; font-weight:700; color:#311026;}
+/* --- Lignes de liste --- */
+.line{font-size:14.5px; font-weight:700; color:#311026; padding:6px 0; line-height:1.4;}
 .line.done{color:#a3a3a3; text-decoration:line-through;}
-.line .q{font-weight:700; color:var(--rose-vif); font-size:13px;}
+.line .q{font-weight:700; color:var(--rose-vif); font-size:13px;
+         font-variant-numeric:tabular-nums; opacity:.9;}
 
 .tag{display:inline-block; padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:800;
      background:#fce7f3; color:var(--rose-vif); margin-left:6px; vertical-align:middle; border:1px solid #f472b6;}
-.rayon{font-size:13px; font-weight:800; color:var(--rose-vif); background:#fdf2f8;
-       display:inline-block; padding:4px 10px; border-radius:12px; margin:12px 0 6px; border:1.5px solid #f472b6;}
-.empty{text-align:center; padding:22px 14px; border-radius:18px; background:#fff5f8;
+.rayon{display:inline-block; font-size:13px; font-weight:800; color:var(--rose-vif);
+       background:#fdf2f8; padding:4px 10px; border-radius:12px; margin:8px 0 6px; border:1.5px solid #f472b6;}
+.rayon .c{opacity:.7; font-weight:700;}
+.empty{text-align:center; padding:24px 14px; border-radius:18px; background:#fff5f8;
        border:3px dashed var(--bord-cadre); color:var(--rose-fonce); font-weight:600; font-size:13.5px;}
-.today-none{font-size:13.5px; color:var(--rose-fonce); font-weight:600; opacity:.85; padding:8px 0;}
+.today-none{font-size:13.5px; color:var(--rose-fonce); font-weight:600; opacity:.85; padding:12px 0;}
 
 .solde{border-radius:18px; padding:16px 20px; margin:14px 0; font-weight:700; font-size:15px;
        background:linear-gradient(135deg,#fdf2f8,#fce7f3); border:3.5px solid var(--bord-cadre); color:var(--rose-fonce);
        display:flex; justify-content:space-between; align-items:center; gap:10px;
        box-shadow:0 8px 25px rgba(157,23,77,.25);}
-.solde .m{font-size:17.5px; font-weight:800; color:var(--rose-vif); white-space:nowrap;}
+.solde .m{font-size:17.5px; font-weight:800; color:var(--rose-vif);
+          white-space:nowrap; font-variant-numeric:tabular-nums;}
 
 .bandeau{border-radius:14px; padding:10px 14px; font-size:13.5px; font-weight:700; margin-bottom:10px;}
 .bandeau.info{background:#fdf2f8; border:2.5px solid #f472b6; color:var(--rose-vif);}
@@ -245,9 +250,11 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--ros
 .stTabs [aria-selected="true"]{background:linear-gradient(135deg,#be185d,#9d174d); color:#fff !important;}
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{display:none;}
 
+/* --- Calendrier --- */
 .cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:0 -2px 8px;}
 .cal-week span{text-align:center; font-size:11.5px; font-weight:800; color:var(--rose-vif);}
 .cal-title{text-align:center; font-size:16px; font-weight:800; color:var(--rose-fonce); padding-top:8px;}
+.cal-vide{height:40px;}
 .st-key-cal-grid{margin:0 -2px;}
 .st-key-cal-grid [data-testid="stHorizontalBlock"],
 [data-testid="stHorizontalBlock"]:has([class*="st-key-cal_"]){gap:4px !important;}
@@ -261,7 +268,6 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--ros
   color:#311026 !important; border:2px solid #f472b6 !important; box-shadow:none !important;
 }
 [class*="st-key-cal_"] button p{font-size:12.5px !important; font-weight:700 !important; line-height:1.1 !important;}
-[class*="st-key-cal_"] button:disabled{background:transparent !important; color:#fbcfe8 !important; opacity:1 !important; border:none !important;}
 [class*="st-key-cal_"] button[kind="primary"], [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
   background:linear-gradient(135deg,#be185d,#9d174d) !important; color:#fff !important;
   box-shadow:0 4px 12px -2px rgba(157,23,77,.5) !important; border:none !important;
@@ -275,44 +281,36 @@ label p{font-weight:700 !important; font-size:13.5px !important; color:var(--ros
   justify-content:flex-start !important; text-align:left !important;
 }
 [class*="st-key-goto-"] button p{font-size:16px !important; font-weight:800 !important;}
-[class*="st-key-goto-"] button:hover::after{opacity:.9;}
 
-.st-key-iatabs{margin-bottom:8px;}
-.st-key-iatabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
-.st-key-iatabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
-.st-key-iatabs button p{font-size:12.5px !important; font-weight:800 !important;}
-
-.st-key-mtabs{margin-bottom:8px;}
+.st-key-iatabs, .st-key-mtabs{margin-bottom:8px;}
+.st-key-iatabs [data-testid="stHorizontalBlock"],
 .st-key-mtabs [data-testid="stHorizontalBlock"]{gap:6px !important;}
-.st-key-mtabs button{font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
-.st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
+.st-key-iatabs button, .st-key-mtabs button{
+  font-size:12.5px !important; padding:10px 6px !important; border-radius:14px !important;}
+.st-key-iatabs button p, .st-key-mtabs button p{font-size:12.5px !important; font-weight:800 !important;}
 
+/* --- Rangée « ligne + boutons » --- */
 [data-testid="stHorizontalBlock"]:has(.line){
-  background: #fff5f8 !important;
-  border: 2px solid #f472b6 !important;
-  border-radius: 14px !important;
-  padding: 6px 12px !important;
-  margin-bottom: 8px !important;
-  align-items:center !important; 
-  gap: 8px !important;
-  box-shadow: 0 3px 10px rgba(157, 23, 77, 0.08) !important;
+  background:#fff5f8 !important;
+  border:2px solid #f472b6 !important;
+  border-radius:14px !important;
+  padding:6px 12px !important;
+  margin-bottom:8px !important;
+  align-items:center !important;
+  gap:8px !important;
+  box-shadow:0 3px 10px rgba(157,23,77,.08) !important;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button{
-  background:#ffffff !important; border:1.5px solid #f472b6 !important; box-shadow:0 2px 6px rgba(157,23,77,0.15) !important;
+  background:#ffffff !important; border:1.5px solid #f472b6 !important;
+  box-shadow:0 2px 6px rgba(157,23,77,.15) !important;
   color:var(--rose-vif) !important; padding:6px 10px !important; font-size:13.5px !important;
   border-radius:10px !important; transition:transform .1s ease;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button:active{transform:scale(.95);}
 
-.line{padding:6px 0; line-height:1.4;}
-.line .q{font-variant-numeric:tabular-nums; opacity:.9;}
-.solde .m{font-variant-numeric:tabular-nums;}
-
-.rayon{background:#fdf2f8; padding:4px 10px; border-radius:10px; margin:8px 0 6px; font-size:13px; font-weight:800; border:1.5px solid #f472b6;}
-.rayon .c{opacity:.7; font-weight:700;}
-
-.today-none{padding:12px 0;}
-.empty{padding:24px 14px;}
+@media (prefers-reduced-motion:reduce){
+  .stButton>button, .stFormSubmitButton>button{transition:none;}
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -341,8 +339,10 @@ for cle, val in st.session_state["_reset"].items():
     st.session_state[cle] = val
 st.session_state["_reset"] = {}
 
+
 def reset_after(**champs):
     st.session_state["_reset"] = champs
+
 
 if not st.session_state["creds_json"]:
     try:
@@ -351,6 +351,13 @@ if not st.session_state["creds_json"]:
     except Exception:
         pass
 
+
+def code_ia_attendu():
+    try:
+        return str(st.secrets.get("code_ia") or CODE_IA_DEFAUT)
+    except Exception:
+        return CODE_IA_DEFAUT
+
 # ==========================================================
 # 4. COUCHE DONNÉES
 # ==========================================================
@@ -358,6 +365,7 @@ if not st.session_state["creds_json"]:
 def get_client(json_str):
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     return gspread.authorize(Credentials.from_service_account_info(json.loads(json_str), scopes=scope))
+
 
 @st.cache_resource(show_spinner=False)
 def get_doc(json_str):
@@ -378,11 +386,13 @@ def get_doc(json_str):
             pass
     return doc
 
+
 @st.cache_resource(show_spinner=False)
 def get_ws(json_str, feuille):
     return get_doc(json_str).worksheet(feuille)
 
-@st.cache_data(ttl=300, show_spinner=False)
+
+@st.cache_data(show_spinner=False)
 def fetch_all(json_str):
     doc = get_doc(json_str)
     donnees = {}
@@ -401,6 +411,7 @@ def fetch_all(json_str):
             donnees[nom] = [entetes]
     return donnees
 
+
 def db():
     if "db" not in st.session_state:
         creds = st.session_state["creds_json"]
@@ -412,18 +423,29 @@ def db():
             st.session_state["db"] = {n: [e] for n, e in SHEETS.items()}
     return st.session_state["db"]
 
+
 def rows(feuille):
     brut = db().get(feuille, [])
     return [(i + 1, r) for i, r in enumerate(brut[1:])]
 
+
 def pad(ligne_, n):
     return (list(ligne_) + [""] * n)[:n]
+
+
+# --- File d'écritures -------------------------------------------------------
+# Les opérations sont empilées puis envoyées à Google Sheets. Les « append »
+# consécutifs sur une même feuille sont fusionnés en un seul appel réseau.
+DECALANTES = ("delete", "insert")
+
 
 def _executer(op):
     creds = st.session_state["creds_json"]
     genre = op[0]
     if genre == "append":
         get_ws(creds, op[1]).append_row(op[2], value_input_option="USER_ENTERED")
+    elif genre == "append_many":
+        get_ws(creds, op[1]).append_rows(op[2], value_input_option="USER_ENTERED")
     elif genre == "insert":
         get_ws(creds, op[1]).insert_row(op[2], op[3] + 1, value_input_option="USER_ENTERED")
     elif genre == "delete":
@@ -433,10 +455,26 @@ def _executer(op):
     elif genre == "clear":
         get_ws(creds, op[1]).batch_clear(["A2:Z2000"])
 
+
+def _compacter(file):
+    sortie = []
+    for op in file:
+        fusionnable = (op[0] == "append" and sortie
+                       and sortie[-1][0] == "append_many" and sortie[-1][1] == op[1])
+        if fusionnable:
+            sortie[-1][2].append(op[2])
+        elif op[0] == "append":
+            sortie.append(["append_many", op[1], [op[2]]])
+        else:
+            sortie.append(list(op))
+    return sortie
+
+
 def vider_file():
     if not st.session_state.get("creds_json"):
         return True
-    file = st.session_state["ops"]
+    file = _compacter(st.session_state["ops"])
+    st.session_state["ops"] = file
     while file:
         try:
             _executer(file[0])
@@ -448,40 +486,72 @@ def vider_file():
     st.session_state["erreur_synchro"] = None
     return True
 
-def pousser(op):
-    st.session_state["ops"].append(op)
-    vider_file()
 
-def add_row(feuille, ligne_):
-    db()[feuille].append(ligne_)
-    pousser(("append", feuille, ligne_))
+def pousser(op, flush=True):
+    st.session_state["ops"].append(op)
+    if flush:
+        vider_file()
+
+
+def _pret_pour_index():
+    """Une suppression ou insertion en attente décale les index côté Sheets :
+    on refuse toute nouvelle opération indexée tant qu'elle n'est pas partie."""
+    if not any(op[0] in DECALANTES for op in st.session_state["ops"]):
+        return True
+    if vider_file():
+        return True
+    st.session_state["erreur_synchro"] = ("Modifications non synchronisées : "
+                                          "réessayez avant de modifier une ligne.")
+    return False
+
+
+def add_row(feuille, ligne_, flush=True):
+    db()[feuille].append(list(ligne_))
+    pousser(("append", feuille, list(ligne_)), flush=flush)
+
 
 def delete_row(feuille, index, annulable=True, libelle="Élément supprimé"):
     donnees = db()[feuille]
-    if not 0 < index < len(donnees):
-        return
+    if not 0 < index < len(donnees) or not _pret_pour_index():
+        return False
     ancienne = list(donnees[index])
     donnees.pop(index)
     pousser(("delete", feuille, index))
-    if annulable:
-        st.session_state["annulation"] = {"type": "restaurer", "feuille": feuille,
-                                         "index": index, "ligne": ancienne, "libelle": libelle}
+    st.session_state["annulation"] = ({"feuille": feuille, "index": index,
+                                       "ligne": ancienne, "libelle": libelle}
+                                      if annulable else None)
+    return True
 
-def set_cell(feuille, index, colonne, valeur, annulable=False, libelle=""):
+
+def set_cell(feuille, index, colonne, valeur, flush=True):
     donnees = db()[feuille]
-    if not 0 < index < len(donnees):
-        return
+    if not 0 < index < len(donnees) or not _pret_pour_index():
+        return False
     ligne_ = pad(donnees[index], max(colonne, len(donnees[index])))
-    ancienne = ligne_[colonne - 1]
     ligne_[colonne - 1] = valeur
     donnees[index] = ligne_
-    pousser(("update", feuille, index, colonne, valeur))
+    pousser(("update", feuille, index, colonne, valeur), flush=flush)
+    return True
 
+
+def restaurer():
+    a = st.session_state.get("annulation")
+    if not a or not _pret_pour_index():
+        return
+    donnees = db()[a["feuille"]]
+    index = min(a["index"], len(donnees))
+    donnees.insert(index, a["ligne"])
+    pousser(("insert", a["feuille"], a["ligne"], index))
+    st.session_state["annulation"] = None
+
+
+# --- Utilitaires ------------------------------------------------------------
 def to_float(valeur):
     try:
         return float(str(valeur).replace(",", ".").replace("€", "").strip())
     except (ValueError, AttributeError):
         return 0.0
+
 
 def parse_date(texte):
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"):
@@ -490,6 +560,7 @@ def parse_date(texte):
         except ValueError:
             continue
     return None
+
 
 def merge_qte(a, b):
     motif = r"^\s*(\d+(?:[.,]\d+)?)\s*(.*)$"
@@ -500,16 +571,23 @@ def merge_qte(a, b):
         return f"{nombre} {ma.group(2).strip()}".strip()
     return f"{a} + {b}"
 
+
+def _mot_present(texte, mot):
+    """Frontière de mot à gauche : « ail » ne matche plus « cocktail »."""
+    return re.search(rf"\b{re.escape(mot)}", texte) is not None
+
+
 def deviner_rayon(nom):
     minus = nom.lower()
     for memo in MEMOIRE_COURSES:
         base = memo["article"].lower().split(" /")[0].strip()
-        if base and (base in minus or minus in memo["article"].lower()):
+        if base and _mot_present(minus, base):
             return memo["rayon"]
     for rayon, mots in INDICES_RAYON:
-        if any(mot in minus for mot in mots):
+        if any(_mot_present(minus, mot) for mot in mots):
             return rayon
     return "Autre"
+
 
 def separer_quantite(ligne_texte):
     texte = re.sub(r"^\s*[-•*·]\s*", "", str(ligne_texte)).strip()
@@ -520,16 +598,18 @@ def separer_quantite(ligne_texte):
             return m.group(3).strip(), f"{m.group(1)} {unite}".strip()
     return texte, "1"
 
-def add_course(article, qte, rayon=None):
+
+def add_course(article, qte, rayon=None, flush=True):
     article = str(article).strip()
     if not article:
         return
     nom = article.lower()
     for idx, r in rows("Courses"):
         if pad(r, 3)[0].strip().lower() == nom:
-            set_cell("Courses", idx, 2, merge_qte(pad(r, 3)[1] or "1", qte))
+            set_cell("Courses", idx, 2, merge_qte(pad(r, 3)[1] or "1", qte), flush=flush)
             return
-    add_row("Courses", [article, qte, rayon or deviner_rayon(article)])
+    add_row("Courses", [article, qte, rayon or deviner_rayon(article)], flush=flush)
+
 
 def evenements_tries():
     sortie = []
@@ -540,14 +620,10 @@ def evenements_tries():
             sortie.append((jour, h, ti, desc, idx))
     return sorted(sortie, key=lambda e: (e[0], e[1] or "99:99"))
 
+
 def taches_actives():
-    resultat = []
-    for idx, r in rows("Taches"):
-        nom, statut = pad(r, 2)
-        if statut == "Fait":
-            continue
-        resultat.append((idx, nom))
-    return resultat
+    return [(idx, pad(r, 2)[0]) for idx, r in rows("Taches") if pad(r, 2)[1] != "Fait"]
+
 
 def depuis(instant):
     if not instant:
@@ -559,25 +635,29 @@ def depuis(instant):
         return f"il y a {int(secondes // 60)} min"
     return f"il y a {int(secondes // 3600)} h"
 
+
 @st.cache_data(ttl=60, show_spinner=False)
-def fetch_market_history(tickers_list, period="1d"):
+def fetch_market_history(tickers, period="1d"):
+    """`tickers` doit être un tuple trié : l'ordre ne doit pas invalider le cache."""
+    liste = list(tickers)
     try:
         import yfinance as yf
-        interval = "1m" if period in ["1d", "5d"] else ("15m" if period == "1mo" else "1d")
-        if period in ["6mo", "1y"]:
+        if period in ("1d", "5d"):
+            interval = "1m"
+        elif period == "1mo":
+            interval = "15m"
+        else:
             interval = "1d"
-            
-        data = yf.download(tickers_list, period=period, interval=interval, progress=False)
-        if 'Close' in data:
-            df_close = data['Close']
-            if isinstance(df_close, pd.Series):
-                df_close = df_close.to_frame(name=tickers_list[0])
-            return df_close.dropna(how="all"), None
-        elif not data.empty:
-            return data, None
-    except Exception as e:
-        return None, str(e)
-    return None, "Données indisponibles"
+        data = yf.download(liste, period=period, interval=interval,
+                           progress=False, auto_adjust=False)
+        if data is None or data.empty:
+            return None, "Données indisponibles"
+        cours = data["Close"] if "Close" in data else data
+        if isinstance(cours, pd.Series):
+            cours = cours.to_frame(name=liste[0])
+        return cours.dropna(how="all"), None
+    except Exception as err:
+        return None, str(err)
 
 # ==========================================================
 # 5. COMPOSANTS D'INTERFACE
@@ -588,14 +668,18 @@ def conteneur(cle=None, bordure=True):
     except TypeError:
         return st.container(border=bordure)
 
+
 def titre(texte):
     st.markdown(f"<div class='section'>{texte}</div>", unsafe_allow_html=True)
+
 
 def vide(texte):
     st.markdown(f"<div class='empty'>{texte}</div>", unsafe_allow_html=True)
 
+
 def ligne(html, done=False):
     st.markdown(f"<div class='line{' done' if done else ''}'>{html}</div>", unsafe_allow_html=True)
+
 
 def ligne_action(html, boutons, done=False):
     cols = st.columns([4] + [1] * len(boutons))
@@ -607,6 +691,7 @@ def ligne_action(html, boutons, done=False):
             if st.button(icone, key=cle):
                 clique = cle
     return clique
+
 
 def pills(cle, options, defaut=None, cols=3):
     if cle not in st.session_state or st.session_state[cle] not in options:
@@ -622,6 +707,7 @@ def pills(cle, options, defaut=None, cols=3):
                     st.rerun()
     return st.session_state[cle]
 
+
 def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
     st.markdown("<div class='cal-week'>" + "".join(f"<span>{j}</span>" for j in JOURS_COURT) + "</div>",
                 unsafe_allow_html=True)
@@ -631,10 +717,11 @@ def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
             colonnes = st.columns(7)
             for col, jour in zip(colonnes, semaine):
                 with col:
-                    cle = f"{prefixe}_{jour.isoformat()}"
                     if jour.month != mois:
-                        st.button(str(jour.day), key=cle, disabled=True)
+                        # simple espace réservé : pas de widget à construire
+                        st.markdown("<div class='cal-vide'></div>", unsafe_allow_html=True)
                         continue
+                    cle = f"{prefixe}_{jour.isoformat()}"
                     nb = len(par_jour.get(jour, []))
                     if st.button(f"{jour.day}•" if nb else str(jour.day), key=cle,
                                  type="primary" if jour == selection else "secondary"):
@@ -650,6 +737,7 @@ def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
     if styles:
         st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
     return choisi
+
 
 def navigateur_mois(cle_etat, aujourd, prefixe):
     if cle_etat not in st.session_state:
@@ -669,27 +757,51 @@ def navigateur_mois(cle_etat, aujourd, prefixe):
             st.rerun()
     return st.session_state[cle_etat]
 
+
 def bandeaux():
     en_attente = len(st.session_state.get("ops", []))
     if en_attente:
         c1, c2 = st.columns([3, 1])
         with c1:
-            st.markdown(f"<div class='bandeau warn'>⏳ {en_attente} modification(s) en attente</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='bandeau warn'>⏳ {en_attente} modification(s) en attente</div>",
+                        unsafe_allow_html=True)
         with c2:
             if st.button("Réessayer", key="retry_sync"):
                 vider_file()
                 st.rerun()
 
+    annulation = st.session_state.get("annulation")
+    if annulation:
+        c1, c2, c3 = st.columns([3, 1, 0.6])
+        with c1:
+            st.markdown(f"<div class='bandeau info'>↩️ {annulation['libelle']}</div>",
+                        unsafe_allow_html=True)
+        with c2:
+            if st.button("Annuler", key="undo_do"):
+                restaurer()
+                st.rerun()
+        with c3:
+            if st.button("✕", key="undo_close"):
+                st.session_state["annulation"] = None
+                st.rerun()
+
+
 def entete_bloc(texte, compteur=None):
     pastille = f"<span class='n'>{compteur}</span>" if compteur is not None else ""
     st.markdown(f"<div class='bloc-head'><span>{texte}</span>{pastille}</div>", unsafe_allow_html=True)
+
 
 def entete_lien(cle, texte, compteur, onglet):
     with conteneur(f"goto-{cle}"):
         if st.button(f"{texte}   ·   {compteur}", key=f"goto_{cle}"):
             st.session_state["m_tab"] = onglet
-            st.query_params["p"] = "maison"
-            st.rerun()
+            aller_a("maison")
+
+
+def aller_a(page):
+    st.session_state["annulation"] = None
+    st.query_params["p"] = page
+    st.rerun()
 
 # ==========================================================
 # 6. CONNEXION
@@ -722,32 +834,38 @@ if st.session_state["ops"]:
 # ==========================================================
 params = st.query_params
 page_cle = params.get("p", "accueil")
-if page_cle not in PAGES and page_cle != "ialab":
-    page_cle = "accueil"
 
 pages_dispo = PAGES.copy()
 if st.session_state.get("mode_ia"):
     pages_dispo["ialab"] = "🧠 Labo IA"
+
+if page_cle not in pages_dispo:
+    page_cle = "accueil"
+    st.query_params["p"] = "accueil"
 
 with conteneur("navrow"):
     cols = st.columns(len(pages_dispo))
     for col, (cle, libelle) in zip(cols, pages_dispo.items()):
         with col:
             if st.button(libelle, key=f"nav_{cle}", type="primary" if page_cle == cle else "secondary"):
-                st.query_params["p"] = cle
-                st.rerun()
+                aller_a(cle)
 
 bandeaux()
 
-evenements = evenements_tries()
-par_jour = {}
-for ev in evenements:
-    par_jour.setdefault(ev[0], []).append(ev)
+if st.session_state.get("erreur_synchro"):
+    st.markdown(f"<div class='bandeau warn'>⚠️ {st.session_state['erreur_synchro']}</div>",
+                unsafe_allow_html=True)
 
 # ==========================================================
 # 8a. ACCUEIL
 # ==========================================================
 if page_cle == "accueil":
+    # L'agenda n'est calculé que sur cette page.
+    evenements = evenements_tries()
+    par_jour = {}
+    for ev in evenements:
+        par_jour.setdefault(ev[0], []).append(ev)
+
     courses = rows("Courses")
     budget = rows("Budget")
     repas = rows("Repas")
@@ -777,7 +895,8 @@ if page_cle == "accueil":
                 st.session_state["show_add_tache"] = True
                 st.rerun()
         else:
-            dash_t_txt = st.text_input("Nouvelle tâche", key="dash_t_txt", placeholder="Écrire ici…", label_visibility="collapsed")
+            dash_t_txt = st.text_input("Nouvelle tâche", key="dash_t_txt",
+                                       placeholder="Écrire ici…", label_visibility="collapsed")
             col_b1, col_b2 = st.columns(2)
             with col_b1:
                 if st.button("Enregistrer", key="dash_add_t", type="primary") and dash_t_txt.strip():
@@ -805,7 +924,7 @@ if page_cle == "accueil":
                 delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
                 st.rerun()
 
-    # 3. COURSES (Redirection épurée)
+    # 3. COURSES
     entete_lien("courses", "🛒 Courses", len(courses), ONGLETS_M[0])
 
     # 4. LE MOIS
@@ -822,7 +941,8 @@ if page_cle == "accueil":
             st.rerun()
 
         marque = " · aujourd'hui" if jour_sel == ajd else ""
-        st.markdown(f"<div class='jour-titre'>{JOURS[jour_sel.weekday()]} {jour_sel.day} {MOIS[jour_sel.month - 1]}{marque}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='jour-titre'>{JOURS[jour_sel.weekday()]} {jour_sel.day} "
+                    f"{MOIS[jour_sel.month - 1]}{marque}</div>", unsafe_allow_html=True)
         du_jour = par_jour.get(jour_sel, [])
         for jd, h, ti, desc, idx in du_jour:
             detail = f"<br><span class='q'>{desc}</span>" if desc else ""
@@ -834,9 +954,11 @@ if page_cle == "accueil":
 
         na, nb, nc = st.columns([1.2, 3, 1])
         with na:
-            n_heure = st.text_input("Heure", key="dash_eheure", placeholder="19:30", label_visibility="collapsed")
+            n_heure = st.text_input("Heure", key="dash_eheure", placeholder="19:30",
+                                    label_visibility="collapsed")
         with nb:
-            n_titre = st.text_input("Événement", key="dash_etitre", placeholder="Ajouter ici…", label_visibility="collapsed")
+            n_titre = st.text_input("Événement", key="dash_etitre", placeholder="Ajouter ici…",
+                                    label_visibility="collapsed")
         with nc:
             if st.button("＋", key="dash_add_ev", type="primary") and n_titre.strip():
                 add_row("Agenda", [str(jour_sel), n_heure.strip(), n_titre.strip(), ""])
@@ -847,10 +969,16 @@ if page_cle == "accueil":
     total_l = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Lucas")
     total_a = sum(to_float(pad(r, 5)[3]) for _, r in budget if pad(r, 5)[1] == "Alex")
     ecart = (total_l - total_a) / 2
-    qui = f"Alex doit à Lucas : {ecart:.2f} €" if ecart > 0.005 else f"Lucas doit à Alex : {abs(ecart):.2f} €" if ecart < -0.005 else "Comptes équilibrés 💖"
-    st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>", unsafe_allow_html=True)
+    if ecart > 0.005:
+        qui = f"Alex doit à Lucas : {ecart:.2f} €"
+    elif ecart < -0.005:
+        qui = f"Lucas doit à Alex : {abs(ecart):.2f} €"
+    else:
+        qui = "Comptes équilibrés 💖"
+    st.markdown(f"<div class='solde'><span>État</span><span class='m'>{qui}</span></div>",
+                unsafe_allow_html=True)
 
-    # 6. RÉGLAGES & ACCÈS DIRECT LABO IA
+    # 6. RÉGLAGES & ACCÈS LABO IA
     with st.expander("⚙️ Réglages"):
         d1, d2 = st.columns(2)
         with d1:
@@ -865,16 +993,23 @@ if page_cle == "accueil":
                 for k in ["creds_json", "db", "ops", "annulation", "mode_ia"]:
                     st.session_state.pop(k, None)
                 st.rerun()
-        
+
         st.divider()
         st.markdown("**🔐 Accès Labo IA**")
-        pwd = st.text_input("Code secret", type="password", key="sec_pwd_input", placeholder="Entrez le code…")
-        if pwd == "2026":
-            st.session_state["mode_ia"] = True
-            st.query_params["p"] = "ialab"
-            st.rerun()
-        elif pwd:
-            st.error("Code incorrect")
+        if st.session_state.get("mode_ia"):
+            if st.button("Verrouiller le Labo IA", key="sec_lock"):
+                st.session_state["mode_ia"] = False
+                aller_a("accueil")
+        else:
+            pwd = st.text_input("Code secret", type="password", key="sec_pwd_input",
+                                placeholder="Entrez le code…")
+            if st.button("Valider", key="sec_ok"):
+                if pwd == code_ia_attendu():
+                    st.session_state["mode_ia"] = True
+                    reset_after(sec_pwd_input="")
+                    aller_a("ialab")
+                else:
+                    st.error("Code incorrect.")
 
         st.caption(f"Synchronisé {depuis(st.session_state['derniere_synchro'])} · version {VERSION}")
 
@@ -887,18 +1022,21 @@ elif page_cle == "budget":
         lignes = []
         for idx, r in budget:
             d, pyr, lbl, mnt, cat = pad(r, 5)
-            lignes.append({"idx": idx, "Date": parse_date(d), "Payeur": pyr, "Intitulé": lbl, "Montant": to_float(mnt), "Catégorie": cat or "Alimentation"})
+            lignes.append({"idx": idx, "Date": parse_date(d), "Payeur": pyr, "Intitulé": lbl,
+                           "Montant": to_float(mnt), "Catégorie": cat or "Alimentation"})
         df = pd.DataFrame(lignes)
         m1, m2 = st.columns(2)
         m1.metric("Payé par Lucas", f"{df[df['Payeur'] == 'Lucas']['Montant'].sum():.2f} €")
         m2.metric("Payé par Alex", f"{df[df['Payeur'] == 'Alex']['Montant'].sum():.2f} €")
         titre("Dépenses")
         for _, r in df.iloc[::-1].iterrows():
-            if ligne_action(f"{r['Intitulé']} <span class='tag'>{r['Catégorie']}</span><br><span class='q'>{r['Montant']:.2f} € · {r['Payeur']}</span>", [("🗑️", f"bu_{r['idx']}")]):
+            if ligne_action(f"{r['Intitulé']} <span class='tag'>{r['Catégorie']}</span>"
+                            f"<br><span class='q'>{r['Montant']:.2f} € · {r['Payeur']}</span>",
+                            [("🗑️", f"bu_{r['idx']}")]):
                 delete_row("Budget", int(r["idx"]), libelle="Dépense supprimée")
                 st.rerun()
     else:
-        vide("Aucune dépense.")
+        vide("Aucune dépense enregistrée. Ajoutez la première ci-dessous.")
 
     st.divider()
     titre("Nouvelle dépense")
@@ -910,18 +1048,22 @@ elif page_cle == "budget":
         b_montant = st.number_input("Montant (€)", min_value=0.0, step=0.5, key="new_bud_montant")
     with bc2:
         b_date = st.date_input("Date", value=ajd, key="new_bud_date")
-    if st.button("Enregistrer", type="primary", key="add_budget") and b_label.strip() and b_montant > 0:
-        add_row("Budget", [str(b_date), b_payeur, b_label.strip(), f"{b_montant:.2f}", b_cat])
-        reset_after(new_bud_label="", new_bud_montant=0.0)
-        st.rerun()
+    if st.button("Enregistrer", type="primary", key="add_budget"):
+        if b_label.strip() and b_montant > 0:
+            add_row("Budget", [str(b_date), b_payeur, b_label.strip(), f"{b_montant:.2f}", b_cat])
+            reset_after(new_bud_label="", new_bud_montant=0.0)
+            st.rerun()
+        else:
+            st.warning("Indiquez un intitulé et un montant supérieur à zéro.")
 
 # ==========================================================
 # 8c. MAISON
 # ==========================================================
 elif page_cle == "maison":
     with conteneur("mtabs"):
-        onglet_m = pills("m_tab", ONGLETS_M, cols=2)
+        onglet_m = pills("m_tab", ONGLETS_M, cols=3)
 
+    # --- Courses ---
     if onglet_m == ONGLETS_M[0]:
         courses = rows("Courses")
         titre("💖 Articles habituels")
@@ -930,7 +1072,8 @@ elif page_cle == "maison":
         mc1, mc2 = st.columns(2)
         for i, memo in enumerate([m for m in MEMOIRE_COURSES if m["rayon"] == rayon_memo]):
             with (mc1 if i % 2 == 0 else mc2):
-                if st.button(("✅ " if memo["article"].lower() in deja else "＋ ") + memo["article"], key=f"memo_{memo['article']}"):
+                prefixe = "✅ " if memo["article"].lower() in deja else "＋ "
+                if st.button(prefixe + memo["article"], key=f"memo_{memo['article']}"):
                     add_course(memo["article"], memo["qte"], memo["rayon"])
                     st.rerun()
 
@@ -942,15 +1085,17 @@ elif page_cle == "maison":
                 if not du_rayon:
                     continue
                 with conteneur(f"grp-{slug(rayon)}"):
-                    st.markdown(f"<div class='rayon'>{rayon}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='rayon'>{rayon} <span class='c'>· {len(du_rayon)}</span></div>",
+                                unsafe_allow_html=True)
                     for idx, r in du_rayon:
                         art, qte, _ = pad(r, 3)
                         if ligne_action(f"{art} <span class='q'>· {qte}</span>", [("✔️", f"co_{idx}")]):
                             delete_row("Courses", idx, libelle="Article retiré")
                             st.rerun()
         else:
-            vide("Panier vide.")
+            vide("Panier vide. Piochez dans les articles habituels ci-dessus.")
 
+    # --- Recettes ---
     elif onglet_m == ONGLETS_M[1]:
         recettes = rows("Recettes")
         for idx, r in recettes:
@@ -964,11 +1109,13 @@ elif page_cle == "maison":
                 with b1:
                     if st.button("🛒 Au panier", key=f"rec_panier_{idx}") and ing:
                         ajoutes = 0
+                        # flush=False : un seul appel réseau pour toute la recette
                         for brut in ing.splitlines():
                             if brut.strip():
                                 article, qte = separer_quantite(brut)
-                                add_course(article, qte)
+                                add_course(article, qte, flush=False)
                                 ajoutes += 1
+                        vider_file()
                         st.toast(f"{ajoutes} ingrédient(s) ajouté(s) 🛒", icon="✅")
                         st.rerun()
                 with b2:
@@ -976,7 +1123,7 @@ elif page_cle == "maison":
                         delete_row("Recettes", idx, libelle="Recette supprimée")
                         st.rerun()
         if not recettes:
-            vide("Aucune recette pour l'instant.")
+            vide("Aucune recette pour l'instant. Créez la première ci-dessous.")
 
         st.divider()
         with st.form("form_recette", clear_on_submit=True):
@@ -989,77 +1136,111 @@ elif page_cle == "maison":
                 add_row("Recettes", [r_titre.strip(), r_ing, r_inst])
                 st.rerun()
 
+    # --- Repas de la semaine ---
+    elif onglet_m == ONGLETS_M[2]:
+        repas = rows("Repas")
+        titre("📅 Semaine")
+        par_jour_repas = {}
+        for idx, r in repas:
+            jour, typ, plat = pad(r, 3)
+            par_jour_repas.setdefault(jour, []).append((idx, typ, plat))
+
+        for jour in JOURS:
+            with conteneur(f"grp-{slug(jour)}"):
+                st.markdown(f"<div class='rayon'>{jour}</div>", unsafe_allow_html=True)
+                du_jour = par_jour_repas.get(jour, [])
+                for idx, typ, plat in du_jour:
+                    if ligne_action(f"<span class='tag'>{typ}</span> 🍽️ {plat}",
+                                    [("🗑️", f"rp_{idx}")]):
+                        delete_row("Repas", idx, libelle=f"« {plat} » retiré du planning")
+                        st.rerun()
+                if not du_jour:
+                    st.markdown("<div class='today-none'>Rien de prévu.</div>", unsafe_allow_html=True)
+
+        st.divider()
+        titre("➕ Ajouter un repas")
+        rp_jour = st.selectbox("Jour", JOURS, index=ajd.weekday(), key="rp_jour")
+        rp_type = pills("rp_type", TYPES_REPAS, cols=2)
+        rp_plat = st.text_input("Plat", key="rp_plat", placeholder="Pâtes au pesto…")
+        if st.button("Ajouter au planning", type="primary", key="add_repas") and rp_plat.strip():
+            add_row("Repas", [rp_jour, rp_type, rp_plat.strip()])
+            reset_after(rp_plat="")
+            st.rerun()
+
 # ==========================================================
-# 8d. LABO IA & MARCHÉS (Dashboard multi-actifs, Journal, DCA, Chat)
+# 8d. LABO IA & MARCHÉS
 # ==========================================================
-elif page_cle == "ialab" and st.session_state.get("mode_ia"):
-    titre("🧠 Labo IA & Marchés Financiers")
-    
+elif page_cle == "ialab":
+    titre("🧠 Labo IA & Marchés financiers")
+
     with conteneur("iatabs"):
         onglet_ia = pills("ia_tab", ONGLETS_IA, cols=2)
 
-    # 1. NOTES & CONTEXTE + ASSISTANT IA SIMULÉ
+    # 1. NOTES & CONTEXTE
     if onglet_ia == ONGLETS_IA[0]:
-        st.caption("Espace de consignes, règles de trading et assistant intelligent sur vos notes.")
+        st.caption("Espace de consignes, règles de trading et recherche dans vos notes.")
 
-        # Simulateur de Chatbot Assistant basé sur les notes IA_Lab
         with conteneur("chat-assistant"):
-            st.markdown("🤖 **Assistant IA de vos notes**")
-            question_ia = st.text_input("Posez une question sur vos stratégies ou règles enregistrées", placeholder="Ex: Quelle est ma règle de breakout ?")
-            if question_ia:
-                ialab_rows_chat = rows("IA_Lab")
-                contexte_global = " ".join([str(pad(r, 4)[1]) + " " + str(pad(r, 4)[2]) for _, r in ialab_rows_chat]).lower()
-                
-                reponse = "Je n'ai pas trouvé de notes correspondantes dans votre base."
-                q_lower = question_ia.lower()
-                if "breakout" in q_lower:
-                    match_br = [pad(r, 4) for _, r in ialab_rows_chat if "breakout" in str(r).lower()]
-                    if match_br:
-                        reponse = f"D'après vos notes ({match_br[0][1]}) : {match_br[0][2]}"
-                elif "dca" in q_lower:
-                    match_dca = [pad(r, 4) for _, r in ialab_rows_chat if "dca" in str(r).lower()]
-                    if match_dca:
-                        reponse = f"D'après vos notes ({match_dca[0][1]}) : {match_dca[0][2]}"
+            st.markdown("🔎 **Rechercher dans vos notes**")
+            question_ia = st.text_input("Mot-clé ou question",
+                                        placeholder="Ex : ma règle de breakout")
+            if question_ia.strip():
+                notes = [(idx, pad(r, 4)) for idx, r in rows("IA_Lab")]
+                mots = [m for m in re.findall(r"\w{3,}", question_ia.lower())]
+                trouves = []
+                for idx, (d, suj, cont, typ) in notes:
+                    blob = f"{suj} {cont}".lower()
+                    score = sum(1 for m in mots if m in blob)
+                    if score:
+                        trouves.append((score, d, suj, cont))
+                trouves.sort(key=lambda t: -t[0])
+                if trouves:
+                    for _, d, suj, cont in trouves[:3]:
+                        st.info(f"**{suj}** ({d})\n\n{cont}")
                 else:
-                    if len(contexte_global) > 10:
-                        reponse = f"En analysant vos notes enregistrées, voici ce qui s'en rapproche le plus : {contexte_global[:250]}..."
-                
-                st.info(reponse)
+                    st.info("Aucune note ne correspond à ces mots-clés.")
 
         st.divider()
-        regles_trading_preset = st.selectbox(
+        regles_preset = st.selectbox(
             "⚡ Charger une règle d'investissement court terme classique",
             [
                 "Personnalisé",
-                "Règle 1 : Breakout / Cassure de résistance (Achat sur cassure de plus haut avec volume)",
-                "Règle 2 : Pullback sur Moyenne Mobile (Achat sur rebond EMA 20 en tendance)",
-                "Règle 3 : RSI de Survente / Surachat (Achat si RSI < 30, Vente/Allègement si RSI > 70)",
-                "Règle 4 : DCA Intraday / Minute (Lissage automatique des points d'entrée en minute)"
-            ]
+                "Règle 1 : Breakout / Cassure de résistance",
+                "Règle 2 : Pullback sur moyenne mobile",
+                "Règle 3 : RSI de survente / surachat",
+                "Règle 4 : DCA intraday",
+            ],
         )
-        
-        def_sujet = "Trading Court Terme" if regles_trading_preset != "Personnalisé" else ""
-        def_contenu = ""
-        if "Règle 1" in regles_trading_preset:
-            def_contenu = "Stratégie Breakout : Attendre la cassure franche d'un range horizontal en données 1m/5m avec volume x2. Stop-loss serré sous le support."
-        elif "Règle 2" in regles_trading_preset:
-            def_contenu = "Pullback EMA 20 : En tendance haussière forte (minutes), acheter lorsque le prix revient tester la moyenne mobile exponentielle à 20 périodes."
-        elif "Règle 3" in regles_trading_preset:
-            def_contenu = "RSI Court Terme (14) : Entrée en position acheteuse si le RSI en unités courtes descend sous 30 (rebond technique probable)."
-        elif "Règle 4" in regles_trading_preset:
-            def_contenu = "DCA Minute : Diviser son capital en 5 parts égales et placer des ordres automatisés toutes les 5 minutes lors des fortes volatilités."
 
-        ialab_sujet = st.text_input("Sujet / Domaine", value=def_sujet, placeholder="Ex: Stratégie Breakout / DCA Court Terme")
-        ialab_type = pills("ialab_type_pills", ["Apprentissage / Note", "Règle de Priorité", "Sécurité & Dangers"], cols=3)
-        ialab_contenu = st.text_area("Notes de synthèse ou Consigne pour l'IA", value=def_contenu, height=130, placeholder="Détaille tes notes ici…")
+        PRESETS = {
+            "Règle 1": "Stratégie Breakout : attendre la cassure franche d'un range horizontal en "
+                       "données 1m/5m avec volume x2. Stop-loss serré sous le support.",
+            "Règle 2": "Pullback EMA 20 : en tendance haussière (unités courtes), acheter lorsque le "
+                       "prix revient tester la moyenne mobile exponentielle à 20 périodes.",
+            "Règle 3": "RSI court terme (14) : entrée acheteuse si le RSI passe sous 30, "
+                       "allègement au-dessus de 70.",
+            "Règle 4": "DCA intraday : diviser le capital en 5 parts égales et placer des ordres "
+                       "espacés lors des fortes volatilités.",
+        }
+        cle_preset = regles_preset.split(" :")[0]
+        def_sujet = "Trading court terme" if cle_preset in PRESETS else ""
+        def_contenu = PRESETS.get(cle_preset, "")
 
-        if st.button("Enregistrer dans la base IA", type="primary", key="btn_save_ialab") and ialab_sujet.strip():
+        ialab_sujet = st.text_input("Sujet / Domaine", value=def_sujet,
+                                    placeholder="Ex : stratégie breakout")
+        ialab_type = pills("ialab_type_pills",
+                           ["Apprentissage / Note", "Règle de Priorité", "Sécurité & Dangers"], cols=3)
+        ialab_contenu = st.text_area("Notes de synthèse ou consigne", value=def_contenu,
+                                     height=130, placeholder="Détaillez vos notes ici…")
+
+        if st.button("Enregistrer dans la base IA", type="primary", key="btn_save_ialab") \
+                and ialab_sujet.strip():
             add_row("IA_Lab", [str(ajd), ialab_sujet.strip(), ialab_contenu.strip(), ialab_type])
-            st.toast("Règle enregistrée pour l'IA 🚀", icon="✅")
+            st.toast("Note enregistrée 🚀", icon="✅")
             st.rerun()
 
         st.divider()
-        titre("📚 Historique de vos notes & contextes enregistrés")
+        titre("📚 Historique des notes")
         ialab_rows = rows("IA_Lab")
         if ialab_rows:
             for idx, r in reversed(ialab_rows):
@@ -1070,13 +1251,13 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                         delete_row("IA_Lab", idx, libelle="Note supprimée")
                         st.rerun()
         else:
-            vide("Aucune note enregistrée pour le moment.")
+            vide("Aucune note enregistrée. Ajoutez la première ci-dessus.")
 
-    # 2. MARCHÉS & ANALYSE (Graphique Plotly Haute Lisibilité)
+    # 2. MARCHÉS & ANALYSE
     elif onglet_ia == ONGLETS_IA[1]:
-        st.caption("Dashboard de comparaison des marchés financiers (Graphique haute lisibilité).")
+        st.caption("Comparaison de plusieurs actifs sur une même période.")
 
-        dictionnaire_actifs = {
+        ACTIFS = {
             "Or (Gold)": "GC=F",
             "Bitcoin": "BTC-USD",
             "Apple": "AAPL",
@@ -1084,112 +1265,102 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
             "S&P 500": "^GSPC",
             "Ethereum": "ETH-USD",
             "Tesla": "TSLA",
-            "Microsoft": "MSFT"
+            "Microsoft": "MSFT",
         }
 
         col_sel1, col_sel2 = st.columns([2, 1])
         with col_sel1:
-            selection_actifs_noms = st.multiselect(
-                "Sélectionner les actifs à comparer",
-                options=list(dictionnaire_actifs.keys()),
-                default=["Or (Gold)", "Bitcoin"]
-            )
+            noms_choisis = st.multiselect("Actifs à comparer", options=list(ACTIFS.keys()),
+                                          default=["Or (Gold)", "Bitcoin"], max_selections=6)
         with col_sel2:
-            periode_choisie = pills("market_period", ["1d", "5d", "1mo", "6mo"], defaut="1d", cols=2)
+            periode = pills("market_period", ["1d", "5d", "1mo", "6mo"], defaut="1d", cols=2)
 
-        mode_affichage = st.radio(
-            "Mode d'affichage du graphique",
-            ["Base 100 (Comparaison relative en %)", "Prix réels en dollars ($)"],
-            horizontal=True
-        )
+        mode_affichage = st.radio("Mode d'affichage",
+                                  ["Base 100 (comparaison relative)", "Prix réels ($)"],
+                                  horizontal=True)
 
-        if selection_actifs_noms:
-            tickers_a_charger = [dictionnaire_actifs[nom] for nom in selection_actifs_noms]
-            
-            df_hist, err = fetch_market_history(tickers_a_charger, period=periode_choisie)
+        if not noms_choisis:
+            st.info("Sélectionnez au moins un actif pour afficher le graphique.")
+        else:
+            tickers = tuple(sorted(ACTIFS[n] for n in noms_choisis))
+            df_hist, err = fetch_market_history(tickers, period=periode)
 
             if err:
-                st.warning(f"Erreur de chargement des marchés : {err}.")
-            elif df_hist is not None and not df_hist.empty:
-                cols_kpi = st.columns(len(selection_actifs_noms))
-                for idx, nom in enumerate(selection_actifs_noms):
-                    tk = dictionnaire_actifs[nom]
-                    with cols_kpi[idx % len(cols_kpi)]:
-                        try:
-                            serie_prix = df_hist[tk].dropna() if isinstance(df_hist.columns, pd.MultiIndex) or tk in df_hist.columns else df_hist.iloc[:, idx].dropna()
-                            if not serie_prix.empty:
-                                dernier_val = float(serie_prix.iloc[-1])
-                                premier_val = float(serie_prix.iloc[0])
-                                var_pct = ((dernier_val - premier_val) / premier_val) * 100
-                                st.metric(label=nom, value=f"{dernier_val:,.2f} $", delta=f"{var_pct:+.2f}%")
-                        except Exception:
-                            st.metric(label=nom, value="N/A")
+                st.warning(f"Chargement des marchés impossible : {err}")
+            elif df_hist is None or df_hist.empty:
+                st.info("Aucune donnée disponible pour cette période.")
+            else:
+                # KPI : 3 par ligne pour rester lisible sur mobile
+                for debut in range(0, len(noms_choisis), 3):
+                    groupe = noms_choisis[debut:debut + 3]
+                    cols_kpi = st.columns(3)
+                    for col, nom in zip(cols_kpi, groupe):
+                        with col:
+                            serie = df_hist.get(ACTIFS[nom])
+                            serie = serie.dropna() if serie is not None else None
+                            if serie is None or serie.empty:
+                                st.metric(label=nom, value="N/A")
+                                continue
+                            dernier, premier = float(serie.iloc[-1]), float(serie.iloc[0])
+                            var = ((dernier - premier) / premier * 100) if premier else 0.0
+                            st.metric(label=nom, value=f"{dernier:,.2f} $", delta=f"{var:+.2f}%")
 
                 st.divider()
-                titre("📊 Graphique interactif (Lignes nettes et épaisses)")
-                
+                titre("📊 Évolution comparée")
+
+                renommage = {v: k for k, v in ACTIFS.items()}
+                df_plot = df_hist.rename(columns=renommage)
+                if "Base 100" in mode_affichage:
+                    df_plot = df_plot.apply(
+                        lambda c: (c / c.dropna().iloc[0]) * 100 if not c.dropna().empty else c)
+                    y_title = "Performance (base 100)"
+                else:
+                    y_title = "Prix en USD ($)"
+
                 try:
                     import plotly.express as px
-
-                    if isinstance(df_hist.columns, pd.MultiIndex):
-                        df_close = df_hist['Close']
-                    else:
-                        df_close = df_hist
-
-                    if "Base 100" in mode_affichage:
-                        df_plot = df_close.apply(lambda x: (x / x.dropna().iloc[0]) * 100 if not x.dropna().empty else x)
-                        y_title = "Performance Base 100"
-                    else:
-                        df_plot = df_close
-                        y_title = "Prix en USD ($)"
-
-                    fig = px.line(df_plot, labels={"value": y_title, "Datetime": "Temps", "Date": "Date"})
+                    fig = px.line(df_plot, labels={"value": y_title, "variable": ""})
                     fig.update_traces(line=dict(width=3))
                     fig.update_layout(
                         margin=dict(l=10, r=10, t=20, b=10),
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                        xaxis_title="",
-                        yaxis_title=y_title,
-                        template="plotly_white",
-                        hovermode="x unified"
+                        xaxis_title="", yaxis_title=y_title,
+                        template="plotly_white", hovermode="x unified",
                     )
-
                     st.plotly_chart(fig, use_container_width=True)
-
-                except Exception as e:
-                    st.info(f"Affichage du graphique indisponible : {e}")
+                except Exception:
+                    st.line_chart(df_plot)
 
                 st.divider()
-                titre("🔍 Enregistrer une analyse croisée")
-                note_comparaison = st.text_area("Notes de synthèse ou stratégie DCA multi-actifs", placeholder="Ex: Analyse des mouvements en minute sur l'or et le bitcoin...")
-                if st.button("Enregistrer l'analyse comparative", type="primary", key="btn_save_multi_market") and note_comparaison.strip():
-                    contenu_txt = f"Actifs : {', '.join(selection_actifs_noms)} | Période : {periode_choisie} | Mode : {mode_affichage}\nAnalyse : {note_comparaison}"
-                    add_row("IA_Lab", [str(ajd), "Analyse Comparative Marchés", contenu_txt, "Analyse Technique / Tendance"])
-                    st.toast("Analyse comparative enregistrée avec succès ! 📈", icon="✅")
+                titre("🔍 Enregistrer une analyse")
+                note_comp = st.text_area("Notes de synthèse",
+                                         placeholder="Ex : corrélation or / bitcoin sur la séance…")
+                if st.button("Enregistrer l'analyse", type="primary", key="btn_save_multi_market") \
+                        and note_comp.strip():
+                    contenu = (f"Actifs : {', '.join(noms_choisis)} | Période : {periode} | "
+                               f"Mode : {mode_affichage}\nAnalyse : {note_comp}")
+                    add_row("IA_Lab", [str(ajd), "Analyse comparative marchés", contenu,
+                                       "Apprentissage / Note"])
+                    st.toast("Analyse enregistrée 📈", icon="✅")
                     st.rerun()
-            else:
-                st.info("Chargement des données boursières...")
-        else:
-            st.info("Veuillez sélectionner au moins un actif ci-dessus pour afficher le dashboard.")
 
-    # 3. JOURNAL DE TRADE COURT TERME
+    # 3. JOURNAL DE TRADE
     elif onglet_ia == ONGLETS_IA[2]:
-        st.caption("Consignez vos positions et tests de trading court terme (Breakout, Pullback...).")
+        st.caption("Consignez vos positions et vos tests de setups court terme.")
 
         trades_rows = rows("Trades")
         if trades_rows:
             titre("📋 Historique des trades")
             for idx, r in reversed(trades_rows):
                 dt, actif, sens, ent, obj, sl, stat, notes = pad(r, 8)
-                badge_couleur = "🟢" if sens == "Achat" else "🔴"
-                with st.expander(f"{badge_couleur} {actif} ({sens}) · Entrée : {ent}$ [{stat}]"):
-                    st.markdown(f"**Objectif (TP) :** {obj}$ | **Stop-Loss (SL) :** {sl}$ | **Date :** {dt}")
+                badge = "🟢" if sens == "Achat" else "🔴"
+                with st.expander(f"{badge} {actif} ({sens}) · entrée {ent} $ [{stat}]"):
+                    st.markdown(f"**Objectif :** {obj} $ · **Stop-loss :** {sl} $ · **Date :** {dt}")
                     if notes:
-                        st.write(f"Notes : {notes}")
-                    
+                        st.write(notes)
                     col_s1, col_s2 = st.columns(2)
                     with col_s1:
-                        if stat != "Clôturé" and st.button("Clôturer le trade", key=f"close_t_{idx}"):
+                        if stat != "Clôturé" and st.button("Clôturer", key=f"close_t_{idx}"):
                             set_cell("Trades", idx, 7, "Clôturé")
                             st.rerun()
                     with col_s2:
@@ -1197,54 +1368,61 @@ elif page_cle == "ialab" and st.session_state.get("mode_ia"):
                             delete_row("Trades", idx, libelle="Trade supprimé")
                             st.rerun()
         else:
-            vide("Aucun trade enregistré pour le moment.")
+            vide("Aucun trade enregistré. Ajoutez le premier ci-dessous.")
 
         st.divider()
-        titre("➕ Enregistrer un nouveau trade")
-        t_actif = st.selectbox("Actif", ["Bitcoin (BTC)", "Or (Gold)", "Apple", "Nvidia", "Ethereum", "Tesla"])
+        titre("➕ Nouveau trade")
+        t_actif = st.selectbox("Actif", ["Bitcoin (BTC)", "Or (Gold)", "Apple", "Nvidia",
+                                         "Ethereum", "Tesla"])
         t_sens = pills("trade_sens", ["Achat", "Vente"], cols=2)
         tc1, tc2, tc3 = st.columns(3)
         with tc1:
-            t_entree = st.number_input("Prix d'entrée ($)", min_value=0.0, step=0.1, key="t_ent")
+            t_entree = st.number_input("Entrée ($)", min_value=0.0, step=0.1, key="t_ent")
         with tc2:
-            t_objectif = st.number_input("Objectif TP ($)", min_value=0.0, step=0.1, key="t_obj")
+            t_objectif = st.number_input("Objectif ($)", min_value=0.0, step=0.1, key="t_obj")
         with tc3:
-            t_stop = st.number_input("Stop-Loss SL ($)", min_value=0.0, step=0.1, key="t_sl")
-        t_notes = st.text_area("Notes de setup (ex: Breakout 5m validé)", key="t_notes")
+            t_stop = st.number_input("Stop-loss ($)", min_value=0.0, step=0.1, key="t_sl")
+        t_notes = st.text_area("Notes de setup", key="t_notes",
+                               placeholder="Ex : breakout 5 min validé")
 
-        if st.button("Enregistrer le trade", type="primary", key="btn_save_trade") and t_entree > 0:
-            add_row("Trades", [str(ajd), t_actif, t_sens, f"{t_entree}", f"{t_objectif}", f"{t_stop}", "En cours", t_notes])
-            st.toast("Trade enregistré avec succès ! 🎯", icon="✅")
-            st.rerun()
+        if st.button("Enregistrer le trade", type="primary", key="btn_save_trade"):
+            if t_entree > 0:
+                add_row("Trades", [str(ajd), t_actif, t_sens, f"{t_entree}", f"{t_objectif}",
+                                   f"{t_stop}", "En cours", t_notes])
+                reset_after(t_ent=0.0, t_obj=0.0, t_sl=0.0, t_notes="")
+                st.toast("Trade enregistré 🎯", icon="✅")
+                st.rerun()
+            else:
+                st.warning("Indiquez un prix d'entrée supérieur à zéro.")
 
-    # 4. SIMULATEUR DE DCA
+    # 4. SIMULATEUR DCA
     elif onglet_ia == ONGLETS_IA[3]:
-        st.caption("Simulateur d'investissement programmé (Dollar-Cost Averaging) pour lisser vos achats sur vos actifs favoris.")
+        st.caption("Répartition d'un investissement programmé mensuel.")
 
-        capital_total = st.number_input("Montant total à investir par mois (€)", min_value=10.0, value=150.0, step=10.0)
-        
-        st.markdown("**Répartition de votre DCA (%)**")
-        dca_btc = st.slider("Bitcoin (BTC)", 0, 100, 40)
-        dca_or = st.slider("Or (Gold)", 0, 100, 30)
+        capital = st.number_input("Montant mensuel (€)", min_value=10.0, value=150.0, step=10.0)
+
+        st.markdown("**Répartition (%)**")
+        dca_btc = st.slider("Bitcoin", 0, 100, 40)
+        dca_or = st.slider("Or", 0, 100, 30)
         dca_actions = st.slider("Actions (Apple / Nvidia)", 0, 100, 30)
 
         total_parts = dca_btc + dca_or + dca_actions
-        if total_parts == 100:
-            st.success("✨ Répartition parfaite à 100 % !")
-            m_btc = capital_total * (dca_btc / 100)
-            m_or = capital_total * (dca_or / 100)
-            m_act = capital_total * (dca_actions / 100)
+        if total_parts != 100:
+            st.warning(f"La répartition doit totaliser 100 % (actuellement {total_parts} %).")
+        else:
+            m_btc = capital * dca_btc / 100
+            m_or = capital * dca_or / 100
+            m_act = capital * dca_actions / 100
 
-            c_res1, c_res2, c_res3 = st.columns(3)
-            c_res1.metric("Bitcoin", f"{m_btc:.2f} € /mois")
-            c_res2.metric("Or", f"{m_or:.2f} € /mois")
-            c_res3.metric("Actions", f"{m_act:.2f} € /mois")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Bitcoin", f"{m_btc:.2f} €")
+            c2.metric("Or", f"{m_or:.2f} €")
+            c3.metric("Actions", f"{m_act:.2f} €")
 
             st.divider()
-            if st.button("Sauvegarder cette stratégie DCA dans le Labo", type="primary"):
-                contenu_dca = f"Stratégie DCA : {capital_total}€/mois | Bitcoin: {dca_btc}% ({m_btc:.2f}€), Or: {dca_or}% ({m_or:.2f}€), Actions: {dca_actions}% ({m_act:.2f}€)"
-                add_row("IA_Lab", [str(ajd), "Plan DCA Mensuel", contenu_dca, "Apprentissage / Note"])
-                st.toast("Stratégie DCA enregistrée dans vos notes IA ! 🧮", icon="✅")
+            if st.button("Enregistrer cette stratégie", type="primary", key="btn_save_dca"):
+                contenu = (f"DCA {capital:.0f} €/mois — Bitcoin {dca_btc}% ({m_btc:.2f} €), "
+                           f"Or {dca_or}% ({m_or:.2f} €), Actions {dca_actions}% ({m_act:.2f} €)")
+                add_row("IA_Lab", [str(ajd), "Plan DCA mensuel", contenu, "Apprentissage / Note"])
+                st.toast("Stratégie enregistrée 🧮", icon="✅")
                 st.rerun()
-        else:
-            st.warning(f"Le total de la répartition doit être égal à 100 % (Actuel : {total_parts} %).")
