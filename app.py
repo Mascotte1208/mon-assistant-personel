@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "3.0"
+VERSION = "3.1"
 DOC_NAME = "MonAssistantData"
 
 SHEETS = {
@@ -44,7 +44,7 @@ RAYON_COULEURS = {
     "Boulangerie": "#A65B12",
     "Supermarché": "#6D3BAF",
     "Boissons": "#164C9E",
-    "Entretien": "#B0184F",
+    "Entretien": "#C2185B",
     "Autre": "#8A7C82",
 }
 CAT_BUDGET = ["Alimentation", "Maison/Bricolage", "Sorties", "Fixe/Admin"]
@@ -142,25 +142,28 @@ st.markdown("""
    et les ombres : les modules externes reprennent ces variables.
    --------------------------------------------------------------- */
 :root{
-  --encre:#241B22;      /* texte principal */
-  --encre-2:#5C4F55;    /* texte secondaire */
-  --gris:#8A7C82;       /* texte tertiaire, unites */
-  --papier:#FBF7F8;     /* fond de page */
+  --encre:#3A1A28;      /* texte principal, prune sombre */
+  --encre-2:#6E4A5B;    /* texte secondaire */
+  --gris:#9B7F8C;       /* texte tertiaire, unites */
+  --papier:#FDE9F1;     /* fond de page, rose clair */
+  --papier-2:#FAD9E7;   /* bas du fond */
   --surface:#FFFFFF;    /* fond des blocs */
-  --trait:#ECE0E5;      /* filets et bordures */
-  --accent:#B0184F;     /* action, valeur mise en avant */
-  --accent-doux:#FDF1F5;
-  --accent-bord:#F3C9D8;
+  --trait:#F3C7DA;      /* bordures des blocs */
+  --trait-doux:#FBE7F0; /* filets a l'interieur des listes */
+  --accent:#C2185B;     /* action, valeur mise en avant */
+  --accent-fonce:#8C1444;
+  --accent-doux:#FDF0F6;
+  --accent-bord:#F3C7DA;
   --vert:#17683D; --ambre:#A65B12; --rouge:#B3261E;
   --r:16px; --r-s:11px;
-  --ombre:0 1px 2px rgba(36,27,34,.04), 0 10px 28px -20px rgba(36,27,34,.35);
+  --ombre:0 1px 2px rgba(140,20,68,.05), 0 12px 30px -22px rgba(140,20,68,.55);
 }
 
 html, body, [class*="css"], .stApp{
   font-family:'Plus Jakarta Sans', system-ui, sans-serif !important;
   color:var(--encre); -webkit-tap-highlight-color:transparent;
 }
-.stApp{background:var(--papier) !important;}
+.stApp{background:linear-gradient(180deg,var(--papier) 0%,var(--papier-2) 100%) fixed !important;}
 #MainMenu, footer, header{visibility:hidden;}
 .block-container{padding-top:1rem !important; padding-bottom:5rem !important;
   max-width:560px !important;}
@@ -176,7 +179,7 @@ html, body, [class*="css"], .stApp{
    --------------------------------------------------------------- */
 [data-testid="stVerticalBlockBorderWrapper"]{
   background:var(--surface) !important;
-  border:1px solid var(--trait) !important;
+  border:1.5px solid var(--trait) !important;
   border-radius:var(--r) !important;
   padding:16px 18px 14px !important;
   box-shadow:var(--ombre) !important;
@@ -189,15 +192,15 @@ html, body, [class*="css"], .stApp{
 .bloc-head{
   display:flex; justify-content:space-between; align-items:center; gap:10px;
   padding-bottom:10px; margin-bottom:10px;
-  font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--encre);
-  border-bottom:1px solid var(--trait);
+  font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--accent-fonce);
+  border-bottom:1.5px solid var(--trait);
 }
 .bloc-head .n{
   background:var(--accent-doux); color:var(--accent); border:1px solid var(--accent-bord);
   border-radius:999px; padding:1px 9px; font-size:11.5px; font-weight:700;
   font-variant-numeric:tabular-nums;
 }
-.section{font-size:15px; font-weight:700; color:var(--encre); margin:20px 0 8px;
+.section{font-size:15px; font-weight:700; color:var(--accent-fonce); margin:20px 0 8px;
   letter-spacing:-.01em;}
 .jour-titre{font-size:13px; font-weight:700; color:var(--encre-2); padding:10px 0 6px;}
 
@@ -207,21 +210,22 @@ html, body, [class*="css"], .stApp{
 .stButton>button, .stFormSubmitButton>button, .stDownloadButton>button{
   border-radius:12px !important; font-weight:600 !important; font-size:14px !important;
   padding:10px 14px !important; width:100%;
-  border:1px solid var(--trait) !important; box-shadow:none !important;
+  border:1.5px solid var(--trait) !important; box-shadow:none !important;
   transition:background .12s ease, border-color .12s ease;
 }
 button[kind="secondary"], button[data-testid="stBaseButton-secondary"],
 button[kind="secondaryFormSubmit"], button[data-testid="stBaseButton-secondaryFormSubmit"],
 .stDownloadButton>button{
-  background:var(--surface) !important; color:var(--encre) !important;
+  background:var(--surface) !important; color:var(--accent) !important;
 }
 button[kind="secondary"]:hover, button[data-testid="stBaseButton-secondary"]:hover{
   border-color:var(--accent-bord) !important; background:var(--accent-doux) !important;
 }
 button[kind="primary"], button[data-testid="stBaseButton-primary"],
 button[kind="primaryFormSubmit"], button[data-testid="stBaseButton-primaryFormSubmit"]{
-  background:var(--accent) !important; color:#fff !important;
-  border-color:var(--accent) !important;
+  background:linear-gradient(180deg,var(--accent) 0%,var(--accent-fonce) 100%) !important;
+  color:#fff !important; border-color:var(--accent-fonce) !important;
+  box-shadow:0 6px 16px -8px rgba(140,20,68,.7) !important;
 }
 button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:2px;}
 @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important;} }
@@ -233,7 +237,8 @@ button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:
 .st-key-navrow [data-testid="stHorizontalBlock"]{gap:4px !important; flex-wrap:wrap !important;}
 .st-key-navrow [data-testid="stHorizontalBlock"] > div{min-width:84px !important; flex:1 1 84px !important;}
 .st-key-navrow button{font-size:12.5px !important; padding:9px 4px !important;
-  border-radius:10px !important; border-color:transparent !important;}
+  border-radius:10px !important; border-color:transparent !important;
+  color:var(--encre-2) !important;}
 .st-key-navrow button p{font-size:12.5px !important; font-weight:600 !important;}
 
 /* Onglets internes : meme logique, plus discrets. */
@@ -252,7 +257,7 @@ button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:
   font-variant-numeric:tabular-nums;}
 [data-testid="stHorizontalBlock"]:has(.line){
   align-items:center !important; gap:6px !important;
-  padding:7px 0 !important; border-bottom:1px solid var(--trait) !important;
+  padding:7px 0 !important; border-bottom:1px solid var(--trait-doux) !important;
 }
 [data-testid="stHorizontalBlock"]:has(.line) button{
   background:transparent !important; border:none !important; box-shadow:none !important;
@@ -268,16 +273,16 @@ button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:
 .rayon{font-size:12px; font-weight:700; color:var(--encre-2); display:block;
   margin:4px 0 6px; letter-spacing:.01em;}
 .empty{text-align:center; padding:26px 16px; border-radius:var(--r);
-  border:1px dashed var(--trait); color:var(--gris); font-weight:500; font-size:13.5px;}
+  border:1.5px dashed var(--trait); background:var(--accent-doux); color:var(--gris); font-weight:500; font-size:13.5px;}
 .today-none{font-size:13.5px; color:var(--gris); font-weight:500; padding:10px 0;}
 
 /* Le solde est le seul chiffre qui merite du volume. */
 .solde{display:flex; justify-content:space-between; align-items:center; gap:12px;
-  border:1px solid var(--trait); border-left:3px solid var(--accent);
+  border:1.5px solid var(--trait); border-left:4px solid var(--accent);
   border-radius:var(--r); background:var(--surface); box-shadow:var(--ombre);
   padding:16px 18px; margin:16px 0;
   font-size:12.5px; font-weight:600; color:var(--gris);}
-.solde .m{font-size:17px; font-weight:700; color:var(--encre); text-align:right;
+.solde .m{font-size:17px; font-weight:700; color:var(--accent); text-align:right;
   font-variant-numeric:tabular-nums;}
 
 .bandeau{border-radius:12px; padding:10px 13px; font-size:13px; font-weight:600;
@@ -293,13 +298,13 @@ button:focus-visible{outline:2px solid var(--accent) !important; outline-offset:
 .stDateInput input, .stTimeInput input{
   color:var(--encre) !important; background:var(--surface) !important;
   -webkit-text-fill-color:var(--encre) !important;
-  border-radius:12px !important; border:1px solid var(--trait) !important;
+  border-radius:12px !important; border:1.5px solid var(--trait) !important;
   padding:11px 13px !important; font-size:14.5px !important; font-weight:500 !important;
 }
 .stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus{
   border-color:var(--accent) !important; box-shadow:0 0 0 3px var(--accent-doux) !important;}
 [data-baseweb="select"]>div{border-radius:12px !important;
-  border:1px solid var(--trait) !important; background:var(--surface) !important;}
+  border:1.5px solid var(--trait) !important; background:var(--surface) !important;}
 label p{font-weight:600 !important; font-size:12.5px !important; color:var(--encre-2) !important;}
 [data-testid="stMetric"]{background:var(--surface); border:1px solid var(--trait) !important;
   border-radius:var(--r); padding:14px 16px; box-shadow:none;}
@@ -312,7 +317,7 @@ label p{font-weight:600 !important; font-size:12.5px !important; color:var(--enc
    --------------------------------------------------------------- */
 .cal-week{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:0 0 6px;}
 .cal-week span{text-align:center; font-size:11px; font-weight:700; color:var(--gris);}
-.cal-title{text-align:center; font-size:15px; font-weight:700; color:var(--encre);
+.cal-title{text-align:center; font-size:15px; font-weight:700; color:var(--accent-fonce);
   padding-top:8px;}
 .st-key-cal-grid [data-testid="stVerticalBlockBorderWrapper"]{
   border:none !important; box-shadow:none !important; padding:0 !important;
@@ -325,23 +330,24 @@ label p{font-weight:600 !important; font-size:12.5px !important; color:var(--enc
 [class*="st-key-cal_"] button{
   min-height:0 !important; padding:9px 0 !important; border-radius:10px !important;
   font-size:12.5px !important; font-weight:600 !important; background:var(--surface) !important;
-  color:var(--encre-2) !important; border:1px solid transparent !important;}
+  color:var(--encre-2) !important; border:1.5px solid transparent !important;}
 [class*="st-key-cal_"] button p{font-size:12.5px !important; font-weight:600 !important;
   line-height:1.1 !important;}
 [class*="st-key-cal_"] button:disabled{background:transparent !important;
-  color:#DDD2D7 !important; opacity:1 !important; border:none !important;}
+  color:#E6C8D6 !important; opacity:1 !important; border:none !important;}
 [class*="st-key-cal_"] button[kind="primary"],
 [class*="st-key-cal_"] button[data-testid="stBaseButton-primary"]{
-  background:var(--accent) !important; color:#fff !important; border-color:var(--accent) !important;}
+  background:linear-gradient(180deg,var(--accent) 0%,var(--accent-fonce) 100%) !important;
+  color:#fff !important; border-color:var(--accent-fonce) !important;}
 
 /* Lien vers une autre page : une rangee, pas un bouton. */
 [class*="st-key-goto-"] [data-testid="stVerticalBlockBorderWrapper"]{
   padding:0 !important; border:none !important; box-shadow:none !important;
   background:transparent !important; margin-bottom:14px !important;}
 [class*="st-key-goto-"] button{
-  background:var(--surface) !important; border:1px solid var(--trait) !important;
+  background:var(--surface) !important; border:1.5px solid var(--trait) !important;
   border-radius:var(--r) !important; box-shadow:var(--ombre) !important;
-  color:var(--encre) !important; font-size:15px !important; font-weight:700 !important;
+  color:var(--accent-fonce) !important; font-size:15px !important; font-weight:700 !important;
   padding:16px 18px !important; text-align:left !important; justify-content:flex-start !important;}
 [class*="st-key-goto-"] button p{font-size:15px !important; font-weight:700 !important;}
 </style>
@@ -652,11 +658,11 @@ def grille_mois(annee, mois, par_jour, aujourd, selection=None, prefixe="cal"):
                     if jour == selection:
                         continue
                     if nb:
-                        styles.append(f".st-key-{cle} button{{background:#FDF1F5 !important;"
-                                      f"color:#B0184F !important;}}")
+                        styles.append(f".st-key-{cle} button{{background:#FBE0EC !important;"
+                                      f"color:#C2185B !important;}}")
                     if jour == aujourd:
-                        styles.append(f".st-key-{cle} button{{border:1px solid #B0184F !important;"
-                                      f"color:#B0184F !important;}}")
+                        styles.append(f".st-key-{cle} button{{border:1.5px solid #C2185B !important;"
+                                      f"color:#C2185B !important;}}")
     if styles:
         st.markdown("<style>" + "".join(styles) + "</style>", unsafe_allow_html=True)
     return choisi
