@@ -126,6 +126,7 @@ def slug(texte):
     return re.sub(r"[^a-z0-9]+", "-", plat.lower()).strip("-")
 
 CSS_ROSE = """
+<style>
 :root{
   --encre:#3A1A28; --encre-2:#6E4A5B; --gris:#9B7F8C;
   --papier:#FDE9F1; --papier-2:#FAD9E7; --surface:#FFFFFF;
@@ -136,9 +137,11 @@ CSS_ROSE = """
   --ombre:0 1px 2px rgba(140,20,68,.05), 0 12px 30px -22px rgba(140,20,68,.55);
 }
 .stApp{background:linear-gradient(180deg,var(--papier) 0%,var(--papier-2) 100%) fixed !important;}
+</style>
 """
 
 CSS_NOIR_BLEU = """
+<style>
 :root{
   --encre:#F0F6FC; --encre-2:#8B949E; --gris:#6E7681;
   --papier:#0D1117; --papier-2:#161B22; --surface:#21262D;
@@ -149,9 +152,11 @@ CSS_NOIR_BLEU = """
   --ombre:0 4px 12px rgba(0,0,0,0.5);
 }
 .stApp{background:var(--papier) !important;}
+</style>
 """
 
 CSS_COMMUN = """
+<style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 html, body, [class*="css"], .stApp{
