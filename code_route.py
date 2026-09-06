@@ -67,7 +67,7 @@ PANNEAUX = [
     },
 ]
 
-def carte(conteneur_func_ou_dict=None, entete_func=None):
+def carte(*args, **kwargs):
     if "quiz_index" not in st.session_state:
         st.session_state["quiz_index"] = 0
         st.session_state["quiz_score"] = 0
@@ -77,62 +77,62 @@ def carte(conteneur_func_ou_dict=None, entete_func=None):
     panneaux_liste = st.session_state["quiz_panneaux"]
     idx = st.session_state["quiz_index"]
 
-    with st.container(border=True):
-        st.markdown(f"<div class='bloc-head'><span>🚦 Quiz Panneaux</span><span class='n'>{idx + 1} / {len(panneaux_liste)}</span></div>", unsafe_allow_html=True)
+    st.markdown(f"### 🚦 Quiz Panneaux ({idx + 1} / {len(panneaux_liste)})")
 
-        if idx >= len(panneaux_liste):
-            score = st.session_state["quiz_score"]
-            total = len(panneaux_liste)
-            st.markdown(f"<div class='today-none'>🎉 Quiz terminé ! Score : {score} / {total}</div>", unsafe_allow_html=True)
-            if st.button("Recommencer", key="quiz_restart", type="primary"):
-                st.session_state["quiz_index"] = 0
-                st.session_state["quiz_score"] = 0
-                st.session_state["quiz_panneaux"] = random.sample(PANNEAUX, len(PANNEAUX))
-                st.session_state["quiz_repondu"] = False
-                st.rerun()
-            return
-
-        actuel = panneaux_liste[idx]
-
-        if "quiz_options" not in st.session_state or st.session_state.get("quiz_current_idx") != idx:
-            fausses = [p["nom"] for p in PANNEAUX if p["nom"] != actuel["nom"]]
-            choix_fausses = random.sample(fausses, min(2, len(fausses)))
-            options = choix_fausses + [actuel["nom"]]
-            random.shuffle(options)
-            st.session_state["quiz_options"] = options
-            st.session_state["quiz_current_idx"] = idx
+    if idx >= len(panneaux_liste):
+        score = st.session_state["quiz_score"]
+        total = len(panneaux_liste)
+        st.success(f"🎉 Quiz terminé ! Score : {score} / {total}")
+        if st.button("Recommencer", key="quiz_restart", type="primary"):
+            st.session_state["quiz_index"] = 0
+            st.session_state["quiz_score"] = 0
+            st.session_state["quiz_panneaux"] = random.sample(PANNEAUX, len(PANNEAUX))
             st.session_state["quiz_repondu"] = False
+            st.rerun()
+        return
 
-        col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
-        with col_img2:
-            st.image(actuel["image"], width=160)
+    actuel = panneaux_liste[idx]
 
-        st.markdown(f"<div class='jour-titre' style='text-align:center;'>Description : {actuel['desc']}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='text-align:center;'><span class='tag'>Catégorie : {actuel['cat']}</span></div>", unsafe_allow_html=True)
-        
+    if "quiz_options" not in st.session_state or st.session_state.get("quiz_current_idx") != idx:
+        fausses = [p["nom"] for p in PANNEAUX if p["nom"] != actuel["nom"]]
+        choix_fausses = random.sample(fausses, min(2, len(fausses)))
+        options = choix_fausses + [actuel["nom"]]
+        random.shuffle(options)
+        st.session_state["quiz_options"] = options
+        st.session_state["quiz_current_idx"] = idx
+        st.session_state["quiz_repondu"] = False
+
+    # Affichage de l'image
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.image(actuel["image"], width=160)
+
+    st.markdown(f"<div style='text-align:center; font-weight:600; margin:10px 0;'>Description : {actuel['desc']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:center;'><span class='tag'>Catégorie : {actuel['cat']}</span></div>", unsafe_allow_html=True)
+    
+    st.write("")
+    st.markdown("**Quel est ce panneau ?**")
+
+    options = st.session_state["quiz_options"]
+    repondu = st.session_state["quiz_repondu"]
+
+    for opt in options:
+        btn_type = "secondary"
+        if repondu and opt == actuel["nom"]:
+            btn_type = "primary"
+
+        if st.button(opt, key=f"opt_{idx}_{opt}", disabled=repondu, type=btn_type):
+            st.session_state["quiz_repondu"] = True
+            if opt == actuel["nom"]:
+                st.session_state["quiz_score"] += 1
+                st.toast("Bonne réponse ! 🎯", icon="✅")
+            else:
+                st.toast(f"Raté ! C'était : {actuel['nom']}", icon="❌")
+            st.rerun()
+
+    if repondu:
         st.write("")
-        st.markdown("**Quel est ce panneau ?**")
-
-        options = st.session_state["quiz_options"]
-        repondu = st.session_state["quiz_repondu"]
-
-        for opt in options:
-            btn_type = "secondary"
-            if repondu and opt == actuel["nom"]:
-                btn_type = "primary"
-
-            if st.button(opt, key=f"opt_{idx}_{opt}", disabled=repondu, type=btn_type):
-                st.session_state["quiz_repondu"] = True
-                if opt == actuel["nom"]:
-                    st.session_state["quiz_score"] += 1
-                    st.toast("Bonne réponse ! 🎯", icon="✅")
-                else:
-                    st.toast(f"Raté ! C'était : {actuel['nom']}", icon="❌")
-                st.rerun()
-
-        if repondu:
-            st.write("")
-            if st.button("Question suivante ➔", key=f"next_{idx}", type="primary"):
-                st.session_state["quiz_index"] += 1
-                st.session_state["quiz_repondu"] = False
-                st.rerun()
+        if st.button("Question suivante ➔", key=f"next_{idx}", type="primary"):
+            st.session_state["quiz_index"] += 1
+            st.session_state["quiz_repondu"] = False
+            st.rerun()
