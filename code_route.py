@@ -1,11 +1,9 @@
 # ==========================================================
-# Code de la Route Belge — Module d'entraînement & Répertoire
+# Code de la Route Belge — Module officiel de révision & quiz
 # ==========================================================
-import os
 import random
 import streamlit as st
 
-# Base de données officielle complète du Code de la Route Belge
 PANNEAUX_OFFICIELS = [
     # --- SÉRIE A : DANGERS ---
     {"code": "A1a", "nom": "Virage dangereux à gauche", "cat": "Série A : Danger", "desc": "Annonce un virage prononcé vers la gauche."},
@@ -57,21 +55,18 @@ PANNEAUX_OFFICIELS = [
     {"code": "F4a", "nom": "Zone 30", "cat": "Série F : Indication", "desc": "Entrée d'une zone où la vitesse est limitée à 30 km/h sur tout le périmètre."},
 ]
 
-def afficher_visuel(code_panneau):
-    """Vérifie si une image locale existe dans /images/ (ex: images/b1.png), sinon affiche une carte propre."""
-    nom_fichier = f"images/{code_panneau.lower().replace(' ', '_').replace('(', '').replace(')', '')}.png"
-    if os.path.exists(nom_fichier):
-        st.image(nom_fichier, width=150)
-    else:
-        st.markdown(
-            f"""
-            <div style='text-align: center; padding: 25px; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; margin: 10px auto; max-width: 250px;'>
-                <div style='font-size: 13px; font-weight: 700; color: var(--gris); text-transform: uppercase;'>Code officiel</div>
-                <div style='font-size: 28px; font-weight: 800; color: var(--accent-fonce); margin-top: 5px;'>{code_panneau}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+def afficher_fiche_panneau(code_panneau, categorie):
+    """Affiche une carte officielle design représentant le panneau par son code réglementaire officiel."""
+    st.markdown(
+        f"""
+        <div style='text-align: center; padding: 35px 20px; background: var(--surface); border: 2px solid var(--accent); border-radius: 18px; box-shadow: var(--ombre); margin: 10px auto; max-width: 320px;'>
+            <div style='font-size: 12px; font-weight: 700; color: var(--gris); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;'>Panneau Officiel Belge</div>
+            <div style='font-size: 42px; font-weight: 800; color: var(--accent-fonce); letter-spacing: 1px; margin: 5px 0;'>{code_panneau}</div>
+            <div style='font-size: 11.5px; font-weight: 600; color: var(--encre-2); margin-top: 6px;'>{categorie}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 def carte(*args, **kwargs):
     mode = st.radio(
@@ -85,8 +80,8 @@ def carte(*args, **kwargs):
 
     # --- MODE 1 : QUIZ ---
     if mode == "🎯 Mode Quiz":
-        if "quiz_version" not in st.session_state or st.session_state["quiz_version"] != "v11_pro":
-            st.session_state["quiz_version"] = "v11_pro"
+        if "quiz_version" not in st.session_state or st.session_state["quiz_version"] != "v12_pro":
+            st.session_state["quiz_version"] = "v12_pro"
             st.session_state["quiz_index"] = 0
             st.session_state["quiz_score"] = 0
             st.session_state["quiz_panneaux"] = random.sample(PANNEAUX_OFFICIELS, min(15, len(PANNEAUX_OFFICIELS)))
@@ -120,12 +115,12 @@ def carte(*args, **kwargs):
             st.session_state["quiz_current_idx"] = idx
             st.session_state["quiz_repondu"] = False
 
-        # Affichage du visuel (image locale ou carte code propre)
-        afficher_visuel(actuel["code"])
+        # Affichage de la fiche officielle du panneau
+        afficher_fiche_panneau(actuel["code"], actuel["cat"])
 
         st.markdown(f"<div style='text-align:center; font-weight:600; margin:15px 0 5px; color:var(--encre); font-size:15px;'>Règle : {actuel['desc']}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div style='text-align:center; margin-bottom:15px;'><span class='tag'>{actuel['cat']}</span></div>", unsafe_allow_html=True)
         
+        st.write("")
         st.markdown("**Quel est ce panneau ?**")
 
         options = st.session_state["quiz_options"]
@@ -155,7 +150,7 @@ def carte(*args, **kwargs):
     # --- MODE 2 : RÉPERTOIRE DE RÉVISION ---
     else:
         st.markdown("### 📚 Répertoire Officiel des Panneaux")
-        st.caption(f"Catalogue complet ({len(PANNEAUX_OFFICIELS)} fiches réglementaires).")
+        st.caption(f"Catalogue complet ({len(PANNEAUX_OFFICIELS)} fiches réglementaires officielles).")
 
         recherche = st.text_input("🔍 Rechercher un panneau (code, mot-clé...)", placeholder="Ex: B1, Stop, Vitesse...")
 
@@ -172,17 +167,8 @@ def carte(*args, **kwargs):
             
             for p in sous_groupe:
                 with st.expander(f"[{p['code']}] — {p['nom']}"):
-                    col_g, col_d = st.columns([1, 3])
-                    with col_g:
-                        # Tente d'afficher l'image locale si présente
-                        nom_f = f"images/{p['code'].lower().replace(' ', '_').replace('(', '').replace(')', '')}.png"
-                        if os.path.exists(nom_f):
-                            st.image(nom_f, width=80)
-                        else:
-                            st.markdown(f"**[{p['code']}]**")
-                    with col_d:
-                        st.markdown(f"**Signification :** {p['desc']}")
-                        st.markdown(f"<span class='tag'>{p['cat']}</span>", unsafe_allow_html=True)
+                    st.markdown(f"**Signification réglementaire :** {p['desc']}")
+                    st.markdown(f"<span class='tag'>{p['cat']}</span>", unsafe_allow_html=True)
             st.write("")
 
         if not resultats:
