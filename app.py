@@ -11,6 +11,7 @@ Streamlit + Google Sheets, un seul fichier organisé en sections :
 import io
 import re
 import json
+import hmac
 import calendar
 import unicodedata
 import streamlit as st
@@ -22,8 +23,26 @@ from datetime import datetime, date, timedelta
 # ==========================================================
 # 1. CONFIGURATION
 # ==========================================================
-VERSION = "3.7"
+VERSION = "3.8"
 DOC_NAME = "MonAssistantData"
+
+
+def code_labo():
+    """Code d'accès au labo, lu dans les secrets — jamais dans le code source.
+
+    Dans les secrets Streamlit :
+
+        [labo]
+        code = "votre-code-a-vous"
+    """
+    try:
+        return str(st.secrets["labo"]["code"])
+    except Exception:
+        return "2026"          # repli si les secrets ne sont pas encore configurés
+
+
+CODE_LABO = code_labo()
+DUREE_LABO = timedelta(hours=2)     # au-delà, le labo se reverrouille tout seul
 
 SHEETS = {
     "Taches":   ["Tache", "Statut"],
@@ -323,6 +342,7 @@ DEFAULTS = {
     "annulation": None,
     "show_add_tache": False,
     "mode_ia": False,
+    "lab_ouvert_a": None,
     "m_tab": ONGLETS_M[0],
     "theme_mode": "🌸 Rose",
     "_reset": {},
@@ -702,6 +722,13 @@ page_cle = params.get("p", "accueil")
 if page_cle not in PAGES and page_cle != "ialab":
     page_cle = "accueil"
 
+# Le labo se referme tout seul après deux heures : une session oubliée sur un
+# téléphone posé quelque part ne reste pas ouverte indéfiniment.
+ouvert_a = st.session_state.get("lab_ouvert_a")
+if ouvert_a and datetime.now() - ouvert_a > DUREE_LABO:
+    st.session_state["mode_ia"] = False
+    st.session_state["lab_ouvert_a"] = None
+
 pages_dispo = PAGES.copy()
 if st.session_state.get("mode_ia"):
     pages_dispo["ialab"] = "🧠"
@@ -855,19 +882,45 @@ if page_cle == "accueil":
             if st.button("🚪 Déconnexion", key="logout"):
                 st.cache_data.clear()
                 st.cache_resource.clear()
-                for k in ["creds_json", "db", "ops", "annulation", "mode_ia", "theme_mode"]:
+                for k in ["creds_json", "db", "ops", "annulation", "mode_ia",
+                          "lab_ouvert_a", "theme_mode"]:
                     st.session_state.pop(k, None)
                 st.rerun()
-        
+
         st.divider()
         st.markdown("**🔐 Accès Labo IA**")
-        pwd = st.text_input("Code secret", type="password", key="sec_pwd_input", placeholder="Entrez le code…")
-        if pwd == "2026":
-            st.session_state["mode_ia"] = True
-            st.query_params["p"] = "ialab"
-            st.rerun()
-        elif pwd:
-            st.error("Code incorrect")
+        # Le code vit dans les secrets, la vérification n'a lieu qu'à l'appui
+        # sur le bouton, et la comparaison est constante en temps.
+        if st.session_state.get("mode_ia"):
+            reste = ""
+            if st.session_state.get("lab_ouvert_a"):
+                minutes = int((DUREE_LABO - (datetime.now() - st.session_state["lab_ouvert_a"]))
+                              .total_seconds() // 60)
+                reste = f" · se referme dans {max(minutes, 0)} min"
+            st.caption(f"Labo déverrouillé pour cette session{reste}.")
+            b1, b2 = st.columns(2)
+            with b1:
+                if st.button("🧠 Ouvrir le labo", key="sec_open", type="primary"):
+                    st.query_params["p"] = "ialab"
+                    st.rerun()
+            with b2:
+                if st.button("🔒 Verrouiller", key="sec_lock"):
+                    st.session_state["mode_ia"] = False
+                    st.session_state["lab_ouvert_a"] = None
+                    st.query_params["p"] = "accueil"
+                    st.rerun()
+        else:
+            pwd = st.text_input("Code secret", type="password", key="sec_pwd_input",
+                                placeholder="Entrez le code…")
+            if st.button("Déverrouiller", key="sec_pwd_go"):
+                if pwd and hmac.compare_digest(pwd.strip(), CODE_LABO):
+                    st.session_state["mode_ia"] = True
+                    st.session_state["lab_ouvert_a"] = datetime.now()
+                    reset_after(sec_pwd_input="")
+                    st.query_params["p"] = "ialab"
+                    st.rerun()
+                else:
+                    st.error("Code incorrect")
 
         st.caption(f"Synchronisé {depuis(st.session_state['derniere_synchro'])} · version {VERSION}")
 
