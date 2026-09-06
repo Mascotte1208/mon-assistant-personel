@@ -68,7 +68,8 @@ PANNEAUX = [
 ]
 
 def carte(*args, **kwargs):
-    if "quiz_index" not in st.session_state:
+    # Réinitialisation propre si la structure des données a changé
+    if "quiz_index" not in st.session_state or "quiz_panneaux" not in st.session_state:
         st.session_state["quiz_index"] = 0
         st.session_state["quiz_score"] = 0
         st.session_state["quiz_panneaux"] = random.sample(PANNEAUX, len(PANNEAUX))
@@ -103,10 +104,11 @@ def carte(*args, **kwargs):
         st.session_state["quiz_repondu"] = False
 
     # Affichage de l'icône/illustration visuelle grand format
+    icone_a_afficher = actuel.get("icone", "🚧")
     st.markdown(
         f"""
         <div style='text-align: center; font-size: 70px; margin: 15px 0; padding: 20px; background: var(--surface); border: 1.5px solid var(--trait); border-radius: 16px; box-shadow: var(--ombre);'>
-            {actuel['icone']}
+            {icone_a_afficher}
         </div>
         """,
         unsafe_allow_html=True
