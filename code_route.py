@@ -1,7 +1,10 @@
 # ==========================================================
-# Code de la Route Belge — Module Haute Performance (corrigé)
+# Code de la Route Belge — Module Haute Performance (avec images)
 # ==========================================================
 import random
+import urllib.parse
+
+import requests
 import streamlit as st
 
 # Base réglementaire officielle complète (Séries A à F)
@@ -29,7 +32,7 @@ BASE_PANNEAUX = [
     {"code": "B9", "nom": "Voie prioritaire", "cat": "Série B : Priorité", "desc": "Losange jaune : vous êtes prioritaire aux intersections de cette route."},
     {"code": "B11", "nom": "Fin de voie prioritaire", "cat": "Série B : Priorité", "desc": "Losange barré : fin du statut de route prioritaire."},
     {"code": "B15", "nom": "Priorité à l'approche d'une intersection", "cat": "Série B : Priorité", "desc": "Indique que vous avez la priorité à la prochaine intersection."},
-    {"code": "Général", "nom": "Priorité à droite", "cat": "Série B : Priorité", "desc": "Règle générale de l'intersection : céder le passage à tout venants de droite."},
+    {"code": "B17", "nom": "Priorité à droite", "cat": "Série B : Priorité", "desc": "Règle générale de l'intersection : céder le passage à tout venant de droite."},
 
     # Série C : Interdictions
     {"code": "C1", "nom": "Interdiction de circuler dans les deux sens", "cat": "Série C : Interdiction", "desc": "Accès interdit à tout véhicule dans les deux sens."},
@@ -37,28 +40,25 @@ BASE_PANNEAUX = [
     {"code": "C5", "nom": "Accès interdit aux automobiles", "cat": "Série C : Interdiction", "desc": "Interdit aux voitures et camions."},
     {"code": "C7", "nom": "Accès interdit aux motocycles", "cat": "Série C : Interdiction", "desc": "Interdit aux motos."},
     {"code": "C11", "nom": "Accès interdit aux cyclistes", "cat": "Série C : Interdiction", "desc": "Interdit aux vélos."},
-    {"code": "C13", "nom": "Accès interdit aux piétons", "cat": "Série C : Interdiction", "desc": "Interdit aux piétons."},
+    {"code": "C19", "nom": "Accès interdit aux piétons", "cat": "Série C : Interdiction", "desc": "Interdit aux piétons."},
     {"code": "C23", "nom": "Accès interdit aux camions", "cat": "Série C : Interdiction", "desc": "Interdit aux véhicules de transport de marchandises."},
     {"code": "C35", "nom": "Interdiction de dépasser", "cat": "Série C : Interdiction", "desc": "Interdiction de dépasser les véhicules à moteur."},
-    {"code": "C43-30", "nom": "Vitesse limitée à 30 km/h", "cat": "Série C : Interdiction", "desc": "Vitesse maximale autorisée de 30 km/h."},
-    {"code": "C43-50", "nom": "Vitesse limitée à 50 km/h", "cat": "Série C : Interdiction", "desc": "Vitesse maximale autorisée de 50 km/h (agglomération)."},
-    {"code": "C43-70", "nom": "Vitesse limitée à 70 km/h", "cat": "Série C : Interdiction", "desc": "Vitesse maximale autorisée de 70 km/h."},
-    {"code": "C43-90", "nom": "Vitesse limitée à 90 km/h", "cat": "Série C : Interdiction", "desc": "Vitesse maximale autorisée de 90 km/h."},
+    {"code": "C43 30", "nom": "Vitesse limitée à 30 km/h", "cat": "Série C : Interdiction", "desc": "Vitesse maximale autorisée de 30 km/h."},
+    {"code": "C43 50", "nom": "Vitesse limitée à 50 km/h", "cat": "Série C : Interdiction", "desc": "Vitesse maximale autorisée de 50 km/h (agglomération)."},
+    {"code": "C43 70", "nom": "Vitesse limitée à 70 km/h", "cat": "Série C : Interdiction", "desc": "Vitesse maximale autorisée de 70 km/h."},
+    {"code": "C43 90", "nom": "Vitesse limitée à 90 km/h", "cat": "Série C : Interdiction", "desc": "Vitesse maximale autorisée de 90 km/h."},
     {"code": "C45", "nom": "Fin de toutes les interdictions locales", "cat": "Série C : Interdiction", "desc": "Fin des limitations de vitesse ou interdictions de dépassement précédentes."},
 
     # Série D : Obligations
     {"code": "D1a", "nom": "Direction obligatoire à droite", "cat": "Série D : Obligation", "desc": "Obligation de tourner à droite à l'intersection."},
     {"code": "D1b", "nom": "Direction obligatoire à gauche", "cat": "Série D : Obligation", "desc": "Obligation de tourner à gauche à l'intersection."},
-    {"code": "D3a", "nom": "Contournement obligatoire par la droite", "cat": "Série D : Obligation", "desc": "Obligation de passer à droite de l'îlot ou de l'obstacle."},
-    {"code": "D9", "nom": "Piste cyclable obligatoire", "cat": "Série D : Obligation", "desc": "Voie exclusive réservée aux cyclistes."},
+    {"code": "D9a", "nom": "Piste cyclable obligatoire", "cat": "Série D : Obligation", "desc": "Voie exclusive réservée aux cyclistes."},
     {"code": "D10", "nom": "Chemin pour piétons", "cat": "Série D : Obligation", "desc": "Voie réservée exclusivement aux piétons."},
-    {"code": "D11", "nom": "Chemin pour cavaliers", "cat": "Série D : Obligation", "desc": "Voie réservée aux cavaliers."},
 
     # Série E : Stationnement
     {"code": "E1", "nom": "Stationnement interdit", "cat": "Série E : Stationnement", "desc": "Interdiction de stationner du côté du panneau."},
     {"code": "E3", "nom": "Arrêt et stationnement interdits", "cat": "Série E : Stationnement", "desc": "Interdiction absolue de s'arrêter et de stationner."},
     {"code": "E9a", "nom": "Stationnement autorisé (Parking)", "cat": "Série E : Stationnement", "desc": "Indique un emplacement ou un parking autorisé."},
-    {"code": "E9b", "nom": "Parking réservé aux personnes handicapées", "cat": "Série E : Stationnement", "desc": "Emplacement réservé aux titulaires de la carte PMR."},
 
     # Série F : Indications
     {"code": "F5", "nom": "Autoroute", "cat": "Série F : Indication", "desc": "Début d'autoroute (règles et vitesses autoroutières applicables)."},
@@ -67,16 +67,66 @@ BASE_PANNEAUX = [
     {"code": "F19", "nom": "Sens unique", "cat": "Série F : Indication", "desc": "Indique une rue à sens unique."},
     {"code": "F4a", "nom": "Zone 30", "cat": "Série F : Indication", "desc": "Entrée d'une zone où la vitesse est limitée à 30 km/h sur tout le périmètre."},
     {"code": "F4b", "nom": "Fin de zone 30", "cat": "Série F : Indication", "desc": "Sortie de la zone 30."},
-    {"code": "Fg", "nom": "Passage pour piétons (Indication)", "cat": "Série F : Indication", "desc": "Indique l'emplacement exact d'un passage clouté."},
 ]
+
+WIKIMEDIA_FILEPATH = "https://commons.wikimedia.org/wiki/Special:FilePath/"
+
+
+def image_url_for(code: str) -> str:
+    """Construit l'URL de l'image officielle (Wikimedia Commons) pour un code de panneau."""
+    filename = f"Belgian road sign {code}.svg"
+    return WIKIMEDIA_FILEPATH + urllib.parse.quote(filename)
+
+
+@st.cache_data(ttl=60 * 60 * 24, show_spinner=False)
+def image_disponible(url: str) -> bool:
+    """Vérifie (et met en cache) si l'image existe réellement sur Commons."""
+    try:
+        r = requests.head(url, timeout=3, allow_redirects=True)
+        return r.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def afficher_panneau(actuel, taille_px=180):
+    """Affiche l'image du panneau si disponible, sinon une carte de repli avec le code."""
+    url = image_url_for(actuel["code"])
+    if image_disponible(url):
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image(url, width=taille_px)
+        st.markdown(
+            f"<div style='text-align:center; font-size:12px; color:var(--gris, #6b7280); "
+            f"letter-spacing:1px; text-transform:uppercase; margin-top:4px;'>{actuel['code']} — {actuel['cat']}</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"""
+            <div style="text-align: center; padding: 40px 20px;
+                        background: var(--surface, #ffffff);
+                        border: 2px solid var(--accent, #1f6feb);
+                        border-radius: 18px;
+                        box-shadow: var(--ombre, 0 2px 10px rgba(0,0,0,0.08));
+                        margin: 10px auto;">
+                <div style="font-size: 12.5px; font-weight: 700; color: var(--gris, #6b7280);
+                            text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">
+                    Référence officielle (image indisponible)
+                </div>
+                <div style="font-size: 46px; font-weight: 800; color: var(--accent-fonce, #0b3d91);
+                            letter-spacing: 1px; margin: 5px 0;">
+                    {actuel['code']}
+                </div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--encre-2, #374151); margin-top: 8px;">
+                    {actuel['cat']}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def carte(*args, **kwargs):
-    if args or kwargs:
-        # Ces paramètres n'étaient pas utilisés : à brancher ici si besoin
-        # (ex: filtre de catégorie de départ, mode par défaut, etc.)
-        pass
-
     mode = st.radio(
         "Navigation Panneaux",
         ["🎯 Mode Quiz Interactif", "📚 Répertoire Officiel Complet"],
@@ -89,8 +139,8 @@ def carte(*args, **kwargs):
 
     # --- MODE 1 : QUIZ HAUTE PERFORMANCE ---
     if mode == "🎯 Mode Quiz Interactif":
-        if "quiz_version" not in st.session_state or st.session_state["quiz_version"] != "v14_perf":
-            st.session_state["quiz_version"] = "v14_perf"
+        if "quiz_version" not in st.session_state or st.session_state["quiz_version"] != "v15_images":
+            st.session_state["quiz_version"] = "v15_images"
             st.session_state["quiz_index"] = 0
             st.session_state["quiz_score"] = 0
             st.session_state["quiz_panneaux"] = random.sample(BASE_PANNEAUX, min(20, len(BASE_PANNEAUX)))
@@ -112,7 +162,6 @@ def carte(*args, **kwargs):
                 st.session_state["quiz_score"] = 0
                 st.session_state["quiz_panneaux"] = random.sample(BASE_PANNEAUX, min(20, len(BASE_PANNEAUX)))
                 st.session_state["quiz_repondu"] = False
-                # on force la régénération des options à la prochaine passe
                 st.session_state.pop("quiz_options", None)
                 st.session_state.pop("quiz_current_idx", None)
                 st.rerun()
@@ -121,7 +170,6 @@ def carte(*args, **kwargs):
         actuel = panneaux_liste[idx]
 
         if "quiz_options" not in st.session_state or st.session_state.get("quiz_current_idx") != idx:
-            # on identifie les mauvaises réponses par code (unique), pas par nom
             faux_panneaux = [p for p in BASE_PANNEAUX if p["code"] != actuel["code"]]
             choix_faux = random.sample(faux_panneaux, min(3, len(faux_panneaux)))
             options = [p["nom"] for p in choix_faux] + [actuel["nom"]]
@@ -130,37 +178,8 @@ def carte(*args, **kwargs):
             st.session_state["quiz_current_idx"] = idx
             st.session_state["quiz_repondu"] = False
 
-        # Carte d'affichage officielle épurée et ultra-lisible
-        # (valeurs de repli si les variables CSS --surface/--accent/... ne sont pas définies ailleurs)
-        st.markdown(
-            f"""
-            <div style="text-align: center; padding: 40px 20px;
-                        background: var(--surface, #ffffff);
-                        border: 2px solid var(--accent, #1f6feb);
-                        border-radius: 18px;
-                        box-shadow: var(--ombre, 0 2px 10px rgba(0,0,0,0.08));
-                        margin: 10px auto;">
-                <div style="font-size: 12.5px; font-weight: 700; color: var(--gris, #6b7280);
-                            text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">
-                    Référence officielle
-                </div>
-                <div style="font-size: 46px; font-weight: 800; color: var(--accent-fonce, #0b3d91);
-                            letter-spacing: 1px; margin: 5px 0;">
-                    {actuel['code']}
-                </div>
-                <div style="font-size: 13px; font-weight: 600; color: var(--encre-2, #374151); margin-top: 8px;">
-                    {actuel['cat']}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            f"<div style='text-align:center; font-weight:600; margin:15px 0; "
-            f"color:var(--encre, #111827); font-size:15px;'>Description : {actuel['desc']}</div>",
-            unsafe_allow_html=True,
-        )
+        # --- Affichage du panneau : image officielle si dispo, sinon carte de repli ---
+        afficher_panneau(actuel)
 
         st.write("")
         st.markdown("**Quelle est la désignation exacte de ce panneau ?**")
@@ -173,8 +192,6 @@ def carte(*args, **kwargs):
             if repondu and opt == actuel["nom"]:
                 btn_type = "primary"
 
-            # clé unique basée sur l'index de la question + la position de l'option
-            # (et non sur le texte de l'option, qui pourrait un jour se répéter)
             if st.button(opt, key=f"opt_{idx}_{i}", disabled=repondu, type=btn_type):
                 st.session_state["quiz_repondu"] = True
                 if opt == actuel["nom"]:
@@ -218,8 +235,16 @@ def carte(*args, **kwargs):
 
             for p in sous_groupe:
                 with st.expander(f"[{p['code']}] — {p['nom']}"):
-                    st.markdown(f"**Signification réglementaire :** {p['desc']}")
-                    st.markdown(f"<span class='tag'>{p['cat']}</span>", unsafe_allow_html=True)
+                    url = image_url_for(p["code"])
+                    col_img, col_txt = st.columns([1, 3])
+                    with col_img:
+                        if image_disponible(url):
+                            st.image(url, width=90)
+                        else:
+                            st.caption("Image indisponible")
+                    with col_txt:
+                        st.markdown(f"**Signification réglementaire :** {p['desc']}")
+                        st.markdown(f"<span class='tag'>{p['cat']}</span>", unsafe_allow_html=True)
             st.write("")
 
         if not resultats:
