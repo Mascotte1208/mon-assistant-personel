@@ -4,9 +4,6 @@
 import random
 import streamlit as st
 
-VERSION_ROUTE = "2.0"
-
-# Liste complète de panneaux officiels (avec images Wikimedia publiques)
 PANNEAUX = [
     {
         "nom": "Cédez le passage",
@@ -106,7 +103,6 @@ def carte(conteneur, entete_bloc):
             st.session_state["quiz_current_idx"] = idx
             st.session_state["quiz_repondu"] = False
 
-        # Affichage de l'image du panneau
         col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
         with col_img2:
             st.image(actuel["image"], width=160)
