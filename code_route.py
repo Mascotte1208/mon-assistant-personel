@@ -1,5 +1,5 @@
 # ==========================================================
-# Code de la Route (Panneaux) — module autonome robuste
+# Code de la Route (Panneaux) — module robuste avec visuels graphiques
 # ==========================================================
 import random
 import streamlit as st
@@ -9,67 +9,67 @@ PANNEAUX = [
         "nom": "Cédez le passage",
         "cat": "Priorité",
         "desc": "Triangle blanc pointé vers le bas à bord rouge.",
-        "icone": "🔻"
+        "visuel": "🔻 CÉDEZ LE PASSAGE"
     },
     {
         "nom": "Priorité de passage",
         "cat": "Priorité",
         "desc": "Losange jaune à bord blanc.",
-        "icone": "🔶"
+        "visuel": "🔶 PRIORITÉ DE PASSAGE"
     },
     {
         "nom": "Sens unique",
         "cat": "Indication",
         "desc": "Panneau rectangulaire bleu avec une flèche blanche.",
-        "icone": "➡️"
+        "visuel": "🟦 ➡️ SENS UNIQUE"
     },
     {
         "nom": "Interdiction de circuler",
         "cat": "Interdiction",
         "desc": "Panneau rond à bord rouge et fond blanc.",
-        "icone": "⛔"
+        "visuel": "⛔ ACCÈS INTERDIT"
     },
     {
         "nom": "Stationnement interdit",
         "cat": "Interdiction",
         "desc": "Cercle à bord rouge, fond bleu barré en diagonale.",
-        "icone": "❌"
+        "visuel": "❌ STATIONNEMENT INTERDIT"
     },
     {
         "nom": "Vitesse limitée à 30 km/h",
         "cat": "Interdiction",
-        "desc": "Cercle blanc à bord rouge avec limitation.",
-        "icone": "⏱️"
+        "desc": "Cercle blanc à bord rouge avec limitation 30.",
+        "visuel": "🔴 30 ⚪ LIMITATION"
     },
     {
         "nom": "Piste cyclable obligatoire",
         "cat": "Obligation",
         "desc": "Cercle bleu avec un pictogramme de vélo.",
-        "icone": "🚲"
+        "visuel": "🔵 🚲 PISTE CYCLABLE"
     },
     {
         "nom": "Danger : Virage dangereux",
         "cat": "Danger",
         "desc": "Triangle à bord rouge annonçant un virage.",
-        "icone": "⚠️"
+        "visuel": "⚠️ VIRAGE DANGEREUX"
     },
     {
         "nom": "Intersection avec priorité à droite",
         "cat": "Danger",
         "desc": "Triangle à bord rouge avec une intersection.",
-        "icone": "🔀"
+        "visuel": "⚠️ PRIORITÉ À DROITE"
     },
     {
         "nom": "Passage pour piétons",
         "cat": "Danger / Indication",
         "desc": "Triangle à bord rouge annonçant un passage clouté.",
-        "icone": "🚶"
+        "visuel": "⚠️ 🚶 PASSAGE PIÉTONS"
     },
 ]
 
 def carte(*args, **kwargs):
-    # Réinitialisation propre si la structure des données a changé
-    if "quiz_index" not in st.session_state or "quiz_panneaux" not in st.session_state:
+    # Réinitialisation forcée de la session pour purger les anciennes clés
+    if "quiz_index" not in st.session_state or "quiz_panneaux" not in st.session_state or len(st.session_state.get("quiz_panneaux", [])) != len(PANNEAUX):
         st.session_state["quiz_index"] = 0
         st.session_state["quiz_score"] = 0
         st.session_state["quiz_panneaux"] = random.sample(PANNEAUX, len(PANNEAUX))
@@ -103,12 +103,11 @@ def carte(*args, **kwargs):
         st.session_state["quiz_current_idx"] = idx
         st.session_state["quiz_repondu"] = False
 
-    # Affichage de l'icône/illustration visuelle grand format
-    icone_a_afficher = actuel.get("icone", "🚧")
+    # Bloc graphique simulant le panneau de signalisation de manière claire
     st.markdown(
         f"""
-        <div style='text-align: center; font-size: 70px; margin: 15px 0; padding: 20px; background: var(--surface); border: 1.5px solid var(--trait); border-radius: 16px; box-shadow: var(--ombre);'>
-            {icone_a_afficher}
+        <div style='text-align: center; font-size: 26px; font-weight: 800; letter-spacing: 1px; margin: 15px 0; padding: 30px; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: var(--ombre); color: var(--accent-fonce);'>
+            {actuel['visuel']}
         </div>
         """,
         unsafe_allow_html=True
