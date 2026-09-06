@@ -1,5 +1,5 @@
 # ==========================================================
-# Code de la Route Belge — Module Haute Performance
+# Code de la Route Belge — Module Haute Performance (corrigé)
 # ==========================================================
 import random
 import streamlit as st
@@ -70,24 +70,33 @@ BASE_PANNEAUX = [
     {"code": "Fg", "nom": "Passage pour piétons (Indication)", "cat": "Série F : Indication", "desc": "Indique l'emplacement exact d'un passage clouté."},
 ]
 
+
 def carte(*args, **kwargs):
+    if args or kwargs:
+        # Ces paramètres n'étaient pas utilisés : à brancher ici si besoin
+        # (ex: filtre de catégorie de départ, mode par défaut, etc.)
+        pass
+
     mode = st.radio(
         "Navigation Panneaux",
         ["🎯 Mode Quiz Interactif", "📚 Répertoire Officiel Complet"],
         horizontal=True,
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        key="carte_mode_radio",
     )
 
     st.write("")
 
     # --- MODE 1 : QUIZ HAUTE PERFORMANCE ---
     if mode == "🎯 Mode Quiz Interactif":
-        if "quiz_version" not in st.session_state or st.session_state["quiz_version"] != "v13_perf":
-            st.session_state["quiz_version"] = "v13_perf"
+        if "quiz_version" not in st.session_state or st.session_state["quiz_version"] != "v14_perf":
+            st.session_state["quiz_version"] = "v14_perf"
             st.session_state["quiz_index"] = 0
             st.session_state["quiz_score"] = 0
             st.session_state["quiz_panneaux"] = random.sample(BASE_PANNEAUX, min(20, len(BASE_PANNEAUX)))
             st.session_state["quiz_repondu"] = False
+            st.session_state.pop("quiz_options", None)
+            st.session_state.pop("quiz_current_idx", None)
 
         panneaux_liste = st.session_state["quiz_panneaux"]
         idx = st.session_state["quiz_index"]
@@ -103,46 +112,70 @@ def carte(*args, **kwargs):
                 st.session_state["quiz_score"] = 0
                 st.session_state["quiz_panneaux"] = random.sample(BASE_PANNEAUX, min(20, len(BASE_PANNEAUX)))
                 st.session_state["quiz_repondu"] = False
+                # on force la régénération des options à la prochaine passe
+                st.session_state.pop("quiz_options", None)
+                st.session_state.pop("quiz_current_idx", None)
                 st.rerun()
             return
 
         actuel = panneaux_liste[idx]
 
         if "quiz_options" not in st.session_state or st.session_state.get("quiz_current_idx") != idx:
-            fausses = [p["nom"] for p in BASE_PANNEAUX if p["nom"] != actuel["nom"]]
-            choix_fausses = random.sample(fausses, min(3, len(fausses)))
-            options = choix_fausses + [actuel["nom"]]
+            # on identifie les mauvaises réponses par code (unique), pas par nom
+            faux_panneaux = [p for p in BASE_PANNEAUX if p["code"] != actuel["code"]]
+            choix_faux = random.sample(faux_panneaux, min(3, len(faux_panneaux)))
+            options = [p["nom"] for p in choix_faux] + [actuel["nom"]]
             random.shuffle(options)
             st.session_state["quiz_options"] = options
             st.session_state["quiz_current_idx"] = idx
             st.session_state["quiz_repondu"] = False
 
         # Carte d'affichage officielle épurée et ultra-lisible
+        # (valeurs de repli si les variables CSS --surface/--accent/... ne sont pas définies ailleurs)
         st.markdown(
             f"""
-            <div style='text-align: center; padding: 40px 20px; background: var(--surface); border: 2px solid var(--accent); border-radius: 18px; box-shadow: var(--ombre); margin: 10px auto;'>
-                <div style='font-size: 12.5px; font-weight: 700; color: var(--gris); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;'>Référence officielle</div>
-                <div style='font-size: 46px; font-weight: 800; color: var(--accent-fonce); letter-spacing: 1px; margin: 5px 0;'>{actuel['code']}</div>
-                <div style='font-size: 13px; font-weight: 600; color: var(--encre-2); margin-top: 8px;'>{actuel['cat']}</div>
+            <div style="text-align: center; padding: 40px 20px;
+                        background: var(--surface, #ffffff);
+                        border: 2px solid var(--accent, #1f6feb);
+                        border-radius: 18px;
+                        box-shadow: var(--ombre, 0 2px 10px rgba(0,0,0,0.08));
+                        margin: 10px auto;">
+                <div style="font-size: 12.5px; font-weight: 700; color: var(--gris, #6b7280);
+                            text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">
+                    Référence officielle
+                </div>
+                <div style="font-size: 46px; font-weight: 800; color: var(--accent-fonce, #0b3d91);
+                            letter-spacing: 1px; margin: 5px 0;">
+                    {actuel['code']}
+                </div>
+                <div style="font-size: 13px; font-weight: 600; color: var(--encre-2, #374151); margin-top: 8px;">
+                    {actuel['cat']}
+                </div>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
-        st.markdown(f"<div style='text-align:center; font-weight:600; margin:15px 0; color:var(--encre); font-size:15px;'>Description : {actuel['desc']}</div>", unsafe_allow_html=True)
-        
+        st.markdown(
+            f"<div style='text-align:center; font-weight:600; margin:15px 0; "
+            f"color:var(--encre, #111827); font-size:15px;'>Description : {actuel['desc']}</div>",
+            unsafe_allow_html=True,
+        )
+
         st.write("")
         st.markdown("**Quelle est la désignation exacte de ce panneau ?**")
 
         options = st.session_state["quiz_options"]
         repondu = st.session_state["quiz_repondu"]
 
-        for opt in options:
+        for i, opt in enumerate(options):
             btn_type = "secondary"
             if repondu and opt == actuel["nom"]:
                 btn_type = "primary"
 
-            if st.button(opt, key=f"opt_{idx}_{opt}", disabled=repondu, type=btn_type):
+            # clé unique basée sur l'index de la question + la position de l'option
+            # (et non sur le texte de l'option, qui pourrait un jour se répéter)
+            if st.button(opt, key=f"opt_{idx}_{i}", disabled=repondu, type=btn_type):
                 st.session_state["quiz_repondu"] = True
                 if opt == actuel["nom"]:
                     st.session_state["quiz_score"] += 1
@@ -163,19 +196,26 @@ def carte(*args, **kwargs):
         st.markdown("### 📚 Répertoire Officiel Complet")
         st.caption(f"Base de données de référence ({len(BASE_PANNEAUX)} panneaux officiels belges répertoriés).")
 
-        recherche = st.text_input("🔍 Filtrer les panneaux (code, nom, catégorie, mot-clé...)", placeholder="Ex: A1a, Stop, Vitesse, Priorité...")
+        recherche = st.text_input(
+            "🔍 Filtrer les panneaux (code, nom, catégorie, mot-clé...)",
+            placeholder="Ex: A1a, Stop, Vitesse, Priorité...",
+            key="repertoire_recherche",
+        )
 
         resultats = BASE_PANNEAUX
         if recherche.strip():
             m = recherche.strip().lower()
-            resultats = [p for p in BASE_PANNEAUX if m in p["nom"].lower() or m in p["cat"].lower() or m in p["code"].lower() or m in p["desc"].lower()]
+            resultats = [
+                p for p in BASE_PANNEAUX
+                if m in p["nom"].lower() or m in p["cat"].lower() or m in p["code"].lower() or m in p["desc"].lower()
+            ]
 
-        categories = sorted(list(set(p["cat"] for p in resultats)))
+        categories = sorted(set(p["cat"] for p in resultats))
 
         for cat in categories:
             st.markdown(f"#### 📌 {cat}")
             sous_groupe = [p for p in resultats if p["cat"] == cat]
-            
+
             for p in sous_groupe:
                 with st.expander(f"[{p['code']}] — {p['nom']}"):
                     st.markdown(f"**Signification réglementaire :** {p['desc']}")
