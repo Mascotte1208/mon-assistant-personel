@@ -1,6 +1,7 @@
 # ==========================================================
 # Code de la Route Belge — Module Haute Performance (avec images)
 # ==========================================================
+import os
 import random
 import urllib.parse
 import uuid
@@ -71,10 +72,35 @@ BASE_PANNEAUX = [
 
 WIKIMEDIA_FILEPATH = "https://commons.wikimedia.org/wiki/Special:FilePath/"
 
+# Dossier local (dans ton projet Streamlit) où tu peux déposer tes propres
+# images pour les panneaux dont le nom de fichier Wikimedia est incertain
+# ou introuvable (ex. la série D). Nomme le fichier avec le "code" exact,
+# ex: assets/panneaux/D1a.svg, assets/panneaux/D9a.png, etc.
+LOCAL_ASSETS_DIR = "assets/panneaux"
+
+# Wikimedia Commons n'utilise pas un nom de fichier cohérent pour tous les
+# panneaux (parfois "road sign", parfois "traffic sign", parfois un suffixe
+# comme "rechts"/"(2)"). Cette table corrige les cas connus où le schéma
+# par défaut ("Belgian road sign {code}.svg") ne correspond à aucun fichier.
+IMAGE_FILENAME_OVERRIDES = {
+    "D1a": "Belgian traffic sign D1c.svg",       # direction obligatoire à droite
+    "D1b": "Belgian traffic sign D1e.svg",       # direction obligatoire à gauche
+    # D9a : aucune image officielle correspondante trouvée sur Commons à ce jour.
+}
+
+
+def local_image_path(code: str):
+    """Renvoie le chemin d'une image locale pour ce code si elle existe, sinon None."""
+    for ext in (".svg", ".png", ".jpg", ".jpeg"):
+        path = os.path.join(LOCAL_ASSETS_DIR, f"{code}{ext}")
+        if os.path.isfile(path):
+            return path
+    return None
+
 
 def image_url_for(code: str) -> str:
     """Construit l'URL de l'image officielle (Wikimedia Commons) pour un code de panneau."""
-    filename = f"Belgian road sign {code}.svg"
+    filename = IMAGE_FILENAME_OVERRIDES.get(code, f"Belgian road sign {code}.svg")
     return WIKIMEDIA_FILEPATH + urllib.parse.quote(filename)
 
 
@@ -103,9 +129,23 @@ def carte_texte_html(actuel, message="Référence officielle"):
 
 
 def afficher_panneau(actuel, taille_px=180):
-    """Affiche l'image du panneau (chargée par le NAVIGATEUR, pas par le serveur).
-    Si l'image ne charge pas (404, réseau, etc.), un onerror JS bascule sur la carte texte
-    — sans jamais dépendre d'une requête réseau depuis le serveur Streamlit."""
+    """Affiche l'image du panneau. Ordre de priorité :
+    1) image locale dans assets/panneaux/{code}.(svg|png|jpg) si elle existe (100% fiable)
+    2) image Wikimedia Commons, chargée par le NAVIGATEUR (pas le serveur)
+    3) si ça échoue aussi (onerror JS), carte texte de repli
+    """
+    local_path = local_image_path(actuel["code"])
+    if local_path:
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            st.image(local_path, width=taille_px)
+        st.markdown(
+            f"<div style='text-align:center; font-size:12px; color:var(--gris, #6b7280); "
+            f"letter-spacing:1px; text-transform:uppercase; margin-top:4px;'>{actuel['code']} — {actuel['cat']}</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
     url = image_url_for(actuel["code"])
     uid = uuid.uuid4().hex[:8]
     fallback_html = carte_texte_html(actuel, message="Référence officielle (image indisponible)").replace("'", "\\'").replace("\n", "")
@@ -237,18 +277,22 @@ def carte(*args, **kwargs):
 
             for p in sous_groupe:
                 with st.expander(f"[{p['code']}] — {p['nom']}"):
-                    url = image_url_for(p["code"])
-                    uid = uuid.uuid4().hex[:8]
                     col_img, col_txt = st.columns([1, 3])
                     with col_img:
-                        st.markdown(
-                            f"""
-                            <img id="thumb-{uid}" src="{url}" style="width:90px;"
-                                 onerror="this.replaceWith(Object.assign(document.createElement('div'),
-                                    {{innerText:'Image indisponible', style:'font-size:11px;color:var(--gris,#6b7280);'}}));" />
-                            """,
-                            unsafe_allow_html=True,
-                        )
+                        local_path = local_image_path(p["code"])
+                        if local_path:
+                            st.image(local_path, width=90)
+                        else:
+                            url = image_url_for(p["code"])
+                            uid = uuid.uuid4().hex[:8]
+                            st.markdown(
+                                f"""
+                                <img id="thumb-{uid}" src="{url}" style="width:90px;"
+                                     onerror="this.replaceWith(Object.assign(document.createElement('div'),
+                                        {{innerText:'Image indisponible', style:'font-size:11px;color:var(--gris,#6b7280);'}}));" />
+                                """,
+                                unsafe_allow_html=True,
+                            )
                     with col_txt:
                         st.markdown(f"**Signification réglementaire :** {p['desc']}")
                         st.markdown(f"<span class='tag'>{p['cat']}</span>", unsafe_allow_html=True)
