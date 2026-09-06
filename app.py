@@ -38,7 +38,6 @@ st.markdown("""
     padding-bottom: 3rem;
     max-width: 820px;
 }
-/* Style général des cartes */
 .app-card {
     background: var(--surface);
     border: 1.5px solid var(--trait);
@@ -78,10 +77,9 @@ def connecter_gspread():
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
-        # Nom de la feuille partagée
         sheet_name = st.secrets.get("sheets", {}).get("name", "Notre Assistant")
         return client.open(sheet_name)
-    except Exception as e:
+    except Exception:
         return None
 
 sh = connecter_gspread()
@@ -92,7 +90,6 @@ def rows(nom_feuille):
     try:
         ws = sh.worksheet(nom_feuille)
         lignes = ws.get_all_values()
-        # Renvoie [(index_1_based, [valeurs])]
         return [(i + 1, ligne) for i, ligne in enumerate(lignes)]
     except Exception:
         return []
@@ -162,7 +159,6 @@ def reset_after(**champs):
     for k, v in champs.items():
         st.session_state[k] = v
 
-# Dictionnaire du contexte partagé avec les modules externes
 ctx = {
     "rows": rows,
     "add_row": add_row,
@@ -178,42 +174,33 @@ ctx = {
 }
 
 # ----------------------------------------------------------
-# 5. Navigation et Barre de sélection des pages
+# 5. Navigation et dictionnaire des pages d'origine + "route"
 # ----------------------------------------------------------
 PAGES = {
     "accueil": "🏠 Accueil",
     "budget": "📊 Budget",
     "maison": "🐾 Maison & Projets",
     "transport": "🚋 Transports",
-    "route": "🚦 Code de la route",
+    "route": "🚦 Code de la route",    # <- Ajout de l'onglet Quiz ici
     "ialab": "🧠 Labo IA & Marchés",
 }
 
-# Option pour activer/désactiver le mode IA Lab dans le menu
 if "mode_ia" not in st.session_state:
     st.session_state["mode_ia"] = True
 
-# Barre de navigation horizontale élégante
 col_nav1, col_nav2 = st.columns([5, 1])
 with col_nav1:
     cles_pages = list(PAGES.keys())
-    labels_pages = list(PAGES.values())
     if not st.session_state.get("mode_ia"):
         cles_pages.remove("ialab")
-        labels_pages = [v for k, v in PAGES.items() if k != "ialab"]
 
-    # Gestion de l'onglet actif
-    if "page_actuelle" not in st.session_state:
-        st.session_state["page_actuelle"] = "accueil"
-
-    page_choisie = st.selectbox(
+    page_cle = st.selectbox(
         "Navigation", 
         options=cles_pages, 
         format_func=lambda x: PAGES[x],
         key="selecteur_page_principal",
         label_visibility="collapsed"
     )
-    page_cle = page_choisie
 
 with col_nav2:
     if st.button("⚙️ Réglages", use_container_width=True):
@@ -225,7 +212,7 @@ st.write("")
 # 6. Routage des Pages
 # ----------------------------------------------------------
 
-# --- PAGE ACCUEIL ---
+# --- ACCUEIL ---
 if page_cle == "accueil":
     st.markdown("# 🏠 Bonjour Lucas & Alexia")
     st.markdown("Bienvenue dans votre espace centralisé.")
@@ -237,31 +224,26 @@ if page_cle == "accueil":
             try:
                 import transports
                 transports.carte(ctx)
-            except Exception as e:
+            except Exception:
                 st.info("Module transports en attente de configuration.")
     with col_d:
         with st.container():
-            st.markdown("### 🚦 Quiz du moment")
-            try:
-                import code_route
-                code_route.carte(st.container, entete_bloc)
-            except Exception as e:
-                st.info("Module code de la route indisponible.")
+            st.markdown("### 🐾 Raccourcis")
+            st.info("Espace d'accès rapide.")
 
-# --- PAGE BUDGET ---
+# --- BUDGET ---
 elif page_cle == "budget":
     titre("📊 Gestion du Budget")
     st.markdown("Suivi des comptes conjoints et dépenses.")
-    # Intègre ton module budget ici si tu en as un séparé, ou gère l'affichage direct
     st.info("Module budget actif (synchronisé avec Google Sheets).")
 
-# --- PAGE MAISON & PROJETS ---
+# --- MAISON ---
 elif page_cle == "maison":
     titre("🐾 Maison, DIY & Saiko")
     st.markdown("Suivi des aménagements (OSB, parpaings) et projets de vie.")
     st.info("Espace de suivi des travaux et idées d'aménagement.")
 
-# --- PAGE TRANSPORTS (STIB) ---
+# --- TRANSPORTS ---
 elif page_cle == "transport":
     titre("🚋 Transports en commun (STIB)")
     try:
@@ -270,7 +252,7 @@ elif page_cle == "transport":
     except Exception as e:
         st.error(f"Erreur de chargement du module transports : {e}")
 
-# --- PAGE CODE DE LA ROUTE ---
+# --- CODE DE LA ROUTE (QUIZ) ---
 elif page_cle == "route":
     titre("🚦 Code de la Route — Entraînement Panneaux")
     try:
@@ -279,7 +261,7 @@ elif page_cle == "route":
     except Exception as e:
         st.error(f"Erreur de chargement du module code_route : {e}")
 
-# --- PAGE LABO IA & MARCHÉS ---
+# --- LABO IA & MARCHÉS ---
 elif page_cle == "ialab" and st.session_state.get("mode_ia"):
     try:
         import labo_ia
