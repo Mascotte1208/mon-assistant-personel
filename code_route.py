@@ -1,5 +1,5 @@
 # ==========================================================
-# Code de la Route (Panneaux) — module autonome avec images
+# Code de la Route (Panneaux) — module autonome robuste
 # ==========================================================
 import random
 import streamlit as st
@@ -9,61 +9,61 @@ PANNEAUX = [
         "nom": "Cédez le passage",
         "cat": "Priorité",
         "desc": "Triangle blanc pointé vers le bas à bord rouge.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Belgian_road_sign_B1.svg/300px-Belgian_road_sign_B1.svg.png"
+        "icone": "🔻"
     },
     {
         "nom": "Priorité de passage",
         "cat": "Priorité",
         "desc": "Losange jaune à bord blanc.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Belgian_road_sign_B9.svg/300px-Belgian_road_sign_B9.svg.png"
+        "icone": "🔶"
     },
     {
         "nom": "Sens unique",
         "cat": "Indication",
-        "desc": "Panneau rectangulaire bleu avec une flèche blanche horizontale.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Belgian_road_sign_F19.svg/300px-Belgian_road_sign_F19.svg.png"
+        "desc": "Panneau rectangulaire bleu avec une flèche blanche.",
+        "icone": "➡️"
     },
     {
-        "nom": "Interdiction de circuler dans les deux sens",
+        "nom": "Interdiction de circuler",
         "cat": "Interdiction",
         "desc": "Panneau rond à bord rouge et fond blanc.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Belgian_road_sign_C1.svg/300px-Belgian_road_sign_C1.svg.png"
+        "icone": "⛔"
     },
     {
         "nom": "Stationnement interdit",
         "cat": "Interdiction",
         "desc": "Cercle à bord rouge, fond bleu barré en diagonale.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Belgian_road_sign_C3.svg/300px-Belgian_road_sign_C3.svg.png"
+        "icone": "❌"
     },
     {
         "nom": "Vitesse limitée à 30 km/h",
         "cat": "Interdiction",
-        "desc": "Cercle blanc à bord rouge avec le chiffre 30.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Belgian_road_sign_C43_%2830%29.svg/300px-Belgian_road_sign_C43_%2830%29.svg.png"
+        "desc": "Cercle blanc à bord rouge avec limitation.",
+        "icone": "⏱️"
     },
     {
         "nom": "Piste cyclable obligatoire",
         "cat": "Obligation",
         "desc": "Cercle bleu avec un pictogramme de vélo.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Belgian_road_sign_D9.svg/300px-Belgian_road_sign_D9.svg.png"
+        "icone": "🚲"
     },
     {
         "nom": "Danger : Virage dangereux",
         "cat": "Danger",
-        "desc": "Triangle à bord rouge avec un virage.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Belgian_road_sign_A1a.svg/300px-Belgian_road_sign_A1a.svg.png"
+        "desc": "Triangle à bord rouge annonçant un virage.",
+        "icone": "⚠️"
     },
     {
         "nom": "Intersection avec priorité à droite",
         "cat": "Danger",
-        "desc": "Triangle à bord rouge avec une croix noire au centre.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Belgian_road_sign_A15.svg/300px-Belgian_road_sign_A15.svg.png"
+        "desc": "Triangle à bord rouge avec une intersection.",
+        "icone": "🔀"
     },
     {
         "nom": "Passage pour piétons",
         "cat": "Danger / Indication",
         "desc": "Triangle à bord rouge annonçant un passage clouté.",
-        "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Belgian_road_sign_A23.svg/300px-Belgian_road_sign_A23.svg.png"
+        "icone": "🚶"
     },
 ]
 
@@ -102,12 +102,17 @@ def carte(*args, **kwargs):
         st.session_state["quiz_current_idx"] = idx
         st.session_state["quiz_repondu"] = False
 
-    # Affichage de l'image
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.image(actuel["image"], width=160)
+    # Affichage de l'icône/illustration visuelle grand format
+    st.markdown(
+        f"""
+        <div style='text-align: center; font-size: 70px; margin: 15px 0; padding: 20px; background: var(--surface); border: 1.5px solid var(--trait); border-radius: 16px; box-shadow: var(--ombre);'>
+            {actuel['icone']}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    st.markdown(f"<div style='text-align:center; font-weight:600; margin:10px 0;'>Description : {actuel['desc']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:center; font-weight:600; margin:10px 0; color:var(--encre);'>Description : {actuel['desc']}</div>", unsafe_allow_html=True)
     st.markdown(f"<div style='text-align:center;'><span class='tag'>Catégorie : {actuel['cat']}</span></div>", unsafe_allow_html=True)
     
     st.write("")
