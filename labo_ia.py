@@ -1,8 +1,8 @@
 # ==========================================================
 # Labo IA & Marches - module autonome pour "Notre Assistant"
-# Version 5.0
+# Version 6.0
 # ==========================================================
-# Cinq onglets, reserves aux personnes qui connaissent le code :
+# Six onglets, reserves aux personnes qui connaissent le code :
 #
 #   Marches   tableau de bord : cours, performances par horizon,
 #             mesures de risque, comparaison base 100, correlations,
@@ -10,12 +10,16 @@
 #   Analyse   etude d'un actif : chandeliers, moyennes mobiles,
 #             bandes de Bollinger, RSI, MACD, volumes, niveaux,
 #             fiche d'identite, lecture automatique detaillee.
+#   Niveaux   zone de mise, objectifs de revente, seuil de sortie,
+#             calculateur de mise, et suivi du cours a la minute.
 #   Actus     les dernieres depeches liees a un actif.
 #   Alertes   des seuils de prix, verifies a chaque chargement.
 #   Notes     le carnet, avec recherche, filtres et export.
 #
-# Ni journal de positions, ni conseil, ni simulation : le module
-# decrit des cours passes, rien de plus.
+# Les niveaux sortent de formules courantes appliquees a des cours
+# passes (moyennes mobiles, Bollinger, ATR, sommets et creux,
+# retracements). Elles decrivent, elles ne predisent pas : ce module
+# ne donne aucun conseil en investissement et ne passe aucun ordre.
 #
 # Branchement dans l'application principale (inchange) :
 #
@@ -36,8 +40,8 @@
 #   1. Constantes            6. Reglages, notes, alertes
 #   2. Acces a l'app         7. Lectures automatiques & IA
 #   3. Mise en forme         8. Onglets
-#   4. Donnees de marche     9. render()
-#   5. Graphiques
+#   4. Donnees de marche     9. Suivi a la minute & Niveaux
+#   5. Graphiques           10. render()
 # ==========================================================
 
 import json
@@ -52,13 +56,20 @@ import streamlit as st
 # ==========================================================
 # 1. CONSTANTES
 # ==========================================================
-VERSION_LABO = "5.0"
+VERSION_LABO = "6.0"
 
 CFG_SUJET = "Paramètres du labo"
 TYPE_CONFIG = "Config"
 TYPE_ALERTE = "Alerte"
 
-ONGLETS = ["📈 Marchés", "🔬 Analyse", "📰 Actus", "🔔 Alertes", "📚 Notes"]
+ONGLETS = ["📈 Marchés", "🔬 Analyse", "🎯 Niveaux", "📰 Actus", "🔔 Alertes", "📚 Notes"]
+ONG_MARCHES, ONG_ANALYSE, ONG_NIVEAUX, ONG_ACTUS, ONG_ALERTES, ONG_NOTES = ONGLETS
+
+# Calculateur de mise : ce qu'on met sur la table, et ce qu'on accepte de perdre.
+CAPITAL_DEFAUT = 1000.0
+RISQUE_DEFAUT = 1.0            # % du capital perdu si le seuil de sortie est touché
+HAUTEURS = {"Compact": 360, "Confort": 520, "Grand": 720}
+RAFRAICHISSEMENT = 60          # secondes, en mode direct
 
 # nom lisible : (ticker, famille, symbole de cotation)
 UNIVERS = {
@@ -401,6 +412,13 @@ CSS = """
 .lab-jauge .bords{display:flex; justify-content:space-between; margin-top:5px;
   font-size:11px; font-weight:600; color:var(--gris,#9B7F8C);}
 
+.lab-direct{font-size:11.5px; font-weight:600; color:var(--gris,#9B7F8C); padding:2px 0 8px;}
+.lab-pouls{display:inline-block; width:6px; height:6px; border-radius:50%;
+  background:var(--vert,#17683D); margin-right:6px; vertical-align:middle;
+  animation:labpouls 2.4s ease-in-out infinite;}
+@keyframes labpouls{0%,100%{opacity:1;} 50%{opacity:.25;}}
+@media (prefers-reduced-motion:reduce){ .lab-pouls{animation:none;} }
+
 .lab-actu{display:block; background:var(--surface,#fff); border:1.5px solid var(--trait,#F3C7DA);
   border-radius:12px; padding:11px 13px; margin-bottom:8px; text-decoration:none !important;}
 .lab-actu .t{font-size:13.5px; font-weight:700; color:var(--encre,#3A1A28); line-height:1.4;}
@@ -588,6 +606,253 @@ def niveaux(cloture, fenetre=5, maxi=3):
     return supports[:maxi], resistances[:maxi]
 
 
+def atr(df, n=14):
+    """Amplitude vraie moyenne : de combien l'actif bouge, en moyenne, par barre.
+
+    C'est la brique des seuils de sortie : un stop plus serré que l'ATR se fait
+    toucher par la simple respiration du marché, sans qu'il se soit rien passé.
+    """
+    if df is None or not {"High", "Low", "Close"}.issubset(df.columns):
+        cloture = df["Close"].dropna() if df is not None and "Close" in df else None
+        if cloture is None or len(cloture) < 3:
+            return None
+        return cloture.diff().abs().ewm(alpha=1 / n, adjust=False).mean()
+    precedent = df["Close"].shift(1)
+    plage = pd.concat([df["High"] - df["Low"],
+                       (df["High"] - precedent).abs(),
+                       (df["Low"] - precedent).abs()], axis=1).max(axis=1)
+    return plage.ewm(alpha=1 / n, adjust=False).mean()
+
+
+def valeur_atr(df, dernier, n=14):
+    """L'ATR du moment, avec un repli à 2 % du cours si le calcul échoue."""
+    try:
+        serie = atr(df, n)
+        valeur = float(serie.dropna().iloc[-1]) if serie is not None else float("nan")
+    except Exception:
+        valeur = float("nan")
+    if _nan(valeur) or valeur <= 0:
+        valeur = abs(float(dernier)) * 0.02
+    return valeur
+
+
+def fibonacci(haut, bas):
+    """Les retracements classiques d'un mouvement : où le cours revient souvent
+    souffler avant de reprendre sa route. Un usage répandu, pas une loi."""
+    if _nan(haut) or _nan(bas) or haut <= bas:
+        return {}
+    ecart = haut - bas
+    return {"23,6 %": haut - 0.236 * ecart, "38,2 %": haut - 0.382 * ecart,
+            "50 %": haut - 0.5 * ecart, "61,8 %": haut - 0.618 * ecart,
+            "78,6 %": haut - 0.786 * ecart}
+
+
+def plan_niveaux(nom, df, p, longue=None):
+    """Zone de mise, objectifs de revente et seuil de sortie.
+
+    Tout est déduit de cours passés par des formules courantes : moyennes
+    mobiles, bandes de Bollinger, ATR, sommets et creux, retracements. Ce sont
+    des repères mécaniques, calculés de la même façon quel que soit l'actif.
+    Aucun n'annonce ce que fera le marché.
+    """
+    serie = longue if longue is not None and len(longue) > 60 else p["serie"]
+    dernier = float(p["dernier"])
+    unite = valeur_atr(df, dernier)
+
+    supports, resistances = niveaux(serie)
+    fenetre = serie.tail(252)
+    haut52 = float(fenetre.max()) if len(fenetre) else float("nan")
+    bas52 = float(fenetre.min()) if len(fenetre) else float("nan")
+    fib = fibonacci(haut52, bas52)
+
+    try:
+        b_haut, _, b_bas = bollinger(serie)
+        bande_haute, bande_basse = float(b_haut.iloc[-1]), float(b_bas.iloc[-1])
+    except Exception:
+        bande_haute = bande_basse = float("nan")
+
+    # --- Où poser une mise : les repères situés sous le cours ---------------
+    candidats_bas = [
+        ("Moyenne 20", p.get("mm20")),
+        ("Moyenne 50", p.get("mm50")),
+        ("Bande basse de Bollinger", bande_basse),
+        ("Dernier support testé", supports[0] if supports else float("nan")),
+        ("Retracement 38,2 %", fib.get("38,2 %")),
+        ("Retracement 61,8 %", fib.get("61,8 %")),
+        ("Cours − 1 ATR", dernier - unite),
+    ]
+    sous = sorted([(float(v), lib) for lib, v in candidats_bas
+                   if not _nan(v) and float(v) < dernier * 0.999], reverse=True)
+    if sous:
+        zone_haute = sous[0][0]
+        zone_basse = sous[1][0] if len(sous) > 1 else zone_haute - unite * 0.5
+        appuis = [f"{lib} ({fprix(v, devise(nom))})" for v, lib in sous[:3]]
+    else:
+        # Le cours est déjà au plus bas de tous ses repères : on encadre le cours.
+        zone_haute, zone_basse = dernier, dernier - unite * 0.75
+        appuis = ["aucun repère sous le cours — il est en bas de tous ses appuis"]
+    # Deux repères peuvent tomber au même endroit : une zone d'épaisseur nulle
+    # n'aide personne, on lui donne au minimum une demi-amplitude de séance.
+    if zone_haute - zone_basse < unite * 0.4:
+        zone_basse = zone_haute - unite * 0.5
+    entree = (zone_haute + zone_basse) / 2
+
+    # --- Où revendre : les repères situés au-dessus -------------------------
+    candidats_hauts = [
+        ("Prochaine résistance", resistances[0] if resistances else float("nan")),
+        ("Résistance suivante", resistances[1] if len(resistances) > 1 else float("nan")),
+        ("Bande haute de Bollinger", bande_haute),
+        ("Plus haut 52 semaines", haut52),
+        ("Cours + 2 ATR", dernier + 2 * unite),
+        ("Cours + 3 ATR", dernier + 3 * unite),
+    ]
+    au_dessus = sorted([(float(v), lib) for lib, v in candidats_hauts
+                        if not _nan(v) and float(v) > dernier * 1.001])
+    objectifs = []
+    vus = set()
+    for valeur, libelle in au_dessus:
+        arrondi = round(valeur, 6)
+        if arrondi in vus:
+            continue
+        vus.add(arrondi)
+        objectifs.append({"libelle": libelle, "prix": valeur,
+                          "gain": (valeur / entree - 1) * 100})
+        if len(objectifs) == 3:
+            break
+
+    # --- Où admettre qu'on s'est trompé -------------------------------------
+    candidats_stop = [entree - 1.5 * unite]
+    if supports:
+        candidats_stop.append(float(supports[0]) - 0.5 * unite)
+    if len(supports) > 1:
+        candidats_stop.append(float(supports[1]) - 0.25 * unite)
+    stop = min(candidats_stop)
+    stop = max(stop, entree - 3.5 * unite)     # jamais un stop absurde de large
+    risque = entree - stop
+
+    for objectif in objectifs:
+        objectif["ratio"] = (objectif["prix"] - entree) / risque if risque > 0 else float("nan")
+
+    return {
+        "actif": nom, "dernier": dernier, "atr": unite,
+        "zone": (zone_basse, zone_haute), "entree": entree, "appuis": appuis,
+        "objectifs": objectifs, "stop": stop,
+        "risque_pct": (risque / entree * 100) if entree else float("nan"),
+        "ecart_entree": (entree / dernier - 1) * 100 if dernier else float("nan"),
+        "supports": supports, "resistances": resistances,
+        "haut52": haut52, "bas52": bas52, "fib": fib,
+        "bande_haute": bande_haute, "bande_basse": bande_basse,
+    }
+
+
+def score_mecanique(p, plan):
+    """Sept critères, chacun vert, orange ou rouge. Rien de plus qu'une addition.
+
+    Ce n'est ni une prévision ni un avis : deux configurations au même score
+    peuvent se terminer de deux façons opposées.
+    """
+    criteres = []
+
+    def ajoute(libelle, points, constat):
+        criteres.append({"libelle": libelle, "points": points, "constat": constat})
+
+    ecart20 = p.get("ecart20")
+    if _nan(ecart20):
+        ajoute("Cours et moyenne 20", 0, "moyenne indisponible")
+    elif ecart20 > 0:
+        ajoute("Cours et moyenne 20", 1, f"au-dessus ({fpct(ecart20, 1)})")
+    else:
+        ajoute("Cours et moyenne 20", -1, f"en dessous ({fpct(ecart20, 1)})")
+
+    mm50, mm200 = p.get("mm50"), p.get("mm200")
+    if _nan(mm50) or _nan(mm200):
+        ajoute("Moyennes 50 et 200", 0, "historique trop court")
+    elif mm50 > mm200:
+        ajoute("Moyennes 50 et 200", 1, "la 50 est au-dessus de la 200")
+    else:
+        ajoute("Moyennes 50 et 200", -1, "la 50 est sous la 200")
+
+    r = p.get("rsi")
+    if _nan(r):
+        ajoute("RSI", 0, "indisponible")
+    elif r >= 72:
+        ajoute("RSI", -1, f"{fnum(r, 0)} — tendu à la hausse")
+    elif r >= 52:
+        ajoute("RSI", 1, f"{fnum(r, 0)} — porté sans excès")
+    elif r >= 35:
+        ajoute("RSI", 0, f"{fnum(r, 0)} — sans direction")
+    else:
+        ajoute("RSI", -1, f"{fnum(r, 0)} — tendu à la baisse")
+
+    if _nan(p.get("macd")) or _nan(p.get("macd_signal")):
+        ajoute("MACD", 0, "indisponible")
+    elif p["macd"] > p["macd_signal"]:
+        ajoute("MACD", 1, "au-dessus de sa ligne de signal")
+    else:
+        ajoute("MACD", -1, "sous sa ligne de signal")
+
+    position = p.get("position")
+    if _nan(position):
+        ajoute("Place dans le couloir", 0, "indisponible")
+    elif position >= 88:
+        ajoute("Place dans le couloir", -1, f"{fnum(position, 0)} % — tout en haut, "
+                                            "on paie cher")
+    elif position <= 25:
+        ajoute("Place dans le couloir", 1, f"{fnum(position, 0)} % — bas de couloir")
+    else:
+        ajoute("Place dans le couloir", 0, f"{fnum(position, 0)} % — milieu de couloir")
+
+    meilleur = plan["objectifs"][0]["ratio"] if plan.get("objectifs") else float("nan")
+    if _nan(meilleur):
+        ajoute("Gain visé contre risque", 0, "aucun objectif au-dessus du cours")
+    elif meilleur >= 2:
+        ajoute("Gain visé contre risque", 1, f"{fnum(meilleur, 1)} pour 1")
+    elif meilleur >= 1:
+        ajoute("Gain visé contre risque", 0, f"{fnum(meilleur, 1)} pour 1")
+    else:
+        ajoute("Gain visé contre risque", -1, f"{fnum(meilleur, 1)} pour 1 — "
+                                              "le risque dépasse le gain visé")
+
+    vol = p.get("vol")
+    if _nan(vol):
+        ajoute("Agitation", 0, "indisponible")
+    elif vol >= 70:
+        ajoute("Agitation", -1, f"{fpct(vol, 0, signe=False)} — très remuant")
+    elif vol >= 35:
+        ajoute("Agitation", 0, f"{fpct(vol, 0, signe=False)} — nerveux")
+    else:
+        ajoute("Agitation", 1, f"{fpct(vol, 0, signe=False)} — calme")
+
+    total = sum(c["points"] for c in criteres)
+    score = (total + len(criteres)) / (2 * len(criteres)) * 100
+    if score >= 70:
+        resume = "La plupart des critères sont verts."
+    elif score >= 45:
+        resume = "Les critères se contredisent."
+    else:
+        resume = "La plupart des critères sont rouges."
+    return score, resume, criteres
+
+
+def taille_mise(capital, risque_pct, entree, stop):
+    """Combien d'unités pour ne perdre que ce qu'on a décidé de perdre.
+
+        quantité = (capital × risque %) ÷ (entrée − seuil de sortie)
+
+    C'est la formule qui protège vraiment : elle part de la perte acceptée,
+    pas de l'envie du moment.
+    """
+    perte_acceptee = float(capital) * float(risque_pct) / 100
+    distance = float(entree) - float(stop)
+    if distance <= 0 or perte_acceptee <= 0:
+        return {}
+    quantite = perte_acceptee / distance
+    montant = quantite * float(entree)
+    return {"perte_acceptee": perte_acceptee, "distance": distance,
+            "quantite": quantite, "montant": montant,
+            "part_capital": montant / float(capital) * 100 if capital else float("nan")}
+
+
 def profil(df, barres_an, reference=None):
     """Photo d'un actif sur la période chargée : que des lectures de cours."""
     if df is None or "Close" not in df:
@@ -725,21 +990,45 @@ def _plotly():
         return None
 
 
-def _mise_en_page(fig, hauteur=360, titre_y=""):
+CONFIG_GRAPH = {
+    "scrollZoom": True,          # molette et pincement à deux doigts
+    "displaylogo": False,
+    "responsive": True,
+    "doubleClick": "reset",      # double-tap : on revient à la vue d'origine
+    "modeBarButtonsToRemove": ["select2d", "lasso2d", "autoScale2d",
+                               "toggleSpikelines", "hoverCompareCartesian",
+                               "hoverClosestCartesian"],
+}
+
+
+def _mise_en_page(fig, hauteur=360, titre_y="", zoom="labo"):
+    """Réglages communs à toutes les figures.
+
+    `uirevision` est la clé du confort : tant qu'elle ne change pas, le zoom et
+    le déplacement survivent aux rafraîchissements. Sans elle, chaque mise à
+    jour à la minute ramenait la vue au point de départ.
+    """
     fig.update_layout(
-        margin=dict(l=8, r=8, t=26, b=8), height=hauteur, template="plotly_white",
-        hovermode="x unified", xaxis_title="", yaxis_title=titre_y,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=11)),
+        margin=dict(l=6, r=52, t=28, b=6), height=hauteur, template="plotly_white",
+        hovermode="x unified", xaxis_title="", yaxis_title=titre_y, dragmode="pan",
+        uirevision=zoom, bargap=0.1,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=11),
+                    bgcolor="rgba(0,0,0,0)"),
         font=dict(family="Plus Jakarta Sans, sans-serif", size=12, color="#6E4A5B"),
-        paper_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        hoverlabel=dict(font_size=12, bgcolor="#FFFFFF", bordercolor="#F3C7DA"),
     )
+    fig.update_xaxes(showspikes=True, spikemode="across", spikesnap="cursor",
+                     spikethickness=1, spikecolor="#C2185B", spikedash="dot",
+                     showgrid=False)
+    fig.update_yaxes(gridcolor="rgba(155,127,140,.18)", zeroline=False)
     return fig
 
 
 _LARGEUR_MODERNE = None
 
 
-def afficher_figure(fig):
+def afficher_figure(fig, config=None):
     """`use_container_width` disparaît des versions récentes de Streamlit,
     et `width='stretch'` n'existe pas dans les anciennes : on regarde une
     fois pour toutes ce que la version installée accepte."""
@@ -751,13 +1040,23 @@ def afficher_figure(fig):
                 inspect.signature(st.plotly_chart).parameters
         except Exception:
             _LARGEUR_MODERNE = False
+    reglages = config or CONFIG_GRAPH
     if _LARGEUR_MODERNE:
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, width="stretch", config=reglages)
     else:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config=reglages)
 
 
-def courbe(df, titre_y="", hauteur=360):
+def coupures(nom):
+    """Les marchés d'actions ferment le week-end : sans cela, le graphique
+    affiche deux jours de plat à chaque fin de semaine. Le crypto, lui,
+    ne s'arrête jamais."""
+    if UNIVERS.get(nom, ("", "", ""))[1] == "Crypto":
+        return []
+    return [dict(bounds=["sat", "mon"])]
+
+
+def courbe(df, titre_y="", hauteur=360, zoom="labo"):
     go = _plotly()
     if go is None:
         st.line_chart(df)
@@ -769,71 +1068,115 @@ def courbe(df, titre_y="", hauteur=360):
                 x=df.index, y=df[colonne], name=str(colonne), mode="lines",
                 line=dict(width=2.6, color=PALETTE[i % len(PALETTE)]),
             ))
-        afficher_figure(_mise_en_page(fig, hauteur, titre_y))
+        afficher_figure(_mise_en_page(fig, hauteur, titre_y, zoom))
     except Exception:
         st.line_chart(df)
 
 
-def graphique_complet(nom, df, options):
-    """Chandeliers, moyennes, Bollinger, volumes, RSI et MACD empilés.
+def _tracer_niveaux(fig, plan, unite, rangee=1):
+    """Zone de mise, objectifs et seuil de sortie, dessinés sur le prix."""
+    if not plan:
+        return
+    basse, haute = plan["zone"]
+    try:
+        fig.add_hrect(y0=basse, y1=haute, line_width=0, fillcolor="rgba(23,104,61,.14)",
+                      annotation_text=f"zone de mise {fprix(basse, unite)} – {fprix(haute, unite)}",
+                      annotation_position="top left",
+                      annotation_font=dict(size=10, color="#17683D"), row=rangee, col=1)
+        for i, objectif in enumerate(plan.get("objectifs", [])[:3]):
+            fig.add_hline(y=objectif["prix"], line=dict(color="#0E7490", width=1.2, dash="dash"),
+                          annotation_text=f"revente {i + 1} · {fprix(objectif['prix'], unite)}",
+                          annotation_position="right",
+                          annotation_font=dict(size=10, color="#0E7490"), row=rangee, col=1)
+        fig.add_hline(y=plan["stop"], line=dict(color="#B3261E", width=1.4, dash="dot"),
+                      annotation_text=f"sortie {fprix(plan['stop'], unite)}",
+                      annotation_position="right",
+                      annotation_font=dict(size=10, color="#B3261E"), row=rangee, col=1)
+    except Exception:
+        pass       # une version ancienne de plotly : on se passe des repères
 
-    Chaque bloc est facultatif : sur téléphone, on n'affiche que l'utile.
+
+def graphique_complet(nom, df, options, plan=None):
+    """Le graphique principal : prix en grand, blocs secondaires facultatifs.
+
+    Ce qui a changé depuis la version précédente : le panneau des prix occupe
+    l'essentiel de la hauteur, on peut zoomer et faire glisser, la vue survit
+    aux rafraîchissements, les week-ends ne creusent plus de trous, l'échelle
+    des prix passe à droite comme sur les plateformes, et les niveaux du plan
+    sont tracés directement sur les cours.
     """
     go = _plotly()
     cloture = df["Close"].dropna()
-    if go is None:
+    unite = devise(nom)
+    if go is None or cloture.empty:
         courbe(pd.DataFrame({nom: cloture}), "Prix", hauteur=380)
         return
     try:
         from plotly.subplots import make_subplots
 
+        hauteur = HAUTEURS.get(options.get("hauteur"), HAUTEURS["Confort"])
         avec_volume = options.get("volume") and "Volume" in df.columns \
             and float(df["Volume"].fillna(0).sum()) > 0
         avec_rsi = options.get("rsi") and len(cloture) >= 20
         avec_macd = options.get("macd") and len(cloture) >= 35
 
-        blocs = ["prix"] + (["volume"] if avec_volume else []) \
-            + (["rsi"] if avec_rsi else []) + (["macd"] if avec_macd else [])
-        poids = [1.0] + [0.34] * (len(blocs) - 1)
+        secondaires = int(avec_volume) + int(avec_rsi) + int(avec_macd)
+        poids = [1.0] + [0.26] * secondaires
         total = sum(poids)
-        fig = make_subplots(rows=len(blocs), cols=1, shared_xaxes=True,
-                            row_heights=[p / total for p in poids], vertical_spacing=0.04)
+        fig = make_subplots(rows=1 + secondaires, cols=1, shared_xaxes=True,
+                            row_heights=[p / total for p in poids], vertical_spacing=0.03)
+        hauteur = int(hauteur * (1 + 0.17 * secondaires))
 
         if options.get("chandeliers") and {"Open", "High", "Low", "Close"}.issubset(df.columns):
             fig.add_trace(go.Candlestick(
                 x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"],
-                name="Cours", increasing_line_color="#15803d",
-                decreasing_line_color="#b91c1c", showlegend=False), row=1, col=1)
+                name="Cours", whiskerwidth=0.25,
+                increasing=dict(line=dict(color="#15803D", width=1), fillcolor="#15803D"),
+                decreasing=dict(line=dict(color="#B91C1C", width=1), fillcolor="#B91C1C"),
+                showlegend=False), row=1, col=1)
         else:
-            fig.add_trace(go.Scatter(x=cloture.index, y=cloture, name="Cours",
-                                     line=dict(color="#C2185B", width=2.4)), row=1, col=1)
+            fig.add_trace(go.Scatter(
+                x=cloture.index, y=cloture, name="Cours", mode="lines",
+                line=dict(color="#C2185B", width=2.2), fill="tozeroy",
+                fillcolor="rgba(194,24,91,.06)"), row=1, col=1)
 
         if options.get("moyennes"):
             for n, couleur, trait in ((20, "#C2185B", "solid"), (50, "#6D3BAF", "dot"),
                                       (200, "#0E7490", "dash")):
                 if len(cloture) >= n:
                     fig.add_trace(go.Scatter(
-                        x=cloture.index, y=moyenne_mobile(cloture, n), name=f"Moyenne {n}",
-                        line=dict(color=couleur, width=1.9, dash=trait)), row=1, col=1)
+                        x=cloture.index, y=moyenne_mobile(cloture, n), name=f"MM {n}",
+                        line=dict(color=couleur, width=1.7, dash=trait)), row=1, col=1)
 
         if options.get("bollinger") and len(cloture) >= 20:
-            haut, milieu, bas = bollinger(cloture)
-            fig.add_trace(go.Scatter(x=cloture.index, y=haut, name="Bollinger haut",
-                                     line=dict(color="#D9A8BE", width=1.2)), row=1, col=1)
-            fig.add_trace(go.Scatter(x=cloture.index, y=bas, name="Bollinger bas",
-                                     line=dict(color="#D9A8BE", width=1.2),
-                                     fill="tonexty", fillcolor="rgba(217,168,190,.16)"),
-                          row=1, col=1)
+            haut, _, bas = bollinger(cloture)
+            fig.add_trace(go.Scatter(x=cloture.index, y=haut, name="Bollinger",
+                                     line=dict(color="#D9A8BE", width=1.1),
+                                     showlegend=False), row=1, col=1)
+            fig.add_trace(go.Scatter(x=cloture.index, y=bas, name="Bollinger",
+                                     line=dict(color="#D9A8BE", width=1.1), fill="tonexty",
+                                     fillcolor="rgba(217,168,190,.14)",
+                                     showlegend=False), row=1, col=1)
+
+        dernier = float(cloture.iloc[-1])
+        fig.add_hline(y=dernier, line=dict(color="#8C1444", width=1, dash="dot"),
+                      annotation_text=fprix(dernier, unite), annotation_position="right",
+                      annotation_font=dict(size=11, color="#8C1444"), row=1, col=1)
+        if options.get("niveaux"):
+            _tracer_niveaux(fig, plan, unite, rangee=1)
 
         rang = 2
         if avec_volume:
+            couleurs = ["rgba(21,128,61,.55)" if c >= o else "rgba(185,28,28,.5)"
+                        for o, c in zip(df.get("Open", cloture), df["Close"])] \
+                if "Open" in df.columns else "#D9A8BE"
             fig.add_trace(go.Bar(x=df.index, y=df["Volume"], name="Volume",
-                                 marker_color="#D9A8BE", showlegend=False), row=rang, col=1)
+                                 marker_color=couleurs, showlegend=False), row=rang, col=1)
             fig.update_yaxes(title_text="Volume", row=rang, col=1)
             rang += 1
         if avec_rsi:
             fig.add_trace(go.Scatter(x=cloture.index, y=rsi(cloture), name="RSI",
-                                     line=dict(color="#6D3BAF", width=1.9),
+                                     line=dict(color="#6D3BAF", width=1.8),
                                      showlegend=False), row=rang, col=1)
             for seuil, couleur in ((70, "#B3261E"), (30, "#17683D")):
                 fig.add_hline(y=seuil, line=dict(color=couleur, width=1, dash="dot"),
@@ -842,22 +1185,52 @@ def graphique_complet(nom, df, options):
             rang += 1
         if avec_macd:
             ligne, signal, histogramme = macd(cloture)
-            couleurs = ["#17683D" if v >= 0 else "#B3261E" for v in histogramme.fillna(0)]
+            teintes = ["#17683D" if v >= 0 else "#B3261E" for v in histogramme.fillna(0)]
             fig.add_trace(go.Bar(x=cloture.index, y=histogramme, name="Écart",
-                                 marker_color=couleurs, showlegend=False), row=rang, col=1)
+                                 marker_color=teintes, showlegend=False), row=rang, col=1)
             fig.add_trace(go.Scatter(x=cloture.index, y=ligne, name="MACD",
-                                     line=dict(color="#C2185B", width=1.7),
+                                     line=dict(color="#C2185B", width=1.6),
                                      showlegend=False), row=rang, col=1)
             fig.add_trace(go.Scatter(x=cloture.index, y=signal, name="Signal",
-                                     line=dict(color="#0E7490", width=1.5, dash="dot"),
+                                     line=dict(color="#0E7490", width=1.4, dash="dot"),
                                      showlegend=False), row=rang, col=1)
             fig.update_yaxes(title_text="MACD", row=rang, col=1)
 
-        fig.update_xaxes(rangeslider_visible=False)
-        hauteur = 380 + 120 * (len(blocs) - 1)
-        afficher_figure(_mise_en_page(fig, hauteur, "Prix"))
+        fig.update_xaxes(rangeslider_visible=False, rangebreaks=coupures(nom))
+        fig.update_yaxes(side="right", row=1, col=1,
+                         type="log" if options.get("log") else "linear")
+        zoom = f"{nom}-{options.get('periode', '')}-{options.get('hauteur', '')}"
+        afficher_figure(_mise_en_page(fig, hauteur, "", zoom))
     except Exception:
         courbe(pd.DataFrame({nom: cloture}), "Prix", hauteur=380)
+
+
+def graphique_minute(nom, df, plan=None):
+    """La séance du jour, minute par minute, avec les niveaux du plan."""
+    go = _plotly()
+    cloture = df["Close"].dropna() if df is not None and "Close" in df else None
+    if go is None or cloture is None or cloture.empty:
+        return
+    try:
+        premier = float(cloture.iloc[0])
+        monte = float(cloture.iloc[-1]) >= premier
+        couleur = "#17683D" if monte else "#B3261E"
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=cloture.index, y=cloture, name="Cours", mode="lines",
+            line=dict(color=couleur, width=2), fill="tozeroy",
+            fillcolor=("rgba(23,104,61,.10)" if monte else "rgba(179,38,30,.10)")))
+        fig.add_hline(y=premier, line=dict(color="#9B7F8C", width=1, dash="dot"),
+                      annotation_text="ouverture", annotation_position="left",
+                      annotation_font=dict(size=10, color="#9B7F8C"))
+        if plan:
+            _tracer_niveaux(fig, plan, devise(nom))
+        fig.update_yaxes(side="right", autorange=True)
+        fig.update_xaxes(rangebreaks=coupures(nom))
+        afficher_figure(_mise_en_page(fig, 260, "", f"minute-{nom}"),
+                        {**CONFIG_GRAPH, "displayModeBar": False})
+    except Exception:
+        pass
 
 # ==========================================================
 # 6. RÉGLAGES, NOTES & ALERTES
@@ -1447,14 +1820,24 @@ def onglet_analyse(cfg):
             actif = st.selectbox("Actif étudié", list(UNIVERS), key="lab_ana_actif")
         with colonne_b:
             periode = pills("lab_ana_periode", list(PERIODES), defaut="1M", cols=4)
-        options = {
-            "chandeliers": st.checkbox("Chandeliers", value=True, key="lab_opt_chand"),
-            "moyennes": st.checkbox("Moyennes mobiles", value=True, key="lab_opt_mm"),
-            "bollinger": st.checkbox("Bandes de Bollinger", value=False, key="lab_opt_boll"),
-            "volume": st.checkbox("Volumes", value=True, key="lab_opt_vol"),
-            "rsi": st.checkbox("RSI", value=True, key="lab_opt_rsi"),
-            "macd": st.checkbox("MACD", value=False, key="lab_opt_macd"),
-        }
+        hauteur = pills("lab_ana_haut", list(HAUTEURS), defaut="Confort", cols=3)
+        colonne_g, colonne_d = st.columns(2)
+        with colonne_g:
+            options = {
+                "chandeliers": st.checkbox("Chandeliers", value=True, key="lab_opt_chand"),
+                "moyennes": st.checkbox("Moyennes mobiles", value=True, key="lab_opt_mm"),
+                "bollinger": st.checkbox("Bandes de Bollinger", value=False,
+                                         key="lab_opt_boll"),
+                "niveaux": st.checkbox("Niveaux du plan", value=True, key="lab_opt_niv"),
+            }
+        with colonne_d:
+            options.update({
+                "volume": st.checkbox("Volumes", value=True, key="lab_opt_vol"),
+                "rsi": st.checkbox("RSI", value=True, key="lab_opt_rsi"),
+                "macd": st.checkbox("MACD", value=False, key="lab_opt_macd"),
+                "log": st.checkbox("Échelle logarithmique", value=False, key="lab_opt_log"),
+            })
+        options.update({"hauteur": hauteur, "periode": periode})
 
     if not _bouton_chargement("lab_go_ana"):
         return
@@ -1500,7 +1883,11 @@ def onglet_analyse(cfg):
     jauge(p.get("position"), f"plus bas {fprix(p['bas'], unite)}",
           f"plus haut {fprix(p['haut'], unite)}")
 
-    graphique_complet(actif, df, options)
+    plan = plan_niveaux(actif, df, p, longue)
+    graphique_complet(actif, df, options, plan)
+    st.caption("Molette ou pincement pour zoomer, glisser pour déplacer, double-tap pour "
+               "revenir à la vue d'origine. Le zoom est conservé d'un rafraîchissement "
+               "à l'autre.")
 
     if perfs:
         sous_titre("Performances")
@@ -1579,7 +1966,12 @@ def onglet_analyse(cfg):
     with conteneur("labrow-note-ana"):
         obs = st.text_area(f"Ce que vous observez sur {actif}", key="lab_note_ana", height=90,
                            placeholder="Ex : le cours reste au-dessus de sa moyenne 20 depuis…")
-        colonne_a, colonne_b = st.columns(2)
+        colonne_a, colonne_b, colonne_c = st.columns(3)
+        with colonne_c:
+            if st.button("🎯 Ouvrir les niveaux", key="lab_ana_niveaux"):
+                st.session_state["lab_niv_actif"] = actif
+                st.session_state["lab_tab"] = ONG_NIVEAUX
+                st.rerun()
         with colonne_a:
             if st.button("Enregistrer dans mes notes", type="primary", key="lab_save_ana"):
                 if obs.strip():
@@ -1595,7 +1987,7 @@ def onglet_analyse(cfg):
         with colonne_b:
             if st.button("🔔 Créer une alerte ici", key="lab_ana_alerte"):
                 st.session_state["lab_al_actif"] = actif
-                st.session_state["lab_tab"] = ONGLETS[3]
+                st.session_state["lab_tab"] = ONG_ALERTES
                 st.rerun()
 
 
@@ -1628,7 +2020,7 @@ def onglet_actus(cfg):
     if st.button("📡 Voir où en sont les grands indices", key="lab_actu_indices"):
         st.session_state["lab_live"] = True
         st.session_state["lab_cmp"] = BOUQUETS["Indices"]
-        st.session_state["lab_tab"] = ONGLETS[0]
+        st.session_state["lab_tab"] = ONG_MARCHES
         st.rerun()
 
 
@@ -1776,14 +2168,287 @@ def onglet_notes(cfg):
         st.caption(f"Labo version {VERSION_LABO} · {len(UNIVERS)} actifs suivis")
 
 # ==========================================================
-# 9. POINT D'ENTRÉE
+# 9. SUIVI À LA MINUTE & ONGLET NIVEAUX
+# ==========================================================
+@st.cache_data(ttl=45, show_spinner=False)
+def cours_minute(ticker):
+    """La séance en cours, une bougie par minute. Renvoie (DataFrame, erreur)."""
+    try:
+        import yfinance as yf
+    except ImportError:
+        return None, "Le module yfinance n'est pas installé."
+    try:
+        brut = yf.download(ticker, period="1d", interval="1m", progress=False,
+                           auto_adjust=False, group_by="column", threads=False)
+    except Exception as err:
+        return None, f"Cotation minute indisponible : {str(err)[:110]}"
+    if brut is None or brut.empty:
+        return None, "Pas de cotation à la minute (marché fermé, ou actif sans séance)."
+    if isinstance(brut.columns, pd.MultiIndex):
+        try:
+            brut = brut.xs(ticker, axis=1, level=-1)
+        except Exception:
+            brut.columns = brut.columns.get_level_values(0)
+    brut = brut.dropna(how="all")
+    return (brut, None) if not brut.empty else (None, "Séance vide pour l'instant.")
+
+
+def _situation(dernier, plan):
+    """Une phrase : où se trouve le cours par rapport au plan."""
+    basse, haute = plan["zone"]
+    if dernier <= plan["stop"]:
+        return ("Le cours est <b>sous le seuil de sortie</b> du plan : "
+                "les repères calculés ne tiennent plus, il faut les recalculer.", "warn")
+    if basse <= dernier <= haute:
+        return ("Le cours est <b>dans la zone de mise</b> calculée.", "info")
+    if dernier < basse:
+        return (f"Le cours est <b>sous la zone de mise</b> "
+                f"({fpct((dernier / basse - 1) * 100, 1)} sous le bas de la zone).", "info")
+    objectifs = plan.get("objectifs") or []
+    if objectifs and dernier >= objectifs[0]["prix"]:
+        return ("Le cours a <b>dépassé le premier objectif</b> du plan.", "info")
+    return (f"Le cours est <b>au-dessus de la zone de mise</b> "
+            f"({fpct((dernier / haute - 1) * 100, 1)} au-dessus du haut de la zone).", "info")
+
+
+def _panneau_direct(nom, plan):
+    """Bloc rafraîchi tout seul : cours à la minute et distance à chaque niveau."""
+    df, err = cours_minute(UNIVERS[nom][0])
+    unite = devise(nom)
+    if err or df is None:
+        note(f"⚠️ {err}", "calme")
+        note(f"Dernier cours connu (clôtures) : <b>{fprix(plan['dernier'], unite)}</b>")
+        return
+
+    cloture = df["Close"].dropna()
+    dernier = float(cloture.iloc[-1])
+    ouverture = float(cloture.iloc[0])
+    variation = (dernier / ouverture - 1) * 100 if ouverture else float("nan")
+    try:
+        horodatage = cloture.index[-1].strftime("%H:%M")
+    except Exception:
+        horodatage = "—"
+
+    st.markdown(
+        f"<div class='lab-direct'><span class='lab-pouls'></span>"
+        f"en direct · dernier point {horodatage} · "
+        f"page rafraîchie à {datetime.now().strftime('%H:%M:%S')}</div>",
+        unsafe_allow_html=True)
+
+    basse, haute = plan["zone"]
+    premier = plan["objectifs"][0] if plan.get("objectifs") else None
+    kpis([
+        {"label": "Cours à la minute", "valeur": fprix(dernier, unite),
+         "delta": fpct(variation) + " depuis l'ouverture", "delta_ton": ton(variation)},
+        {"label": "Haut de la zone de mise", "valeur": fprix(haute, unite),
+         "delta": fpct((haute / dernier - 1) * 100, 1) + " d'ici",
+         "delta_ton": ton(haute - dernier)},
+        {"label": "Première revente",
+         "valeur": fprix(premier["prix"], unite) if premier else "—",
+         "delta": (fpct((premier["prix"] / dernier - 1) * 100, 1) + " d'ici") if premier else "",
+         "delta_ton": "up"},
+        {"label": "Seuil de sortie", "valeur": fprix(plan["stop"], unite),
+         "delta": fpct((plan["stop"] / dernier - 1) * 100, 1) + " d'ici",
+         "delta_ton": "down"},
+        {"label": "Séance", "valeur": fprix(float(cloture.max()), unite),
+         "aide": f"plus bas {fprix(float(cloture.min()), unite)}"},
+    ], largeur=158)
+
+    texte, style = _situation(dernier, plan)
+    note(texte, style)
+    graphique_minute(nom, df, plan)
+
+
+# Défini une seule fois au chargement : un fragment recréé à chaque passage
+# perdrait son identité et ne se rafraîchirait jamais.
+try:
+    panneau_direct = st.fragment(run_every=RAFRAICHISSEMENT)(_panneau_direct)
+except Exception:
+    panneau_direct = _panneau_direct
+
+
+def onglet_niveaux(cfg):
+    with conteneur("labrow-niv"):
+        _defaut("lab_niv_actif", cfg["watchlist"][0] if cfg["watchlist"] else "Bitcoin")
+        actif = st.selectbox("Actif étudié", list(UNIVERS), key="lab_niv_actif")
+        colonne_a, colonne_b = st.columns([2, 1])
+        with colonne_a:
+            periode = pills("lab_niv_periode", list(PERIODES), defaut="6M", cols=4)
+        with colonne_b:
+            direct = st.toggle("Suivre à la minute", value=True, key="lab_niv_direct")
+
+    if not _bouton_chargement("lab_go_niv"):
+        return
+
+    with st.spinner("Lecture des marchés…"):
+        donnees, barres_an, err = marche([actif], periode)
+    if err:
+        note(f"⚠️ {err}", "warn")
+        return
+    df = donnees.get(actif)
+    with st.spinner("Historique long…"):
+        longues, _ = historique([actif])
+    longue = longues.get(actif)
+    p = profil(df, barres_an, longues.get(REFERENCE))
+    if not p:
+        note("Pas assez de données pour cet actif sur cette période.", "warn")
+        return
+
+    plan = plan_niveaux(actif, df, p, longue)
+    unite = devise(actif)
+
+    if direct:
+        panneau_direct(actif, plan)
+    else:
+        _panneau_direct(actif, plan)
+
+    # --- Le plan ------------------------------------------------------------
+    sous_titre("Les trois niveaux")
+    basse, haute = plan["zone"]
+    lignes = [["🎯 Zone de mise", f"{fprix(basse, unite)} – {fprix(haute, unite)}",
+               cell_pct(plan["ecart_entree"], 1), "—"]]
+    for i, objectif in enumerate(plan["objectifs"]):
+        lignes.append([f"💰 Revente {i + 1} · {objectif['libelle']}",
+                       fprix(objectif["prix"], unite),
+                       cell_pct(objectif["gain"], 1),
+                       f"{fnum(objectif['ratio'], 1)} pour 1"])
+    lignes.append(["🛑 Seuil de sortie", fprix(plan["stop"], unite),
+                   cell_pct(-plan["risque_pct"], 1), "—"])
+    table([("Niveau", "txt"), ("Prix", "num"), ("Écart", "num"), ("Gain / risque", "num")],
+          lignes)
+    st.caption("L'écart de la zone de mise est mesuré depuis le cours actuel ; celui des "
+               "reventes depuis le milieu de la zone de mise. « 2 pour 1 » signifie que le "
+               "gain visé vaut deux fois la perte acceptée.")
+
+    puces([
+        f"Amplitude moyenne d'une séance (ATR) : <b>{fprix(plan['atr'], unite)}</b>, soit "
+        f"{fpct(plan['atr'] / plan['dernier'] * 100, 1, signe=False)} du cours.",
+        "La zone s'appuie sur : " + ", ".join(plan["appuis"]) + ".",
+        f"Le seuil de sortie est posé sous ces appuis, à "
+        f"{fpct(plan['risque_pct'], 1, signe=False)} du milieu de la zone.",
+    ])
+
+    # --- Le graphique -------------------------------------------------------
+    sous_titre("Les niveaux sur le graphique")
+    with conteneur("labrow-niv-opt"):
+        colonne_a, colonne_b = st.columns(2)
+        with colonne_a:
+            hauteur = pills("lab_niv_haut", list(HAUTEURS), defaut="Confort", cols=3)
+        with colonne_b:
+            chandeliers = st.checkbox("Chandeliers", value=True, key="lab_niv_chand")
+            echelle = st.checkbox("Échelle logarithmique", value=False, key="lab_niv_log")
+    graphique_complet(actif, df, {"chandeliers": chandeliers, "moyennes": True,
+                                  "bollinger": True, "volume": False, "rsi": False,
+                                  "macd": False, "niveaux": True, "log": echelle,
+                                  "hauteur": hauteur, "periode": periode}, plan)
+    st.caption("Molette ou pincement pour zoomer, glisser pour déplacer, double-tap pour "
+               "revenir à la vue d'origine.")
+
+    # --- Le score -----------------------------------------------------------
+    score, resume, criteres = score_mecanique(p, plan)
+    sous_titre("Ce que disent les sept critères")
+    kpis([{"label": "Somme des critères", "valeur": f"{fnum(score, 0)} / 100", "aide": resume},
+          {"label": "Verts", "valeur": fnum(sum(1 for c in criteres if c["points"] > 0), 0)},
+          {"label": "Rouges", "valeur": fnum(sum(1 for c in criteres if c["points"] < 0), 0)}],
+         largeur=165)
+    table([("Critère", "txt"), ("Constat", "txt"), ("", "num")],
+          [[c["libelle"], c["constat"],
+            "✅" if c["points"] > 0 else ("❌" if c["points"] < 0 else "⚪")]
+           for c in criteres])
+    note("Ce total additionne sept règles mécaniques appliquées à des cours passés. Deux "
+         "situations au même score peuvent finir de façon opposée : ce n'est pas une "
+         "prévision, encore moins un conseil.", "calme")
+
+    # --- La mise ------------------------------------------------------------
+    sous_titre("Combien mettre")
+    monnaie = unite if unite in ("$", "€") else "€"
+    with conteneur("labrow-mise"):
+        colonne_a, colonne_b = st.columns(2)
+        with colonne_a:
+            capital = st.number_input(f"Capital de départ ({monnaie})", min_value=0.0,
+                                      step=100.0, value=CAPITAL_DEFAUT,
+                                      key="lab_mise_capital")
+        with colonne_b:
+            risque = st.number_input("Part du capital risquée (%)", min_value=0.1,
+                                     max_value=100.0, step=0.5, value=RISQUE_DEFAUT,
+                                     key="lab_mise_risque")
+    calcul = taille_mise(capital, risque, plan["entree"], plan["stop"])
+    if calcul:
+        premier = plan["objectifs"][0] if plan["objectifs"] else None
+        gain = calcul["quantite"] * (premier["prix"] - plan["entree"]) if premier else float("nan")
+        kpis([
+            {"label": "Quantité", "valeur": fnum(calcul["quantite"], 4),
+             "aide": f"au prix de {fprix(plan['entree'], unite)}"},
+            {"label": "Montant engagé", "valeur": fnum(calcul["montant"], 2, monnaie),
+             "aide": f"{fpct(calcul['part_capital'], 0, signe=False)} du capital"},
+            {"label": "Perte si le seuil est touché",
+             "valeur": fnum(calcul["perte_acceptee"], 2, monnaie), "delta_ton": "down"},
+            {"label": "Gain à la première revente", "valeur": fnum(gain, 2, monnaie),
+             "delta_ton": "up"},
+        ], largeur=165)
+        puces([
+            "La formule : <b>quantité = (capital × part risquée) ÷ (mise − seuil de sortie)</b>. "
+            "Elle part de la perte que vous acceptez, pas de l'envie du moment.",
+            f"Ici : ({fnum(capital, 0, monnaie)} × {fnum(risque, 1)} %) ÷ "
+            f"{fprix(calcul['distance'], unite)} = {fnum(calcul['quantite'], 4)} unité(s).",
+        ], "calme")
+        if monnaie != "€":
+            st.caption("Tout est calculé dans la devise de cotation de l'actif "
+                       f"({monnaie}) : aucune conversion de change n'est appliquée.")
+        if calcul["part_capital"] > 100:
+            note("Le montant dépasse le capital indiqué : le seuil de sortie est trop proche "
+                 "de la mise pour ce niveau de risque. Élargissez le seuil, ou baissez la "
+                 "part risquée.", "warn")
+    else:
+        note("Calcul impossible : le seuil de sortie doit être sous la zone de mise et la "
+             "part risquée supérieure à zéro.", "warn")
+
+    # --- Suites -------------------------------------------------------------
+    sous_titre("Garder ce plan")
+    resume_plan = (
+        f"{actif} · cours {fprix(plan['dernier'], unite)}\n"
+        f"Zone de mise {fprix(basse, unite)} – {fprix(haute, unite)}\n"
+        + "\n".join(f"Revente {i + 1} ({o['libelle']}) {fprix(o['prix'], unite)} · "
+                    f"{fnum(o['ratio'], 1)} pour 1"
+                    for i, o in enumerate(plan["objectifs"]))
+        + f"\nSeuil de sortie {fprix(plan['stop'], unite)} "
+          f"({fpct(plan['risque_pct'], 1, signe=False)})\n"
+          f"Somme des critères {fnum(score, 0)}/100 — {resume}")
+    with conteneur("labrow-plan-suites"):
+        colonne_a, colonne_b = st.columns(2)
+        with colonne_a:
+            if st.button("📚 Enregistrer dans mes notes", type="primary", key="lab_plan_save"):
+                add_row("IA_Lab", [str(date.today()), f"Niveaux — {actif}",
+                                   resume_plan, "Suivi"])
+                st.toast("Plan enregistré", icon="✅")
+        with colonne_b:
+            if st.button("🔔 Créer les trois alertes", key="lab_plan_alertes"):
+                ajouter_alerte(actif, "En dessous de", haute, "haut de la zone de mise")
+                if plan["objectifs"]:
+                    ajouter_alerte(actif, "Au-dessus de", plan["objectifs"][0]["prix"],
+                                   "première revente")
+                ajouter_alerte(actif, "En dessous de", plan["stop"], "seuil de sortie")
+                st.toast("Alertes créées", icon="🔔")
+                st.rerun()
+
+    bloc_commentaire_ia("niveaux", resume_plan)
+
+    note("Ces niveaux sortent de formules appliquées à des cours passés : moyennes mobiles, "
+         "bandes de Bollinger, ATR, sommets et creux, retracements. Ils ne prédisent rien, "
+         "ne tiennent compte d'aucune actualité, et ne constituent pas un conseil en "
+         "investissement. Le seul chiffre qui vous protège vraiment est la part du capital "
+         "que vous acceptez de perdre.", "calme")
+
+# ==========================================================
+# 10. POINT D'ENTRÉE
 # ==========================================================
 ROUTES = {
-    ONGLETS[0]: onglet_marches,
-    ONGLETS[1]: onglet_analyse,
-    ONGLETS[2]: onglet_actus,
-    ONGLETS[3]: onglet_alertes,
-    ONGLETS[4]: onglet_notes,
+    ONG_MARCHES: onglet_marches,
+    ONG_ANALYSE: onglet_analyse,
+    ONG_NIVEAUX: onglet_niveaux,
+    ONG_ACTUS: onglet_actus,
+    ONG_ALERTES: onglet_alertes,
+    ONG_NOTES: onglet_notes,
 }
 
 
@@ -1800,7 +2465,7 @@ def render(ctx):
     st.markdown(CSS, unsafe_allow_html=True)
     titre("🧠 Labo IA & marchés")
     with conteneur("labtabs"):
-        onglet = pills("lab_tab", ONGLETS, defaut=ONGLETS[0], cols=3)
+        onglet = pills("lab_tab", ONGLETS, defaut=ONG_MARCHES, cols=3)
 
     try:
         cfg = config()
