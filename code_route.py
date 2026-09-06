@@ -1,5 +1,5 @@
 # ==========================================================
-# Code de la Route (Panneaux) — module robuste avec visuels graphiques
+# Code de la Route (Panneaux) — module 100% sécurisé anti-cache
 # ==========================================================
 import random
 import streamlit as st
@@ -68,8 +68,9 @@ PANNEAUX = [
 ]
 
 def carte(*args, **kwargs):
-    # Réinitialisation forcée de la session pour purger les anciennes clés
-    if "quiz_index" not in st.session_state or "quiz_panneaux" not in st.session_state or len(st.session_state.get("quiz_panneaux", [])) != len(PANNEAUX):
+    # Réinitialisation forcée si la session contient des données obsolètes
+    if "quiz_version" not in st.session_state or st.session_state["quiz_version"] != "v3":
+        st.session_state["quiz_version"] = "v3"
         st.session_state["quiz_index"] = 0
         st.session_state["quiz_score"] = 0
         st.session_state["quiz_panneaux"] = random.sample(PANNEAUX, len(PANNEAUX))
@@ -103,18 +104,22 @@ def carte(*args, **kwargs):
         st.session_state["quiz_current_idx"] = idx
         st.session_state["quiz_repondu"] = False
 
-    # Bloc graphique simulant le panneau de signalisation de manière claire
+    # Utilisation de .get() sécurisé pour éviter tout plantage lié au cache mémoire
+    texte_visuel = actuel.get("visuel") or actuel.get("icone") or actuel.get("nom", "Panneau")
+    description = actuel.get("desc", "")
+    categorie = actuel.get("cat", "Général")
+
     st.markdown(
         f"""
-        <div style='text-align: center; font-size: 26px; font-weight: 800; letter-spacing: 1px; margin: 15px 0; padding: 30px; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: var(--ombre); color: var(--accent-fonce);'>
-            {actuel['visuel']}
+        <div style='text-align: center; font-size: 24px; font-weight: 800; letter-spacing: 1px; margin: 15px 0; padding: 30px; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: var(--ombre); color: var(--accent-fonce);'>
+            {texte_visuel}
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    st.markdown(f"<div style='text-align:center; font-weight:600; margin:10px 0; color:var(--encre);'>Description : {actuel['desc']}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div style='text-align:center;'><span class='tag'>Catégorie : {actuel['cat']}</span></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:center; font-weight:600; margin:10px 0; color:var(--encre);'>Description : {description}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:center;'><span class='tag'>Catégorie : {categorie}</span></div>", unsafe_allow_html=True)
     
     st.write("")
     st.markdown("**Quel est ce panneau ?**")
