@@ -67,8 +67,7 @@ PANNEAUX = [
     },
 ]
 
-def carte(*args, **kwargs):
-    # Supporte l'appel avec ou sans arguments venant d'app.py
+def carte(conteneur_func_ou_dict=None, entete_func=None):
     if "quiz_index" not in st.session_state:
         st.session_state["quiz_index"] = 0
         st.session_state["quiz_score"] = 0
