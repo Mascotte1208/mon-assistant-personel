@@ -3,8 +3,8 @@
 # ==========================================================
 import random
 import urllib.parse
+import uuid
 
-import requests
 import streamlit as st
 
 # Base réglementaire officielle complète (Séries A à F)
@@ -78,52 +78,54 @@ def image_url_for(code: str) -> str:
     return WIKIMEDIA_FILEPATH + urllib.parse.quote(filename)
 
 
-@st.cache_data(ttl=60 * 60 * 24, show_spinner=False)
-def image_disponible(url: str) -> bool:
-    """Vérifie (et met en cache) si l'image existe réellement sur Commons."""
-    try:
-        r = requests.head(url, timeout=3, allow_redirects=True)
-        return r.status_code == 200
-    except requests.RequestException:
-        return False
+def carte_texte_html(actuel, message="Référence officielle"):
+    """Carte de repli (texte + code) utilisée quand aucune image n'est trouvée."""
+    return f"""
+        <div style="text-align: center; padding: 40px 20px;
+                    background: var(--surface, #ffffff);
+                    border: 2px solid var(--accent, #1f6feb);
+                    border-radius: 18px;
+                    box-shadow: var(--ombre, 0 2px 10px rgba(0,0,0,0.08));
+                    margin: 10px auto;">
+            <div style="font-size: 12.5px; font-weight: 700; color: var(--gris, #6b7280);
+                        text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">
+                {message}
+            </div>
+            <div style="font-size: 46px; font-weight: 800; color: var(--accent-fonce, #0b3d91);
+                        letter-spacing: 1px; margin: 5px 0;">
+                {actuel['code']}
+            </div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--encre-2, #374151); margin-top: 8px;">
+                {actuel['cat']}
+            </div>
+        </div>
+        """
 
 
 def afficher_panneau(actuel, taille_px=180):
-    """Affiche l'image du panneau si disponible, sinon une carte de repli avec le code."""
+    """Affiche l'image du panneau (chargée par le NAVIGATEUR, pas par le serveur).
+    Si l'image ne charge pas (404, réseau, etc.), un onerror JS bascule sur la carte texte
+    — sans jamais dépendre d'une requête réseau depuis le serveur Streamlit."""
     url = image_url_for(actuel["code"])
-    if image_disponible(url):
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            st.image(url, width=taille_px)
-        st.markdown(
-            f"<div style='text-align:center; font-size:12px; color:var(--gris, #6b7280); "
-            f"letter-spacing:1px; text-transform:uppercase; margin-top:4px;'>{actuel['code']} — {actuel['cat']}</div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f"""
-            <div style="text-align: center; padding: 40px 20px;
-                        background: var(--surface, #ffffff);
-                        border: 2px solid var(--accent, #1f6feb);
-                        border-radius: 18px;
-                        box-shadow: var(--ombre, 0 2px 10px rgba(0,0,0,0.08));
-                        margin: 10px auto;">
-                <div style="font-size: 12.5px; font-weight: 700; color: var(--gris, #6b7280);
-                            text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">
-                    Référence officielle (image indisponible)
-                </div>
-                <div style="font-size: 46px; font-weight: 800; color: var(--accent-fonce, #0b3d91);
-                            letter-spacing: 1px; margin: 5px 0;">
-                    {actuel['code']}
-                </div>
-                <div style="font-size: 13px; font-weight: 600; color: var(--encre-2, #374151); margin-top: 8px;">
-                    {actuel['cat']}
-                </div>
+    uid = uuid.uuid4().hex[:8]
+    fallback_html = carte_texte_html(actuel, message="Référence officielle (image indisponible)").replace("'", "\\'").replace("\n", "")
+
+    st.markdown(
+        f"""
+        <div id="panneau-wrap-{uid}" style="text-align:center; margin: 10px auto;">
+            <img
+                src="{url}"
+                style="width:{taille_px}px; max-width:90%; display:block; margin:0 auto;"
+                onerror="document.getElementById('panneau-wrap-{uid}').innerHTML = '{fallback_html}';"
+            />
+            <div style="font-size:12px; color:var(--gris, #6b7280); letter-spacing:1px;
+                        text-transform:uppercase; margin-top:6px;">
+                {actuel['code']} — {actuel['cat']}
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def carte(*args, **kwargs):
@@ -236,12 +238,17 @@ def carte(*args, **kwargs):
             for p in sous_groupe:
                 with st.expander(f"[{p['code']}] — {p['nom']}"):
                     url = image_url_for(p["code"])
+                    uid = uuid.uuid4().hex[:8]
                     col_img, col_txt = st.columns([1, 3])
                     with col_img:
-                        if image_disponible(url):
-                            st.image(url, width=90)
-                        else:
-                            st.caption("Image indisponible")
+                        st.markdown(
+                            f"""
+                            <img id="thumb-{uid}" src="{url}" style="width:90px;"
+                                 onerror="this.replaceWith(Object.assign(document.createElement('div'),
+                                    {{innerText:'Image indisponible', style:'font-size:11px;color:var(--gris,#6b7280);'}}));" />
+                            """,
+                            unsafe_allow_html=True,
+                        )
                     with col_txt:
                         st.markdown(f"**Signification réglementaire :** {p['desc']}")
                         st.markdown(f"<span class='tag'>{p['cat']}</span>", unsafe_allow_html=True)
