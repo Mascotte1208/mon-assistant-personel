@@ -67,7 +67,8 @@ PANNEAUX = [
     },
 ]
 
-def carte(conteneur, entete_bloc):
+def carte(*args, **kwargs):
+    # Supporte l'appel avec ou sans arguments venant d'app.py
     if "quiz_index" not in st.session_state:
         st.session_state["quiz_index"] = 0
         st.session_state["quiz_score"] = 0
@@ -77,8 +78,8 @@ def carte(conteneur, entete_bloc):
     panneaux_liste = st.session_state["quiz_panneaux"]
     idx = st.session_state["quiz_index"]
 
-    with conteneur("carte-code-route"):
-        entete_bloc("🚦 Quiz Panneaux", f"{idx + 1} / {len(panneaux_liste)}")
+    with st.container(border=True):
+        st.markdown(f"<div class='bloc-head'><span>🚦 Quiz Panneaux</span><span class='n'>{idx + 1} / {len(panneaux_liste)}</span></div>", unsafe_allow_html=True)
 
         if idx >= len(panneaux_liste):
             score = st.session_state["quiz_score"]
